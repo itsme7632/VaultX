@@ -23,6 +23,7 @@ export const transactionsTable = pgTable("transactions", {
   txHash: text("tx_hash"),
   address: text("address"),
   note: text("note"),
+  txId: text("tx_id").unique(),
   metadata: text("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

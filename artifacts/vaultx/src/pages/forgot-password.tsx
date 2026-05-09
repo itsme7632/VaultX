@@ -1,29 +1,18 @@
-import { useState } from "react";
 import { Link } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
-import { useForgotPassword } from "@workspace/api-client-react";
+import { ArrowLeft, MessageCircle, Phone, HeadphonesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-
-const schema = z.object({ email: z.string().email("Invalid email address") });
-type FormData = z.infer<typeof schema>;
+import { useQuery } from "@tanstack/react-query";
+import { settingsApi } from "@workspace/api-client-react";
 
 export default function ForgotPasswordPage() {
-  const [sent, setSent] = useState(false);
-  const forgotPassword = useForgotPassword();
-
-  const form = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { email: "" },
+  const { data: settings } = useQuery({
+    queryKey: ["settings-public"],
+    queryFn: () => settingsApi.getPublicSettings(),
+    staleTime: 60000,
   });
 
-  const onSubmit = (data: FormData) => {
-    forgotPassword.mutate({ data }, { onSuccess: () => setSent(true) });
-  };
+  const telegram = settings?.supportTelegram || "https://t.me/vaultxsupport";
+  const whatsapp = settings?.supportWhatsapp || "https://wa.me/vaultxsupport";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-white flex flex-col items-center justify-center px-5">
@@ -32,50 +21,38 @@ export default function ForgotPasswordPage() {
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
             <span className="text-white font-bold text-2xl">V</span>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Reset password</h1>
-          <p className="text-muted-foreground mt-1 text-sm">We'll send you a reset link</p>
+          <h1 className="text-2xl font-bold text-foreground">Forgot password?</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Contact our support team to reset your password</p>
         </div>
 
-        {sent ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-border p-8 text-center">
-            <CheckCircle className="w-12 h-12 text-accent mx-auto mb-3" />
-            <h2 className="font-semibold text-foreground">Check your email</h2>
-            <p className="text-sm text-muted-foreground mt-2">
-              If an account exists for that email, a reset link has been sent.
+        <div className="bg-white rounded-2xl shadow-sm border border-border p-6 space-y-4">
+          <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+            <HeadphonesIcon className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+            <p className="text-sm text-foreground leading-relaxed">
+              For security reasons, password resets are handled by our support team. Please reach out via the channels below and we'll help you regain access to your account.
             </p>
-            <Link href="/login">
-              <Button variant="outline" className="mt-6 w-full">
-                Back to login
+          </div>
+
+          <div className="space-y-3 pt-1">
+            <a href={telegram.startsWith("http") ? telegram : `https://t.me/${telegram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="block">
+              <Button variant="outline" className="w-full h-12 gap-3 border-[1.5px] hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
+                <MessageCircle size={18} className="text-sky-500 shrink-0" />
+                <span className="font-semibold">Message us on Telegram</span>
               </Button>
-            </Link>
+            </a>
+
+            <a href={whatsapp.startsWith("http") ? whatsapp : `https://wa.me/${whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="block">
+              <Button variant="outline" className="w-full h-12 gap-3 border-[1.5px] hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
+                <Phone size={18} className="text-emerald-500 shrink-0" />
+                <span className="font-semibold">Contact us on WhatsApp</span>
+              </Button>
+            </a>
           </div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email address</FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                          <Input {...field} type="email" placeholder="you@example.com" className="pl-9 h-11 bg-muted/40" data-testid="input-email" />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full h-11 font-semibold" disabled={forgotPassword.isPending} data-testid="button-submit">
-                  {forgotPassword.isPending ? "Sending..." : "Send reset link"}
-                </Button>
-              </form>
-            </Form>
-          </div>
-        )}
+
+          <p className="text-[11px] text-muted-foreground text-center pt-1">
+            Please have your registered email address ready when contacting support.
+          </p>
+        </div>
 
         <Link href="/login" className="flex items-center justify-center gap-1 text-sm text-muted-foreground mt-5 hover:text-foreground">
           <ArrowLeft size={14} />

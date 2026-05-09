@@ -1,6 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
-import { runMigrations } from "@workspace/db";
+import { runMigrations, backfillTransactionIds } from "@workspace/db";
 import { runSeed } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
@@ -25,6 +25,10 @@ async function main() {
   logger.info("Running database seed…");
   await runSeed();
   logger.info("Seed complete ✓");
+
+  logger.info("Backfilling transaction IDs…");
+  await backfillTransactionIds();
+  logger.info("Transaction ID backfill complete ✓");
 
   app.listen(port, (err?: Error) => {
     if (err) {

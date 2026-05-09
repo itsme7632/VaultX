@@ -9,6 +9,7 @@ import {
   notificationsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { generateTxId } from "../lib/generate-tx-id";
 
 const router: IRouter = Router();
 
@@ -34,7 +35,6 @@ function computeInvestmentView(
   const projectedTotalMin = projectedDailyMin * totalDays;
   const projectedTotalMax = projectedDailyMax * totalDays;
 
-  // Compute next payout: 24h after last earning (or after start if never earned)
   const lastRef = inv.lastEarningAt ? new Date(inv.lastEarningAt) : start;
   const nextPayoutAt = new Date(lastRef.getTime() + 24 * 60 * 60 * 1000);
 
@@ -184,6 +184,7 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
     type: "investment",
     amount: amount.toString(),
     status: "completed",
+    txId: generateTxId(),
     note: `Invested ${amount} USDT in ${plan.name}`,
   });
 
@@ -250,6 +251,7 @@ router.post("/investments/:id/claim", requireAuth, async (req, res): Promise<voi
     type: "earning",
     amount: pending.toFixed(8),
     status: "completed",
+    txId: generateTxId(),
     note: `Earnings claimed from investment #${id}`,
   });
 
@@ -307,6 +309,7 @@ router.post("/investments/:id/reinvest", requireAuth, async (req, res): Promise<
     type: "reinvest",
     amount: pending.toFixed(8),
     status: "completed",
+    txId: generateTxId(),
     note: `Reinvested ${pending.toFixed(2)} USDT into ${result.planName ?? "investment"} #${id}`,
   });
 

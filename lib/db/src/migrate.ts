@@ -89,6 +89,7 @@ const TABLES_SQL = [
     "tx_hash" text,
     "address" text,
     "note" text,
+    "tx_id" text,
     "metadata" text,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -213,6 +214,15 @@ const TABLES_SQL = [
     "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT "platform_settings_key_unique" UNIQUE("key")
   )`,
+
+  `CREATE TABLE IF NOT EXISTS "admin_action_logs" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "admin_id" integer NOT NULL,
+    "target_user_id" integer NOT NULL,
+    "action" text NOT NULL,
+    "details" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
 ];
 
 const FOREIGN_KEYS_SQL = [
@@ -285,6 +295,21 @@ const FOREIGN_KEYS_SQL = [
     ALTER TABLE "support_messages" ADD CONSTRAINT "support_messages_user_id_users_id_fk"
       FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
   EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+
+  `DO $$ BEGIN
+    ALTER TABLE "admin_action_logs" ADD CONSTRAINT "admin_action_logs_admin_id_users_id_fk"
+      FOREIGN KEY ("admin_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+
+  `DO $$ BEGIN
+    ALTER TABLE "admin_action_logs" ADD CONSTRAINT "admin_action_logs_target_user_id_users_id_fk"
+      FOREIGN KEY ("target_user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+];
+
+const COLUMN_MIGRATIONS_SQL = [
+  `ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "tx_id" text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "transactions_tx_id_unique" ON "transactions"("tx_id") WHERE "tx_id" IS NOT NULL`,
 ];
 
 export async function runMigrations(): Promise<void> {
@@ -301,7 +326,46 @@ export async function runMigrations(): Promise<void> {
     for (const sql of FOREIGN_KEYS_SQL) {
       await pool.query(sql);
     }
+    for (const sql of COLUMN_MIGRATIONS_SQL) {
+      await pool.query(sql);
+    }
     console.log("[migrate] All tables created / verified ✓");
+  } finally {
+    await pool.end();
+  }
+}
+
+export async function backfillTransactionIds(): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    const { rows } = await pool.query(
+      `SELECT id FROM transactions WHERE tx_id IS NULL ORDER BY id`
+    );
+
+    if (rows.length === 0) return;
+
+    const prefixes = ["TX", "VX"];
+    for (const row of rows) {
+      let updated = false;
+      while (!updated) {
+        const prefix = prefixes[Math.floor(Math.random() * 2)];
+        const digits = Math.floor(100000 + Math.random() * 900000).toString();
+        const txId = `${prefix}-${digits}`;
+        try {
+          await pool.query(
+            `UPDATE transactions SET tx_id = $1 WHERE id = $2 AND tx_id IS NULL`,
+            [txId, row.id]
+          );
+          updated = true;
+        } catch (e: any) {
+          if (e.code !== "23505") throw e;
+        }
+      }
+    }
+
+    console.log(`[backfill] Generated txIds for ${rows.length} transactions ✓`);
   } finally {
     await pool.end();
   }

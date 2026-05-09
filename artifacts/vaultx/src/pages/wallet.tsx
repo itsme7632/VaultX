@@ -123,6 +123,8 @@ export default function WalletPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground capitalize truncate">{tx.note || tx.type}</p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {tx.txId ? <span className="font-mono text-primary/70">{tx.txId}</span> : null}
+                      {tx.txId && (tx.network || tx.createdAt) ? " · " : ""}
                       {formatDateTime(tx.createdAt)}{tx.network ? ` · ${tx.network}` : ""}
                     </p>
                   </div>

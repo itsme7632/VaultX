@@ -10,6 +10,7 @@ import {
   usersTable,
 } from "@workspace/db";
 import { logger } from "./logger";
+import { generateTxId } from "./generate-tx-id";
 
 function randomRoi(minRate: number, maxRate: number): number {
   return minRate + Math.random() * (maxRate - minRate);
@@ -87,6 +88,7 @@ export async function processAllInvestments(): Promise<void> {
         type: "reinvest",
         amount: earning.toFixed(8),
         status: "completed",
+        txId: generateTxId(),
         note: `Auto-reinvested ROI ${(dailyRate * 100).toFixed(2)}% from ${plan.name}`,
       });
     } else {
@@ -150,6 +152,7 @@ async function processReferralCommission(userId: number, earning: number, planNa
     type: "referral",
     amount: commission.toFixed(8),
     status: "completed",
+    txId: generateTxId(),
     note: `Referral commission (5%) from ${planName} earnings`,
   });
 

@@ -118,7 +118,8 @@ export default function TransactionPage() {
             </div>
 
             {[
-              { label: "Transaction ID", val: `#${tx.id}`, copyKey: "id", mono: true },
+              ...(tx.txId ? [{ label: "VaultX TxID", val: tx.txId, copyKey: "txid", mono: true }] : []),
+              { label: "Internal ID", val: `#${tx.id}`, mono: true },
               { label: "Type", val: tx.type.replace("_", " "), capitalize: true },
               { label: "Amount", val: formatUSDT(tx.amount) },
               ...(tx.fee > 0 ? [{ label: "Fee", val: formatUSDT(tx.fee) }] : []),

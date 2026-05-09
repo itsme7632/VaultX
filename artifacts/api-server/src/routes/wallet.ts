@@ -10,6 +10,7 @@ import {
   notificationsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { generateTxId } from "../lib/generate-tx-id";
 
 const router: IRouter = Router();
 
@@ -65,7 +66,7 @@ router.get("/wallet/transactions", requireAuth, async (req, res): Promise<void> 
         id: tx.id, type: tx.type, amount: parseFloat(tx.amount),
         fee: parseFloat((tx.fee as string) ?? "0"), status: tx.status,
         network: tx.network, address: tx.address, txHash: tx.txHash,
-        note: tx.note, metadata, createdAt: tx.createdAt,
+        txId: tx.txId, note: tx.note, metadata, createdAt: tx.createdAt,
       };
     }),
   });
@@ -90,7 +91,7 @@ router.get("/wallet/transactions/:id", requireAuth, async (req, res): Promise<vo
     id: tx.id, type: tx.type, amount: parseFloat(tx.amount),
     fee: parseFloat((tx.fee as string) ?? "0"), status: tx.status,
     network: tx.network, address: tx.address, txHash: tx.txHash,
-    note: tx.note, metadata, createdAt: tx.createdAt, updatedAt: tx.updatedAt,
+    txId: tx.txId, note: tx.note, metadata, createdAt: tx.createdAt, updatedAt: tx.updatedAt,
   });
 });
 
@@ -119,6 +120,7 @@ router.post("/wallet/deposit", requireAuth, async (req, res): Promise<void> => {
     status: "pending",
     network,
     txHash: txHash || null,
+    txId: generateTxId(),
     note: `Deposit via ${network}`,
     metadata,
   } as any).returning();
@@ -137,6 +139,7 @@ router.post("/wallet/deposit", requireAuth, async (req, res): Promise<void> => {
     status: tx.status,
     network: tx.network,
     txHash: tx.txHash,
+    txId: tx.txId,
     createdAt: tx.createdAt,
   });
 });
@@ -182,6 +185,7 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
     status: "pending",
     network,
     address,
+    txId: generateTxId(),
     note: `Withdrawal via ${network} (fee: ${fee.toFixed(2)} USDT)`,
   }).returning();
 
@@ -200,6 +204,7 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
     status: tx.status,
     network: tx.network,
     address: tx.address,
+    txId: tx.txId,
     createdAt: tx.createdAt,
   });
 });
@@ -293,11 +298,14 @@ router.post("/wallet/transfer", requireAuth, async (req, res): Promise<void> => 
     await db.update(walletsTable).set({ balance: (parseFloat(recipientWallet.balance) + amount).toFixed(8) }).where(eq(walletsTable.userId, recipient.id));
   }
 
+  const senderTxId = generateTxId();
+
   const [tx] = await db.insert(transactionsTable).values({
     userId: req.session.userId!,
     type: "transfer",
     amount: amount.toString(),
     status: "completed",
+    txId: senderTxId,
     note: note || `Transfer to @${recipient.username}`,
   }).returning();
 
@@ -306,6 +314,7 @@ router.post("/wallet/transfer", requireAuth, async (req, res): Promise<void> => 
     type: "transfer",
     amount: amount.toString(),
     status: "completed",
+    txId: generateTxId(),
     note: `Received from @${senderUser?.username ?? "user"}`,
   });
 
@@ -321,6 +330,7 @@ router.post("/wallet/transfer", requireAuth, async (req, res): Promise<void> => 
     type: tx.type,
     amount: parseFloat(tx.amount),
     status: tx.status,
+    txId: tx.txId,
     note: tx.note,
     recipient: { username: recipient.username, displayId: recipient.displayId, fullName: recipient.fullName },
     createdAt: tx.createdAt,

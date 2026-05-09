@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import bcrypt from "bcryptjs";
 import { eq, ilike, desc, count, sum, or, and, gte, sql } from "drizzle-orm";
 import {
   db,
@@ -11,8 +12,10 @@ import {
   investmentPlansTable,
   referralsTable,
   platformSettingsTable,
+  adminActionLogsTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
+import { generateTxId } from "../lib/generate-tx-id";
 
 const router: IRouter = Router();
 
@@ -178,6 +181,7 @@ router.post("/admin/users/:id/adjust-balance", requireAdmin, async (req, res): P
     type: "admin_adjustment",
     amount: Math.abs(adj).toFixed(8),
     status: "completed",
+    txId: generateTxId(),
     note: `Admin adjustment: ${reason}`,
   });
 
@@ -204,6 +208,74 @@ router.post("/admin/users/:id/reset-2fa", requireAdmin, async (req, res): Promis
   });
 
   res.json({ success: true });
+});
+
+router.post("/admin/users/:id/reset-password", requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  const { password } = req.body ?? {};
+
+  if (!password || password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, id));
+
+  await db.insert(adminActionLogsTable).values({
+    adminId: req.session.userId!,
+    targetUserId: id,
+    action: "password_reset",
+    details: `Password reset for @${user.username} (${user.email})`,
+  });
+
+  await db.insert(notificationsTable).values({
+    userId: id,
+    type: "security",
+    title: "Password Reset",
+    message: "Your password has been reset by an administrator. If you did not request this, please contact support immediately.",
+  });
+
+  res.json({ success: true });
+});
+
+router.get("/admin/password-reset-logs", requireAdmin, async (req, res): Promise<void> => {
+  const logs = await db
+    .select()
+    .from(adminActionLogsTable)
+    .where(eq(adminActionLogsTable.action, "password_reset"))
+    .orderBy(desc(adminActionLogsTable.createdAt))
+    .limit(200);
+
+  if (logs.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const userIds = [...new Set([...logs.map((l) => l.adminId), ...logs.map((l) => l.targetUserId)])];
+  const users = await db
+    .select({ id: usersTable.id, username: usersTable.username })
+    .from(usersTable)
+    .where(or(...userIds.map((uid) => eq(usersTable.id, uid))));
+
+  const userMap = Object.fromEntries(users.map((u) => [u.id, u.username]));
+
+  res.json(
+    logs.map((l) => ({
+      id: l.id,
+      adminUsername: userMap[l.adminId] ?? `#${l.adminId}`,
+      targetUsername: userMap[l.targetUserId] ?? `#${l.targetUserId}`,
+      details: l.details,
+      createdAt: l.createdAt,
+    }))
+  );
 });
 
 router.post("/admin/users/:id/notify", requireAdmin, async (req, res): Promise<void> => {
@@ -294,10 +366,11 @@ router.post("/admin/kyc/:id/reject", requireAdmin, async (req, res): Promise<voi
 });
 
 router.get("/admin/withdrawals", requireAdmin, async (req, res): Promise<void> => {
-  const { status } = req.query as { status?: string };
+  const { status, txId: txIdSearch } = req.query as { status?: string; txId?: string };
   const where = and(
     eq(transactionsTable.type, "withdrawal"),
-    status ? eq(transactionsTable.status, status) : undefined
+    status ? eq(transactionsTable.status, status) : undefined,
+    txIdSearch ? ilike(transactionsTable.txId, `%${txIdSearch}%`) : undefined
   );
 
   const withdrawals = await db
@@ -318,6 +391,7 @@ router.get("/admin/withdrawals", requireAdmin, async (req, res): Promise<void> =
     network: w.tx.network,
     address: w.tx.address,
     txHash: w.tx.txHash,
+    txId: w.tx.txId,
     status: w.tx.status,
     note: w.tx.note,
     createdAt: w.tx.createdAt,
@@ -384,7 +458,7 @@ router.post("/admin/withdrawals/:id/reject", requireAdmin, async (req, res): Pro
 
 // ─── DEPOSITS ─────────────────────────────────────────────────────────────
 router.get("/admin/deposits", requireAdmin, async (req, res): Promise<void> => {
-  const { status = "pending" } = req.query as { status?: string };
+  const { status = "pending", txId: txIdSearch } = req.query as { status?: string; txId?: string };
 
   const deposits = await db
     .select({ tx: transactionsTable, username: usersTable.username, displayId: usersTable.displayId, fullName: usersTable.fullName })
@@ -392,7 +466,8 @@ router.get("/admin/deposits", requireAdmin, async (req, res): Promise<void> => {
     .leftJoin(usersTable, eq(transactionsTable.userId, usersTable.id))
     .where(and(
       eq(transactionsTable.type, "deposit"),
-      status !== "all" ? eq(transactionsTable.status, status) : undefined
+      status !== "all" ? eq(transactionsTable.status, status) : undefined,
+      txIdSearch ? ilike(transactionsTable.txId, `%${txIdSearch}%`) : undefined
     ))
     .orderBy(desc(transactionsTable.createdAt))
     .limit(100);
@@ -410,6 +485,7 @@ router.get("/admin/deposits", requireAdmin, async (req, res): Promise<void> => {
       network: d.tx.network,
       address: d.tx.address,
       txHash: d.tx.txHash,
+      txId: d.tx.txId,
       proofImageUrl: metadata?.proofImageUrl ?? null,
       status: d.tx.status,
       note: d.tx.note,

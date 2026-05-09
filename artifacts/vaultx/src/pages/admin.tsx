@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound } from "lucide-react";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
   useAdminGetUsers, getAdminGetUsersQueryKey,
@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -56,6 +56,8 @@ export default function AdminPage() {
   const [networkModal, setNetworkModal] = useState<any>(null);
   const [newsModal, setNewsModal] = useState<any>(null);
   const [proofModal, setProofModal] = useState<string | null>(null);
+  const [resetPwModal, setResetPwModal] = useState<{ userId: number; username: string } | null>(null);
+  const [resetNewPw, setResetNewPw] = useState("");
   const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", type: "announcement" as AdminBroadcastBodyType });
   const [wdTxHash, setWdTxHash] = useState("");
   const { data: analytics, isLoading: analyticsLoading } = useAdminGetAnalytics({ query: { queryKey: getAdminGetAnalyticsQueryKey(), staleTime: 30000 } });
@@ -68,6 +70,7 @@ export default function AdminPage() {
   const { data: newsData } = useQuery({ queryKey: ["admin-news"], queryFn: () => adminApi("/admin/news"), staleTime: 30000 });
   const { data: depData, isLoading: depLoading } = useQuery({ queryKey: ["admin-deposits", depFilter], queryFn: () => adminApi(`/admin/deposits?status=${depFilter}`), staleTime: 20000, enabled: tab === "deposits" });
   const { data: settingsData } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" });
+  const { data: resetLogs } = useQuery({ queryKey: ["admin-reset-logs"], queryFn: () => adminApi("/admin/password-reset-logs"), staleTime: 30000, enabled: tab === "logs" });
 
   const approveKyc = useAdminApproveKyc();
   const rejectKyc = useAdminRejectKyc();
@@ -127,6 +130,17 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const resetUserPw = useMutation({
+    mutationFn: ({ userId, password }: { userId: number; password: string }) =>
+      adminApi(`/admin/users/${userId}/reset-password`, "POST", { password }),
+    onSuccess: () => {
+      setResetPwModal(null);
+      setResetNewPw("");
+      toast({ title: "Password reset", description: "New password set successfully" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
+
   const notifyUser = useMutation({
     mutationFn: ({ userId, title, message }: any) => adminApi(`/admin/users/${userId}/notify`, "POST", { title, message }),
     onSuccess: () => toast({ title: "Notification sent" }),
@@ -166,6 +180,7 @@ export default function AdminPage() {
     { id: "news", label: "News", icon: Newspaper },
     { id: "broadcast", label: "Broadcast", icon: Bell },
     { id: "settings", label: "Settings", icon: Settings },
+    { id: "logs", label: "Logs", icon: FileText },
   ];
 
   const STAT_CARDS = analytics ? [
@@ -296,6 +311,7 @@ export default function AdminPage() {
                         {wd.fee > 0 && <p className="text-[10px] text-muted-foreground">Fee: {formatUSDT(wd.fee)}</p>}
                       </div>
                     </div>
+                    {wd.txId && <p className="text-[10px] font-mono text-primary/70 mb-1">{wd.txId}</p>}
                     <p className="text-xs text-muted-foreground font-medium mb-0.5">{wd.network}</p>
                     <p className="text-xs font-mono text-foreground break-all bg-muted/50 rounded-lg px-2 py-1 mb-2">{wd.address}</p>
                     {wd.status === "pending" && (
@@ -339,6 +355,7 @@ export default function AdminPage() {
                           <Badge variant="outline" className={cn("text-[9px] mt-1", dep.status === "completed" ? "bg-emerald-50 text-emerald-600" : dep.status === "failed" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{dep.status}</Badge>
                         </div>
                       </div>
+                      {dep.txId && <p className="text-[10px] font-mono text-primary/70 mb-1">{dep.txId}</p>}
                       {dep.network && <p className="text-xs text-muted-foreground mb-1">Network: <span className="font-medium text-foreground">{dep.network}</span></p>}
                       {dep.txHash && <p className="text-xs font-mono text-muted-foreground break-all bg-muted/50 rounded px-2 py-1 mb-2">TX: {dep.txHash}</p>}
                       {dep.proofImageUrl && (
@@ -478,6 +495,33 @@ export default function AdminPage() {
           {tab === "settings" && (
             <SettingsTab settingsData={settingsData} toast={toast} />
           )}
+
+          {/* LOGS */}
+          {tab === "logs" && (
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-foreground">Password Reset Logs</p>
+              {resetLogs?.length ? (
+                <div className="bg-white border border-border rounded-2xl divide-y divide-border shadow-sm overflow-hidden">
+                  {resetLogs.map((log: any) => (
+                    <div key={log.id} className="px-4 py-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">@{log.targetUsername}</p>
+                          <p className="text-[10px] text-muted-foreground">Reset by @{log.adminUsername}</p>
+                          {log.details && <p className="text-xs text-muted-foreground mt-0.5">{log.details}</p>}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground shrink-0">{formatDateTime(log.createdAt)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-sm text-muted-foreground bg-white border border-border rounded-2xl">
+                  No password reset logs yet
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -575,6 +619,7 @@ export default function AdminPage() {
               <div className="flex gap-2 flex-wrap">
                 <Button size="sm" variant="outline" className="text-xs h-8 flex-1" onClick={() => { setAdjustModal({ userId: userModal.id, username: userModal.username }); setUserModal(null); }}>Adjust Balance</Button>
                 <Button size="sm" variant="outline" className="text-xs h-8 flex-1" onClick={() => reset2fa.mutate(userModal.id)}>Reset 2FA</Button>
+                <Button size="sm" variant="outline" className="text-xs h-8 flex-1 gap-1 text-amber-600 border-amber-300 hover:bg-amber-50" onClick={() => { setResetPwModal({ userId: userModal.id, username: userModal.username }); setUserModal(null); }}><KeyRound size={11} />Reset Password</Button>
               </div>
 
               <div className="flex gap-2">
@@ -654,6 +699,36 @@ export default function AdminPage() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password modal */}
+      <Dialog open={!!resetPwModal} onOpenChange={(o) => { if (!o) { setResetPwModal(null); setResetNewPw(""); } }}>
+        <DialogContent className="max-w-sm mx-4">
+          <DialogHeader><DialogTitle>Reset Password — @{resetPwModal?.username}</DialogTitle></DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label className="text-sm">New Password</Label>
+              <Input
+                type="password"
+                value={resetNewPw}
+                onChange={(e) => setResetNewPw(e.target.value)}
+                placeholder="Min. 6 characters"
+                className="mt-1.5 h-10"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">The user will be notified via in-app notification. This action is logged.</p>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setResetPwModal(null); setResetNewPw(""); }}>Cancel</Button>
+              <Button
+                className="flex-1 bg-amber-500 hover:bg-amber-600"
+                onClick={() => resetUserPw.mutate({ userId: resetPwModal!.userId, password: resetNewPw })}
+                disabled={resetUserPw.isPending || resetNewPw.length < 6}
+              >
+                {resetUserPw.isPending ? "Resetting..." : "Set New Password"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
