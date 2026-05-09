@@ -17,6 +17,9 @@ declare module "express-session" {
 
 const app: Express = express();
 
+// Trust the Replit/reverse-proxy so secure cookies work in production
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,
