@@ -1,0 +1,225 @@
+CREATE TABLE "users" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"display_id" text,
+	"full_name" text NOT NULL,
+	"username" text NOT NULL,
+	"email" text NOT NULL,
+	"whatsapp" text,
+	"country" text,
+	"password_hash" text NOT NULL,
+	"avatar_url" text,
+	"referral_code" text NOT NULL,
+	"referred_by" integer,
+	"kyc_status" text DEFAULT 'none' NOT NULL,
+	"two_fa_enabled" boolean DEFAULT false NOT NULL,
+	"two_fa_secret" text,
+	"is_admin" boolean DEFAULT false NOT NULL,
+	"is_verified" boolean DEFAULT false NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"withdrawal_locked" boolean DEFAULT false NOT NULL,
+	"transfer_locked" boolean DEFAULT false NOT NULL,
+	"whatsapp_locked" boolean DEFAULT false NOT NULL,
+	"ip_address" text,
+	"last_login_ip" text,
+	"last_login_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "users_display_id_unique" UNIQUE("display_id"),
+	CONSTRAINT "users_username_unique" UNIQUE("username"),
+	CONSTRAINT "users_email_unique" UNIQUE("email"),
+	CONSTRAINT "users_referral_code_unique" UNIQUE("referral_code")
+);
+--> statement-breakpoint
+CREATE TABLE "session" (
+	"sid" text PRIMARY KEY NOT NULL,
+	"sess" text NOT NULL,
+	"expire" timestamp with time zone NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "investment_plans" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"description" text NOT NULL,
+	"min_amount" numeric(18, 8) NOT NULL,
+	"max_amount" numeric(18, 8) NOT NULL,
+	"daily_return_rate" numeric(10, 6) NOT NULL,
+	"min_roi_rate" numeric(10, 6) DEFAULT '0.025' NOT NULL,
+	"max_roi_rate" numeric(10, 6) DEFAULT '0.030' NOT NULL,
+	"duration_days" integer NOT NULL,
+	"risk_level" text DEFAULT 'medium' NOT NULL,
+	"features" text[] DEFAULT '{}' NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"is_featured" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "user_investments" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"plan_id" integer NOT NULL,
+	"amount" numeric(18, 8) NOT NULL,
+	"pending_earnings" numeric(18, 8) DEFAULT '0' NOT NULL,
+	"total_earned" numeric(18, 8) DEFAULT '0' NOT NULL,
+	"daily_return_rate" numeric(10, 6) NOT NULL,
+	"auto_compound" boolean DEFAULT false NOT NULL,
+	"status" text DEFAULT 'active' NOT NULL,
+	"start_date" timestamp with time zone DEFAULT now() NOT NULL,
+	"end_date" timestamp with time zone NOT NULL,
+	"last_earning_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "wallet_addresses" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"network" text NOT NULL,
+	"address" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "wallets" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"balance" numeric(18, 8) DEFAULT '0' NOT NULL,
+	"total_deposited" numeric(18, 8) DEFAULT '0' NOT NULL,
+	"total_withdrawn" numeric(18, 8) DEFAULT '0' NOT NULL,
+	"total_earnings" numeric(18, 8) DEFAULT '0' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "wallets_user_id_unique" UNIQUE("user_id")
+);
+--> statement-breakpoint
+CREATE TABLE "transactions" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"type" text NOT NULL,
+	"amount" numeric(18, 8) NOT NULL,
+	"fee" numeric(18, 8) DEFAULT '0' NOT NULL,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"network" text,
+	"tx_hash" text,
+	"address" text,
+	"note" text,
+	"metadata" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "referrals" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"referrer_id" integer NOT NULL,
+	"referred_id" integer NOT NULL,
+	"commission_amount" numeric(18, 8) DEFAULT '0' NOT NULL,
+	"status" text DEFAULT 'active' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "notifications" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer,
+	"type" text DEFAULT 'announcement' NOT NULL,
+	"title" text NOT NULL,
+	"message" text NOT NULL,
+	"is_read" boolean DEFAULT false NOT NULL,
+	"is_broadcast" boolean DEFAULT false NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "kyc_submissions" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"full_legal_name" text DEFAULT '' NOT NULL,
+	"document_type" text NOT NULL,
+	"document_number" text DEFAULT '' NOT NULL,
+	"country" text DEFAULT '' NOT NULL,
+	"front_image_url" text NOT NULL,
+	"back_image_url" text,
+	"selfie_url" text NOT NULL,
+	"status" text DEFAULT 'pending' NOT NULL,
+	"rejection_reason" text,
+	"submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"reviewed_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "password_reset_tokens" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"token" text NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"used_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "password_reset_tokens_token_unique" UNIQUE("token")
+);
+--> statement-breakpoint
+CREATE TABLE "news_posts" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"title" text NOT NULL,
+	"content" text NOT NULL,
+	"excerpt" text DEFAULT '' NOT NULL,
+	"category" text DEFAULT 'announcement' NOT NULL,
+	"image_url" text,
+	"is_featured" boolean DEFAULT false NOT NULL,
+	"is_published" boolean DEFAULT false NOT NULL,
+	"published_at" timestamp with time zone,
+	"created_by" integer,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "support_messages" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"ticket_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"is_admin" boolean DEFAULT false NOT NULL,
+	"message" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "support_tickets" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"user_id" integer NOT NULL,
+	"subject" text NOT NULL,
+	"status" text DEFAULT 'open' NOT NULL,
+	"priority" text DEFAULT 'normal' NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"closed_at" timestamp with time zone
+);
+--> statement-breakpoint
+CREATE TABLE "deposit_networks" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"network" text NOT NULL,
+	"label" text NOT NULL,
+	"wallet_address" text NOT NULL,
+	"min_deposit" numeric(18, 8) DEFAULT '10' NOT NULL,
+	"network_fee" numeric(18, 8) DEFAULT '1' NOT NULL,
+	"confirmation_time" text DEFAULT '10-30 minutes' NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "deposit_networks_network_unique" UNIQUE("network")
+);
+--> statement-breakpoint
+CREATE TABLE "platform_settings" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"key" text NOT NULL,
+	"value" text NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "platform_settings_key_unique" UNIQUE("key")
+);
+--> statement-breakpoint
+ALTER TABLE "user_investments" ADD CONSTRAINT "user_investments_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_investments" ADD CONSTRAINT "user_investments_plan_id_investment_plans_id_fk" FOREIGN KEY ("plan_id") REFERENCES "public"."investment_plans"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "wallet_addresses" ADD CONSTRAINT "wallet_addresses_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "wallets" ADD CONSTRAINT "wallets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "transactions" ADD CONSTRAINT "transactions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "referrals" ADD CONSTRAINT "referrals_referrer_id_users_id_fk" FOREIGN KEY ("referrer_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "referrals" ADD CONSTRAINT "referrals_referred_id_users_id_fk" FOREIGN KEY ("referred_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "kyc_submissions" ADD CONSTRAINT "kyc_submissions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "news_posts" ADD CONSTRAINT "news_posts_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "support_messages" ADD CONSTRAINT "support_messages_ticket_id_support_tickets_id_fk" FOREIGN KEY ("ticket_id") REFERENCES "public"."support_tickets"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "support_messages" ADD CONSTRAINT "support_messages_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "support_tickets" ADD CONSTRAINT "support_tickets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
