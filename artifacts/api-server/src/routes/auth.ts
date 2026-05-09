@@ -1,0 +1,248 @@
+import { Router, type IRouter } from "express";
+import bcrypt from "bcryptjs";
+import { eq, or } from "drizzle-orm";
+import { db, usersTable, passwordResetTokensTable } from "@workspace/db";
+import { ensureWallet } from "../lib/wallet";
+import { generateReferralCode } from "../lib/referral";
+import { requireAuth } from "../middlewares/auth";
+import { v4 as uuidv4 } from "uuid";
+
+const router: IRouter = Router();
+
+function serializeUser(user: typeof usersTable.$inferSelect) {
+  return {
+    id: user.id,
+    displayId: user.displayId,
+    fullName: user.fullName,
+    username: user.username,
+    email: user.email,
+    whatsapp: user.whatsapp,
+    country: user.country,
+    avatarUrl: user.avatarUrl,
+    referralCode: user.referralCode,
+    kycStatus: user.kycStatus,
+    twoFaEnabled: user.twoFaEnabled,
+    isAdmin: user.isAdmin,
+    isVerified: user.isVerified,
+    withdrawalLocked: user.withdrawalLocked,
+    transferLocked: user.transferLocked,
+    whatsappLocked: user.whatsappLocked,
+    createdAt: user.createdAt,
+  };
+}
+
+async function generateDisplayId(): Promise<string> {
+  for (let i = 0; i < 20; i++) {
+    const id = String(Math.floor(100000 + Math.random() * 900000));
+    const existing = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.displayId, id))
+      .limit(1);
+    if (!existing.length) return id;
+  }
+  return String(Date.now()).slice(-6);
+}
+
+router.post("/auth/signup", async (req, res): Promise<void> => {
+  const { fullName, username, email, whatsapp, country, password, confirmPassword, referralCode } = req.body;
+
+  if (!fullName || !username || !email || !password || !confirmPassword) {
+    res.status(400).json({ error: "Missing required fields", message: "Please fill in all required fields" });
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    res.status(400).json({ error: "Password mismatch", message: "Passwords do not match" });
+    return;
+  }
+
+  if (password.length < 8) {
+    res.status(400).json({ error: "Weak password", message: "Password must be at least 8 characters" });
+    return;
+  }
+
+  const existing = await db
+    .select()
+    .from(usersTable)
+    .where(or(eq(usersTable.email, email.toLowerCase()), eq(usersTable.username, username.toLowerCase())))
+    .limit(1);
+
+  if (existing.length > 0) {
+    const conflict = existing[0].email === email.toLowerCase() ? "email" : "username";
+    res.status(400).json({ error: "Conflict", message: `This ${conflict} is already taken` });
+    return;
+  }
+
+  let referredById: number | undefined;
+  if (referralCode) {
+    const referrer = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.referralCode, referralCode.toUpperCase()))
+      .limit(1);
+    if (referrer.length > 0) referredById = referrer[0].id;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const newReferralCode = generateReferralCode();
+  const displayId = await generateDisplayId();
+
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      displayId,
+      fullName,
+      username: username.toLowerCase(),
+      email: email.toLowerCase(),
+      whatsapp: whatsapp || null,
+      country: country || null,
+      passwordHash,
+      referralCode: newReferralCode,
+      referredBy: referredById || null,
+      ipAddress: req.ip ?? null,
+      whatsappLocked: !!(whatsapp),
+    })
+    .returning();
+
+  await ensureWallet(user.id);
+
+  req.session.userId = user.id;
+  req.session.isAdmin = user.isAdmin;
+
+  res.status(201).json({ user: serializeUser(user) });
+});
+
+router.post("/auth/login", async (req, res): Promise<void> => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    res.status(400).json({ error: "Missing fields", message: "Email and password are required" });
+    return;
+  }
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, email.toLowerCase()))
+    .limit(1);
+
+  if (!user) {
+    res.status(401).json({ error: "Invalid credentials", message: "No account found with this email" });
+    return;
+  }
+
+  if (!user.isActive) {
+    res.status(401).json({ error: "Account disabled", message: "Your account has been disabled" });
+    return;
+  }
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) {
+    res.status(401).json({ error: "Invalid credentials", message: "Incorrect password" });
+    return;
+  }
+
+  await db
+    .update(usersTable)
+    .set({ lastLoginAt: new Date(), lastLoginIp: req.ip ?? null })
+    .where(eq(usersTable.id, user.id));
+
+  req.session.userId = user.id;
+  req.session.isAdmin = user.isAdmin;
+
+  res.json({ user: serializeUser(user) });
+});
+
+router.post("/auth/logout", requireAuth, async (req, res): Promise<void> => {
+  req.session.destroy((err) => {
+    if (err) {
+      res.status(500).json({ success: false, message: "Failed to logout" });
+      return;
+    }
+    res.clearCookie("connect.sid");
+    res.json({ success: true, message: "Logged out" });
+  });
+});
+
+router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, req.session.userId!))
+    .limit(1);
+
+  if (!user) {
+    res.status(401).json({ error: "Not found", message: "User not found" });
+    return;
+  }
+
+  res.json(serializeUser(user));
+});
+
+router.post("/auth/forgot-password", async (req, res): Promise<void> => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: "Missing email", message: "Email is required" });
+    return;
+  }
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, email.toLowerCase()))
+    .limit(1);
+
+  if (user) {
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await db.insert(passwordResetTokensTable).values({
+      userId: user.id,
+      token,
+      expiresAt,
+    });
+    req.log.info({ token }, "Password reset token generated");
+  }
+
+  res.json({ success: true, message: "If that email exists, a reset link has been sent" });
+});
+
+router.post("/auth/reset-password", async (req, res): Promise<void> => {
+  const { token, password, confirmPassword } = req.body;
+
+  if (!token || !password || !confirmPassword) {
+    res.status(400).json({ error: "Missing fields", message: "All fields are required" });
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    res.status(400).json({ error: "Password mismatch", message: "Passwords do not match" });
+    return;
+  }
+
+  const [resetToken] = await db
+    .select()
+    .from(passwordResetTokensTable)
+    .where(eq(passwordResetTokensTable.token, token))
+    .limit(1);
+
+  if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+    res.status(400).json({ error: "Invalid token", message: "Reset link is invalid or expired" });
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  await db
+    .update(usersTable)
+    .set({ passwordHash })
+    .where(eq(usersTable.id, resetToken.userId));
+
+  await db
+    .update(passwordResetTokensTable)
+    .set({ usedAt: new Date() })
+    .where(eq(passwordResetTokensTable.id, resetToken.id));
+
+  res.json({ success: true, message: "Password reset successfully" });
+});
+
+export default router;

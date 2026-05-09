@@ -1,0 +1,36 @@
+import { Router, type IRouter } from "express";
+import healthRouter from "./health";
+import authRouter from "./auth";
+import usersRouter from "./users";
+import investmentsRouter from "./investments";
+import walletRouter from "./wallet";
+import transactionsRouter from "./transactions";
+import referralsRouter from "./referrals";
+import notificationsRouter from "./notifications";
+import kycRouter from "./kyc";
+import marketRouter from "./market";
+import dashboardRouter from "./dashboard";
+import adminRouter from "./admin";
+import newsRouter from "./news";
+import supportRouter from "./support";
+import depositNetworksRouter from "./deposit-networks";
+
+const router: IRouter = Router();
+
+router.use(healthRouter);
+router.use(authRouter);
+router.use(usersRouter);
+router.use(investmentsRouter);
+router.use(walletRouter);
+router.use(transactionsRouter);
+router.use(referralsRouter);
+router.use(notificationsRouter);
+router.use(kycRouter);
+router.use(marketRouter);
+router.use(dashboardRouter);
+router.use(adminRouter);
+router.use(newsRouter);
+router.use(supportRouter);
+router.use(depositNetworksRouter);
+
+export default router;

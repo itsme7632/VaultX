@@ -1,0 +1,330 @@
+import { Router, type IRouter } from "express";
+import { eq, or, ilike, desc, and } from "drizzle-orm";
+import {
+  db,
+  walletsTable,
+  transactionsTable,
+  usersTable,
+  platformSettingsTable,
+  depositNetworksTable,
+  notificationsTable,
+} from "@workspace/db";
+import { requireAuth } from "../middlewares/auth";
+
+const router: IRouter = Router();
+
+async function getSetting(key: string, fallback: string): Promise<string> {
+  const [s] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, key)).limit(1);
+  return s?.value ?? fallback;
+}
+
+router.get("/wallet", requireAuth, async (req, res): Promise<void> => {
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.session.userId!)).limit(1);
+
+  if (!wallet) {
+    res.status(404).json({ error: "Wallet not found" });
+    return;
+  }
+
+  const networks = await db.select().from(depositNetworksTable).where(eq(depositNetworksTable.isActive, true)).orderBy(depositNetworksTable.id);
+
+  res.json({
+    balance: parseFloat(wallet.balance),
+    totalDeposited: parseFloat(wallet.totalDeposited),
+    totalWithdrawn: parseFloat(wallet.totalWithdrawn),
+    totalEarnings: parseFloat(wallet.totalEarnings),
+    addresses: networks.map((n) => ({
+      network: n.network,
+      label: n.label,
+      address: n.walletAddress,
+      minDeposit: parseFloat(n.minDeposit),
+      networkFee: parseFloat(n.networkFee),
+      confirmationTime: n.confirmationTime,
+    })),
+  });
+});
+
+router.get("/wallet/transactions", requireAuth, async (req, res): Promise<void> => {
+  const { type, limit = "40", offset = "0" } = req.query as Record<string, string>;
+  const conditions: any[] = [eq(transactionsTable.userId, req.session.userId!)];
+  if (type) conditions.push(eq(transactionsTable.type, type));
+
+  const items = await db
+    .select()
+    .from(transactionsTable)
+    .where(conditions.length === 1 ? conditions[0] : and(...conditions))
+    .orderBy(desc(transactionsTable.createdAt))
+    .limit(Math.min(parseInt(limit, 10) || 40, 100))
+    .offset(parseInt(offset, 10) || 0);
+
+  res.json({
+    items: items.map((tx) => {
+      let metadata: any = null;
+      try { if (tx.metadata) metadata = JSON.parse(tx.metadata as string); } catch {}
+      return {
+        id: tx.id, type: tx.type, amount: parseFloat(tx.amount),
+        fee: parseFloat((tx.fee as string) ?? "0"), status: tx.status,
+        network: tx.network, address: tx.address, txHash: tx.txHash,
+        note: tx.note, metadata, createdAt: tx.createdAt,
+      };
+    }),
+  });
+});
+
+router.get("/wallet/transactions/:id", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id as string, 10);
+  if (!id || isNaN(id)) { res.status(400).json({ error: "Invalid ID" }); return; }
+
+  const [tx] = await db
+    .select()
+    .from(transactionsTable)
+    .where(and(eq(transactionsTable.id, id), eq(transactionsTable.userId, req.session.userId!)))
+    .limit(1);
+
+  if (!tx) { res.status(404).json({ error: "Transaction not found" }); return; }
+
+  let metadata: any = null;
+  try { if (tx.metadata) metadata = JSON.parse(tx.metadata as string); } catch {}
+
+  res.json({
+    id: tx.id, type: tx.type, amount: parseFloat(tx.amount),
+    fee: parseFloat((tx.fee as string) ?? "0"), status: tx.status,
+    network: tx.network, address: tx.address, txHash: tx.txHash,
+    note: tx.note, metadata, createdAt: tx.createdAt, updatedAt: tx.updatedAt,
+  });
+});
+
+router.post("/wallet/deposit", requireAuth, async (req, res): Promise<void> => {
+  const { amount, network, txHash, proofImageUrl } = req.body;
+
+  if (!amount || !network || amount <= 0) {
+    res.status(400).json({ error: "Invalid input", message: "Amount and network are required" });
+    return;
+  }
+
+  const [networkRecord] = await db.select().from(depositNetworksTable).where(eq(depositNetworksTable.network, network)).limit(1);
+  const minDeposit = networkRecord ? parseFloat(networkRecord.minDeposit) : 10;
+
+  if (amount < minDeposit) {
+    res.status(400).json({ error: "Below minimum", message: `Minimum deposit is ${minDeposit} USDT for ${network}` });
+    return;
+  }
+
+  const metadata = proofImageUrl ? JSON.stringify({ proofImageUrl }) : null;
+
+  const [tx] = await db.insert(transactionsTable).values({
+    userId: req.session.userId!,
+    type: "deposit",
+    amount: amount.toString(),
+    status: "pending",
+    network,
+    txHash: txHash || null,
+    note: `Deposit via ${network}`,
+    metadata,
+  } as any).returning();
+
+  await db.insert(notificationsTable).values({
+    userId: req.session.userId!,
+    type: "transaction",
+    title: "Deposit Submitted",
+    message: `Your deposit of ${amount} USDT via ${network} is pending confirmation.`,
+  });
+
+  res.status(201).json({
+    id: tx.id,
+    type: tx.type,
+    amount: parseFloat(tx.amount),
+    status: tx.status,
+    network: tx.network,
+    txHash: tx.txHash,
+    createdAt: tx.createdAt,
+  });
+});
+
+router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => {
+  const { amount, network, address } = req.body;
+
+  if (!amount || !network || !address || amount <= 0) {
+    res.status(400).json({ error: "Invalid input", message: "Amount, network, and address are required" });
+    return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+  if (user?.withdrawalLocked) {
+    res.status(403).json({ error: "Withdrawals locked", message: "Withdrawals are currently locked on your account. Please contact support." });
+    return;
+  }
+
+  const minWithdrawal = parseFloat(await getSetting("min_withdrawal", "10"));
+  if (amount < minWithdrawal) {
+    res.status(400).json({ error: "Below minimum", message: `Minimum withdrawal is ${minWithdrawal} USDT` });
+    return;
+  }
+
+  const feePercent = parseFloat(await getSetting("withdrawal_fee_percent", "1.5")) / 100;
+  const fee = amount * feePercent;
+  const netAmount = amount - fee;
+
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.session.userId!)).limit(1);
+
+  if (!wallet || parseFloat(wallet.balance) < amount) {
+    res.status(400).json({ error: "Insufficient balance", message: `Insufficient balance. You need ${amount} USDT (including ${fee.toFixed(2)} fee).` });
+    return;
+  }
+
+  await db.update(walletsTable).set({ balance: (parseFloat(wallet.balance) - amount).toFixed(8) }).where(eq(walletsTable.userId, req.session.userId!));
+
+  const [tx] = await db.insert(transactionsTable).values({
+    userId: req.session.userId!,
+    type: "withdrawal",
+    amount: netAmount.toFixed(8),
+    fee: fee.toFixed(8),
+    status: "pending",
+    network,
+    address,
+    note: `Withdrawal via ${network} (fee: ${fee.toFixed(2)} USDT)`,
+  }).returning();
+
+  await db.insert(notificationsTable).values({
+    userId: req.session.userId!,
+    type: "transaction",
+    title: "Withdrawal Requested",
+    message: `Your withdrawal of ${netAmount.toFixed(2)} USDT via ${network} is pending admin approval.`,
+  });
+
+  res.status(201).json({
+    id: tx.id,
+    type: tx.type,
+    amount: parseFloat(tx.amount),
+    fee,
+    status: tx.status,
+    network: tx.network,
+    address: tx.address,
+    createdAt: tx.createdAt,
+  });
+});
+
+router.get("/wallet/resolve-user", requireAuth, async (req, res): Promise<void> => {
+  const { query } = req.query as { query?: string };
+
+  if (!query) {
+    res.status(400).json({ error: "Missing query" });
+    return;
+  }
+
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(
+      or(
+        ilike(usersTable.username, query),
+        ilike(usersTable.displayId, query),
+        eq(usersTable.displayId, query)
+      )
+    )
+    .limit(1);
+
+  if (!user) {
+    res.status(404).json({ error: "User not found", message: "No user found with that username or ID" });
+    return;
+  }
+
+  if (user.id === req.session.userId) {
+    res.status(400).json({ error: "Cannot transfer to self", message: "You cannot transfer to yourself" });
+    return;
+  }
+
+  res.json({
+    id: user.id,
+    displayId: user.displayId,
+    username: user.username,
+    fullName: user.fullName,
+    avatarUrl: user.avatarUrl,
+  });
+});
+
+router.post("/wallet/transfer", requireAuth, async (req, res): Promise<void> => {
+  const { recipientQuery, amount, note } = req.body;
+
+  if (!recipientQuery || !amount || amount <= 0) {
+    res.status(400).json({ error: "Invalid input", message: "Recipient and amount are required" });
+    return;
+  }
+
+  const [senderUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+  if (senderUser?.transferLocked) {
+    res.status(403).json({ error: "Transfers locked", message: "Transfers are currently locked on your account." });
+    return;
+  }
+
+  const [recipient] = await db
+    .select()
+    .from(usersTable)
+    .where(
+      or(
+        ilike(usersTable.username, recipientQuery),
+        ilike(usersTable.displayId, recipientQuery),
+        eq(usersTable.displayId, recipientQuery)
+      )
+    )
+    .limit(1);
+
+  if (!recipient) {
+    res.status(404).json({ error: "Recipient not found", message: "No user found with that username or ID" });
+    return;
+  }
+
+  if (recipient.id === req.session.userId) {
+    res.status(400).json({ error: "Cannot transfer to self", message: "You cannot transfer to yourself" });
+    return;
+  }
+
+  const [senderWallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, req.session.userId!)).limit(1);
+
+  if (!senderWallet || parseFloat(senderWallet.balance) < amount) {
+    res.status(400).json({ error: "Insufficient balance", message: "Insufficient wallet balance" });
+    return;
+  }
+
+  await db.update(walletsTable).set({ balance: (parseFloat(senderWallet.balance) - amount).toFixed(8) }).where(eq(walletsTable.userId, req.session.userId!));
+
+  const [recipientWallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, recipient.id)).limit(1);
+  if (recipientWallet) {
+    await db.update(walletsTable).set({ balance: (parseFloat(recipientWallet.balance) + amount).toFixed(8) }).where(eq(walletsTable.userId, recipient.id));
+  }
+
+  const [tx] = await db.insert(transactionsTable).values({
+    userId: req.session.userId!,
+    type: "transfer",
+    amount: amount.toString(),
+    status: "completed",
+    note: note || `Transfer to @${recipient.username}`,
+  }).returning();
+
+  await db.insert(transactionsTable).values({
+    userId: recipient.id,
+    type: "transfer",
+    amount: amount.toString(),
+    status: "completed",
+    note: `Received from @${senderUser?.username ?? "user"}`,
+  });
+
+  await db.insert(notificationsTable).values({
+    userId: recipient.id,
+    type: "transaction",
+    title: "Transfer Received",
+    message: `You received ${amount} USDT from @${senderUser?.username ?? "user"}.`,
+  });
+
+  res.status(201).json({
+    id: tx.id,
+    type: tx.type,
+    amount: parseFloat(tx.amount),
+    status: tx.status,
+    note: tx.note,
+    recipient: { username: recipient.username, displayId: recipient.displayId, fullName: recipient.fullName },
+    createdAt: tx.createdAt,
+  });
+});
+
+export default router;

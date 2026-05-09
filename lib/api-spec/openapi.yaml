@@ -1,0 +1,1680 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: VaultX Crypto Investment Platform API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: twofa
+    description: Two-factor authentication
+  - name: investments
+    description: Investment plans and user investments
+  - name: wallet
+    description: Wallet operations
+  - name: transactions
+    description: Transaction history
+  - name: referrals
+    description: Referral system
+  - name: notifications
+    description: Notifications
+  - name: kyc
+    description: KYC verification
+  - name: market
+    description: Crypto market data
+  - name: dashboard
+    description: Dashboard summary
+  - name: admin
+    description: Admin operations
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupBody"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordBody"
+      responses:
+        "200":
+          description: Email sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Reset password with token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordBody"
+      responses:
+        "200":
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /users/profile:
+    get:
+      operationId: getUserProfile
+      tags: [users]
+      summary: Get user profile
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+    put:
+      operationId: updateUserProfile
+      tags: [users]
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileBody"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /users/change-password:
+    post:
+      operationId: changePassword
+      tags: [users]
+      summary: Change password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordBody"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /2fa/setup:
+    post:
+      operationId: setup2fa
+      tags: [twofa]
+      summary: Initialize 2FA setup, returns QR code and secret
+      responses:
+        "200":
+          description: 2FA setup info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TwoFASetup"
+
+  /2fa/verify:
+    post:
+      operationId: verify2fa
+      tags: [twofa]
+      summary: Verify and enable 2FA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwoFAVerifyBody"
+      responses:
+        "200":
+          description: 2FA enabled with backup codes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TwoFAEnabled"
+
+  /2fa/disable:
+    post:
+      operationId: disable2fa
+      tags: [twofa]
+      summary: Disable 2FA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TwoFAVerifyBody"
+      responses:
+        "200":
+          description: 2FA disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /investments/plans:
+    get:
+      operationId: getInvestmentPlans
+      tags: [investments]
+      summary: Get all investment plans
+      responses:
+        "200":
+          description: Investment plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InvestmentPlan"
+
+  /investments:
+    get:
+      operationId: getUserInvestments
+      tags: [investments]
+      summary: Get user's investments
+      responses:
+        "200":
+          description: User investments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserInvestment"
+    post:
+      operationId: createInvestment
+      tags: [investments]
+      summary: Create a new investment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInvestmentBody"
+      responses:
+        "201":
+          description: Investment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInvestment"
+
+  /investments/{id}/claim:
+    post:
+      operationId: claimEarnings
+      tags: [investments]
+      summary: Claim earnings from an investment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Earnings claimed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaimResponse"
+
+  /investments/{id}/compound:
+    post:
+      operationId: compoundEarnings
+      tags: [investments]
+      summary: Add earnings back to investment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Earnings compounded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInvestment"
+
+  /investments/{id}/toggle-compound:
+    post:
+      operationId: toggleAutoCompound
+      tags: [investments]
+      summary: Toggle auto-compound for an investment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Auto-compound toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserInvestment"
+
+  /wallet:
+    get:
+      operationId: getWallet
+      tags: [wallet]
+      summary: Get wallet info and balances
+      responses:
+        "200":
+          description: Wallet info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+
+  /wallet/deposit:
+    post:
+      operationId: createDeposit
+      tags: [wallet]
+      summary: Request a deposit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DepositBody"
+      responses:
+        "201":
+          description: Deposit initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /wallet/withdraw:
+    post:
+      operationId: createWithdrawal
+      tags: [wallet]
+      summary: Request a withdrawal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawBody"
+      responses:
+        "201":
+          description: Withdrawal requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /wallet/transfer:
+    post:
+      operationId: createTransfer
+      tags: [wallet]
+      summary: Internal transfer to another user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferBody"
+      responses:
+        "201":
+          description: Transfer completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /wallet/resolve-user:
+    get:
+      operationId: resolveTransferUser
+      tags: [wallet]
+      summary: Look up a user by username or user ID for transfer
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resolved user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResolvedUser"
+
+  /transactions:
+    get:
+      operationId: getTransactions
+      tags: [transactions]
+      summary: Get transaction history
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [deposit, withdrawal, transfer, earning, investment, referral]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, completed, failed, cancelled]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionList"
+
+  /referrals:
+    get:
+      operationId: getReferralStats
+      tags: [referrals]
+      summary: Get referral stats and code
+      responses:
+        "200":
+          description: Referral stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReferralStats"
+
+  /referrals/history:
+    get:
+      operationId: getReferralHistory
+      tags: [referrals]
+      summary: Get referral earnings history
+      responses:
+        "200":
+          description: Referral history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReferralEntry"
+
+  /referrals/leaderboard:
+    get:
+      operationId: getReferralLeaderboard
+      tags: [referrals]
+      summary: Get referral leaderboard
+      responses:
+        "200":
+          description: Leaderboard
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderboardEntry"
+
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: Get notifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationList"
+
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: All marked as read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /kyc/status:
+    get:
+      operationId: getKycStatus
+      tags: [kyc]
+      summary: Get KYC status
+      responses:
+        "200":
+          description: KYC status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KycStatus"
+
+  /kyc/submit:
+    post:
+      operationId: submitKyc
+      tags: [kyc]
+      summary: Submit KYC documents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KycSubmitBody"
+      responses:
+        "201":
+          description: KYC submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KycStatus"
+
+  /market/prices:
+    get:
+      operationId: getMarketPrices
+      tags: [market]
+      summary: Get crypto market prices
+      responses:
+        "200":
+          description: Market prices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CryptoPrice"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/earnings-chart:
+    get:
+      operationId: getEarningsChart
+      tags: [dashboard]
+      summary: Get earnings chart data (7 or 30 days)
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+      responses:
+        "200":
+          description: Earnings chart data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChartDataPoint"
+
+  /dashboard/activity:
+    get:
+      operationId: getDashboardActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      responses:
+        "200":
+          description: Activity feed
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /admin/users:
+    get:
+      operationId: adminGetUsers
+      tags: [admin]
+      summary: Admin — list all users
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserList"
+
+  /admin/users/{id}:
+    get:
+      operationId: adminGetUser
+      tags: [admin]
+      summary: Admin — get user detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+    put:
+      operationId: adminUpdateUser
+      tags: [admin]
+      summary: Admin — update user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUpdateUserBody"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+
+  /admin/users/{id}/adjust-balance:
+    post:
+      operationId: adminAdjustBalance
+      tags: [admin]
+      summary: Admin — adjust user balance
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAdjustBalanceBody"
+      responses:
+        "200":
+          description: Balance adjusted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/kyc:
+    get:
+      operationId: adminGetKycSubmissions
+      tags: [admin]
+      summary: Admin — list KYC submissions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        "200":
+          description: KYC submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminKycSubmission"
+
+  /admin/kyc/{id}/approve:
+    post:
+      operationId: adminApproveKyc
+      tags: [admin]
+      summary: Admin — approve KYC
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: KYC approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/kyc/{id}/reject:
+    post:
+      operationId: adminRejectKyc
+      tags: [admin]
+      summary: Admin — reject KYC
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRejectBody"
+      responses:
+        "200":
+          description: KYC rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/withdrawals:
+    get:
+      operationId: adminGetWithdrawals
+      tags: [admin]
+      summary: Admin — list withdrawal requests
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, completed, failed]
+      responses:
+        "200":
+          description: Withdrawal requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminWithdrawal"
+
+  /admin/withdrawals/{id}/approve:
+    post:
+      operationId: adminApproveWithdrawal
+      tags: [admin]
+      summary: Admin — approve withdrawal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Withdrawal approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/withdrawals/{id}/reject:
+    post:
+      operationId: adminRejectWithdrawal
+      tags: [admin]
+      summary: Admin — reject withdrawal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRejectBody"
+      responses:
+        "200":
+          description: Withdrawal rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/notifications/broadcast:
+    post:
+      operationId: adminBroadcastNotification
+      tags: [admin]
+      summary: Admin — broadcast notification to all users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminBroadcastBody"
+      responses:
+        "200":
+          description: Notification sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/analytics:
+    get:
+      operationId: adminGetAnalytics
+      tags: [admin]
+      summary: Admin — platform analytics
+      responses:
+        "200":
+          description: Analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAnalytics"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+      required: [success]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error]
+
+    SignupBody:
+      type: object
+      properties:
+        fullName:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        whatsapp:
+          type: string
+        password:
+          type: string
+        confirmPassword:
+          type: string
+        referralCode:
+          type: string
+      required: [fullName, username, email, password, confirmPassword]
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        twoFaCode:
+          type: string
+      required: [email, password]
+
+    ForgotPasswordBody:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+      required: [email]
+
+    ResetPasswordBody:
+      type: object
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+        confirmPassword:
+          type: string
+      required: [token, password, confirmPassword]
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/UserProfile"
+        token:
+          type: string
+      required: [user]
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        whatsapp:
+          type: string
+        country:
+          type: string
+        avatarUrl:
+          type: string
+        referralCode:
+          type: string
+        kycStatus:
+          type: string
+          enum: [none, pending, approved, rejected]
+        twoFaEnabled:
+          type: boolean
+        isAdmin:
+          type: boolean
+        isVerified:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, fullName, username, email, referralCode, kycStatus, twoFaEnabled, isAdmin, isVerified, createdAt]
+
+    UpdateProfileBody:
+      type: object
+      properties:
+        fullName:
+          type: string
+        whatsapp:
+          type: string
+        country:
+          type: string
+        avatarUrl:
+          type: string
+
+    ChangePasswordBody:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+        confirmPassword:
+          type: string
+      required: [currentPassword, newPassword, confirmPassword]
+
+    TwoFASetup:
+      type: object
+      properties:
+        secret:
+          type: string
+        qrCodeUrl:
+          type: string
+        otpAuthUrl:
+          type: string
+      required: [secret, qrCodeUrl, otpAuthUrl]
+
+    TwoFAVerifyBody:
+      type: object
+      properties:
+        code:
+          type: string
+      required: [code]
+
+    TwoFAEnabled:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        backupCodes:
+          type: array
+          items:
+            type: string
+      required: [enabled, backupCodes]
+
+    InvestmentPlan:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        minAmount:
+          type: number
+        maxAmount:
+          type: number
+        dailyReturnRate:
+          type: number
+        durationDays:
+          type: integer
+        riskLevel:
+          type: string
+          enum: [low, medium, high]
+        features:
+          type: array
+          items:
+            type: string
+        isActive:
+          type: boolean
+      required: [id, name, description, minAmount, maxAmount, dailyReturnRate, durationDays, riskLevel, features, isActive]
+
+    UserInvestment:
+      type: object
+      properties:
+        id:
+          type: integer
+        planId:
+          type: integer
+        planName:
+          type: string
+        amount:
+          type: number
+        pendingEarnings:
+          type: number
+        totalEarned:
+          type: number
+        dailyReturnRate:
+          type: number
+        autoCompound:
+          type: boolean
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, completed, cancelled]
+        daysRemaining:
+          type: integer
+        progressPercent:
+          type: number
+      required: [id, planId, planName, amount, pendingEarnings, totalEarned, dailyReturnRate, autoCompound, startDate, endDate, status, daysRemaining, progressPercent]
+
+    CreateInvestmentBody:
+      type: object
+      properties:
+        planId:
+          type: integer
+        amount:
+          type: number
+      required: [planId, amount]
+
+    ClaimResponse:
+      type: object
+      properties:
+        amountClaimed:
+          type: number
+        newBalance:
+          type: number
+      required: [amountClaimed, newBalance]
+
+    Wallet:
+      type: object
+      properties:
+        balance:
+          type: number
+        totalDeposited:
+          type: number
+        totalWithdrawn:
+          type: number
+        totalEarnings:
+          type: number
+        addresses:
+          type: array
+          items:
+            $ref: "#/components/schemas/WalletAddress"
+      required: [balance, totalDeposited, totalWithdrawn, totalEarnings, addresses]
+
+    WalletAddress:
+      type: object
+      properties:
+        network:
+          type: string
+        address:
+          type: string
+        qrCode:
+          type: string
+      required: [network, address]
+
+    DepositBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        network:
+          type: string
+        txHash:
+          type: string
+      required: [amount, network]
+
+    WithdrawBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        network:
+          type: string
+        address:
+          type: string
+      required: [amount, network, address]
+
+    TransferBody:
+      type: object
+      properties:
+        recipientQuery:
+          type: string
+        amount:
+          type: number
+        note:
+          type: string
+      required: [recipientQuery, amount]
+
+    ResolvedUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        avatarUrl:
+          type: string
+      required: [id, username, fullName]
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [deposit, withdrawal, transfer, earning, investment, referral]
+        amount:
+          type: number
+        status:
+          type: string
+          enum: [pending, completed, failed, cancelled]
+        network:
+          type: string
+        txHash:
+          type: string
+        address:
+          type: string
+        note:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, amount, status, createdAt]
+
+    TransactionList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+        total:
+          type: integer
+      required: [items, total]
+
+    ReferralStats:
+      type: object
+      properties:
+        code:
+          type: string
+        totalReferrals:
+          type: integer
+        activeReferrals:
+          type: integer
+        totalEarned:
+          type: number
+        pendingEarnings:
+          type: number
+        commissionRate:
+          type: number
+      required: [code, totalReferrals, activeReferrals, totalEarned, pendingEarnings, commissionRate]
+
+    ReferralEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        referredUsername:
+          type: string
+        amount:
+          type: number
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, referredUsername, amount, status, createdAt]
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        username:
+          type: string
+        totalReferrals:
+          type: integer
+        totalEarned:
+          type: number
+      required: [rank, username, totalReferrals, totalEarned]
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [earning, security, transaction, announcement, referral]
+        title:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, title, message, isRead, createdAt]
+
+    NotificationList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        unreadCount:
+          type: integer
+      required: [items, unreadCount]
+
+    KycStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [none, pending, approved, rejected]
+        rejectionReason:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+        documentType:
+          type: string
+        frontImageUrl:
+          type: string
+        backImageUrl:
+          type: string
+        selfieUrl:
+          type: string
+      required: [status]
+
+    KycSubmitBody:
+      type: object
+      properties:
+        documentType:
+          type: string
+          enum: [passport, drivers_license, national_id]
+        frontImageUrl:
+          type: string
+        backImageUrl:
+          type: string
+        selfieUrl:
+          type: string
+      required: [documentType, frontImageUrl, selfieUrl]
+
+    CryptoPrice:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        price:
+          type: number
+        change24h:
+          type: number
+        changePercent24h:
+          type: number
+        marketCap:
+          type: number
+        volume24h:
+          type: number
+        iconUrl:
+          type: string
+      required: [symbol, name, price, change24h, changePercent24h]
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalBalance:
+          type: number
+        activeInvestmentsCount:
+          type: integer
+        activeInvestmentsValue:
+          type: number
+        dailyEarnings:
+          type: number
+        totalEarnings:
+          type: number
+        pendingEarnings:
+          type: number
+        referralEarnings:
+          type: number
+      required: [totalBalance, activeInvestmentsCount, activeInvestmentsValue, dailyEarnings, totalEarnings, pendingEarnings, referralEarnings]
+
+    ChartDataPoint:
+      type: object
+      properties:
+        date:
+          type: string
+        earnings:
+          type: number
+        balance:
+          type: number
+      required: [date, earnings, balance]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, description, createdAt]
+
+    AdminUserList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserSummary"
+        total:
+          type: integer
+      required: [items, total]
+
+    AdminUserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        balance:
+          type: number
+        kycStatus:
+          type: string
+        isAdmin:
+          type: boolean
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+      required: [id, fullName, username, email, balance, kycStatus, isAdmin, isActive, createdAt]
+
+    AdminUserDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        fullName:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        whatsapp:
+          type: string
+        country:
+          type: string
+        balance:
+          type: number
+        totalDeposited:
+          type: number
+        totalWithdrawn:
+          type: number
+        totalEarnings:
+          type: number
+        referralCount:
+          type: integer
+        referralEarnings:
+          type: number
+        kycStatus:
+          type: string
+        isAdmin:
+          type: boolean
+        isActive:
+          type: boolean
+        twoFaEnabled:
+          type: boolean
+        ipAddress:
+          type: string
+        lastLoginAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, fullName, username, email, balance, kycStatus, isAdmin, isActive, createdAt]
+
+    AdminUpdateUserBody:
+      type: object
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+        isAdmin:
+          type: boolean
+        isActive:
+          type: boolean
+
+    AdminAdjustBalanceBody:
+      type: object
+      properties:
+        amount:
+          type: number
+        reason:
+          type: string
+      required: [amount, reason]
+
+    AdminKycSubmission:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        documentType:
+          type: string
+        frontImageUrl:
+          type: string
+        backImageUrl:
+          type: string
+        selfieUrl:
+          type: string
+        status:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+      required: [id, userId, username, fullName, documentType, status, submittedAt]
+
+    AdminWithdrawal:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        username:
+          type: string
+        amount:
+          type: number
+        network:
+          type: string
+        address:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, userId, username, amount, network, address, status, createdAt]
+
+    AdminRejectBody:
+      type: object
+      properties:
+        reason:
+          type: string
+      required: [reason]
+
+    AdminBroadcastBody:
+      type: object
+      properties:
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [announcement, security, earning, transaction, referral]
+      required: [title, message, type]
+
+    AdminAnalytics:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        activeUsers:
+          type: integer
+        totalDeposits:
+          type: number
+        totalWithdrawals:
+          type: number
+        totalInvestments:
+          type: number
+        totalEarningsPaid:
+          type: number
+        pendingWithdrawals:
+          type: integer
+        pendingKyc:
+          type: integer
+        newUsersToday:
+          type: integer
+        revenueToday:
+          type: number
+      required: [totalUsers, activeUsers, totalDeposits, totalWithdrawals, totalInvestments, totalEarningsPaid, pendingWithdrawals, pendingKyc, newUsersToday, revenueToday]
