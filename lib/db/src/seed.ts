@@ -307,28 +307,92 @@ If you notice any suspicious activity, contact our support team immediately at s
   console.log("[seed] News posts seeded ✓");
 }
 
-async function seedAdminUser(db: ReturnType<typeof drizzle<typeof schema>>) {
-  const existing = await db
-    .select({ c: count() })
-    .from(usersTable)
-    .where(eq(usersTable.email, "admin@vaultx.io"));
+/**
+ * ALWAYS runs on every startup.
+ * Guarantees admin@vaultx.com exists with the correct password and isAdmin=true.
+ * Safe to run on fresh DBs, existing DBs, or after credential changes.
+ */
+async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>) {
+  const ADMIN_EMAIL = "admin@vaultx.com";
+  const ADMIN_PASSWORD = "Admin123@";
 
-  if ((existing[0]?.c ?? 0) > 0) {
-    console.log("[seed] Admin user already exists, skipping");
-    return null;
+  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+
+  // Check if the canonical admin account already exists
+  const [existing] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, ADMIN_EMAIL))
+    .limit(1);
+
+  if (existing) {
+    // Always refresh the password and role so they can never drift
+    await db
+      .update(usersTable)
+      .set({
+        passwordHash,
+        isAdmin: true,
+        isActive: true,
+        isVerified: true,
+        kycStatus: "approved",
+      })
+      .where(eq(usersTable.email, ADMIN_EMAIL));
+
+    // Ensure wallet row exists
+    await db
+      .insert(walletsTable)
+      .values({ userId: existing.id })
+      .onConflictDoNothing();
+
+    console.log("[seed] Admin account verified/updated ✓ (admin@vaultx.com / Admin123@)");
+    return;
   }
 
-  const passwordHash = await bcrypt.hash("Admin@12345", 12);
+  // Account doesn't exist yet — pick a username that isn't already taken
+  const candidateUsernames = ["admin", "vaultxadmin", "superadmin", "admin_vx"];
+  let chosenUsername = "admin_vx";
+  for (const candidate of candidateUsernames) {
+    const [taken] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.username, candidate))
+      .limit(1);
+    if (!taken) {
+      chosenUsername = candidate;
+      break;
+    }
+  }
+
+  // Pick a displayId that isn't taken
+  let displayId = "000100";
+  for (let n = 100; n < 200; n++) {
+    const candidate = String(n).padStart(6, "0");
+    const [taken] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.displayId, candidate))
+      .limit(1);
+    if (!taken) { displayId = candidate; break; }
+  }
+
+  // Pick a referral code that isn't taken
+  let referralCode = "VXADMIN01";
+  const [refTaken] = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.referralCode, referralCode))
+    .limit(1);
+  if (refTaken) referralCode = "VXADMIN" + Date.now().toString().slice(-4);
 
   const [admin] = await db
     .insert(usersTable)
     .values({
-      displayId: "000001",
+      displayId,
       fullName: "VaultX Admin",
-      username: "admin",
-      email: "admin@vaultx.io",
+      username: chosenUsername,
+      email: ADMIN_EMAIL,
       passwordHash,
-      referralCode: "ADMIN001",
+      referralCode,
       kycStatus: "approved",
       isAdmin: true,
       isVerified: true,
@@ -337,18 +401,12 @@ async function seedAdminUser(db: ReturnType<typeof drizzle<typeof schema>>) {
     })
     .returning();
 
-  await db.insert(walletsTable).values({ userId: admin.id });
+  await db
+    .insert(walletsTable)
+    .values({ userId: admin.id })
+    .onConflictDoNothing();
 
-  await db.insert(walletAddressesTable).values([
-    { userId: admin.id, network: "TRC20", address: "TN3W4H6rK2ce4vX9YnFQHwKx7X8rHBdFW" },
-    { userId: admin.id, network: "ERC20", address: "0x742d35Cc6634C0532925a3b8D4C9F7f4b62Ee8E" },
-    { userId: admin.id, network: "BTC", address: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh" },
-    { userId: admin.id, network: "ETH", address: "0x742d35Cc6634C0532925a3b8D4C9F7f4b62Ee8E" },
-    { userId: admin.id, network: "BSC", address: "0x742d35Cc6634C0532925a3b8D4C9F7f4b62Ee8E" },
-  ]);
-
-  console.log("[seed] Admin user seeded ✓ (admin@vaultx.io / Admin@12345)");
-  return admin.id;
+  console.log(`[seed] Admin account created ✓  email: ${ADMIN_EMAIL}  username: ${chosenUsername}  password: ${ADMIN_PASSWORD}`);
 }
 
 async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
@@ -560,7 +618,7 @@ export async function runSeed(): Promise<void> {
     await seedDepositNetworks(db);
     await seedPlatformSettings(db);
     await seedNews(db);
-    await seedAdminUser(db);
+    await ensureAdminAccount(db);
     await seedDemoUser(db);
     console.log("[seed] Database seeding complete ✓");
   } finally {
