@@ -6,7 +6,7 @@ import {
   useAdminGetKycSubmissions, getAdminGetKycSubmissionsQueryKey,
   useAdminGetWithdrawals, getAdminGetWithdrawalsQueryKey,
   useAdminApproveKyc, useAdminRejectKyc,
-  useAdminApproveWithdrawal, useAdminRejectWithdrawal,
+  useAdminRejectWithdrawal,
   useAdminAdjustBalance,
   useAdminBroadcastNotification,
   type AdminGetKycSubmissionsStatus, type AdminGetWithdrawalsStatus,
@@ -71,7 +71,17 @@ export default function AdminPage() {
 
   const approveKyc = useAdminApproveKyc();
   const rejectKyc = useAdminRejectKyc();
-  const approveWd = useAdminApproveWithdrawal();
+  const approveWd = useMutation({
+    mutationFn: ({ id, txHash }: { id: number; txHash: string }) =>
+      adminApi(`/admin/withdrawals/${id}/approve`, "POST", { txHash: txHash || null }),
+    onSuccess: () => {
+      setWdTxHash("");
+      queryClient.invalidateQueries({ queryKey: getAdminGetWithdrawalsQueryKey({ status: wdFilter }) });
+      queryClient.invalidateQueries({ queryKey: getAdminGetAnalyticsQueryKey() });
+      toast({ title: "Withdrawal approved", description: "Transaction processed successfully" });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
   const rejectWd = useAdminRejectWithdrawal();
   const adjustBalance = useAdminAdjustBalance();
   const broadcast = useAdminBroadcastNotification();
@@ -129,7 +139,7 @@ export default function AdminPage() {
   });
 
   const handleApproveKyc = (id: number) => approveKyc.mutate({ id }, { onSuccess: () => queryClient.invalidateQueries({ queryKey: getAdminGetKycSubmissionsQueryKey({ status: kycFilter }) }), onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }) });
-  const handleApproveWd = (id: number) => approveWd.mutate({ id }, { onSuccess: () => { setWdTxHash(""); queryClient.invalidateQueries({ queryKey: getAdminGetWithdrawalsQueryKey({ status: wdFilter }) }); }, onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }) });
+  const handleApproveWd = (id: number) => approveWd.mutate({ id, txHash: wdTxHash });
   const handleReject = () => {
     if (!rejectModal) return;
     if (rejectModal.type === "kyc") {
@@ -692,7 +702,9 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (settingsData) {
+    if (settingsData && typeof settingsData === "object" && !Array.isArray(settingsData)) {
+      setForm(settingsData as Record<string, string>);
+    } else if (Array.isArray(settingsData)) {
       const obj: Record<string, string> = {};
       for (const s of settingsData) obj[s.key] = s.value;
       setForm(obj);
@@ -700,15 +712,15 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
   }, [settingsData]);
 
   const FIELDS = [
-    { key: "site_name", label: "Platform Name", placeholder: "VaultX" },
+    { key: "platform_name", label: "Platform Name", placeholder: "VaultX" },
     { key: "support_email", label: "Support Email", placeholder: "support@vaultx.com" },
-    { key: "telegram_link", label: "Telegram Link", placeholder: "https://t.me/vaultx" },
-    { key: "whatsapp_number", label: "WhatsApp Support Number", placeholder: "+1234567890" },
+    { key: "support_telegram", label: "Telegram Link", placeholder: "https://t.me/vaultx" },
+    { key: "support_whatsapp", label: "WhatsApp Support Number", placeholder: "+1234567890" },
     { key: "min_deposit", label: "Min. Deposit (USDT)", placeholder: "10" },
     { key: "min_withdrawal", label: "Min. Withdrawal (USDT)", placeholder: "10" },
     { key: "withdrawal_fee_percent", label: "Withdrawal Fee (%)", placeholder: "1.5" },
-    { key: "referral_bonus_percent", label: "Referral Bonus (%)", placeholder: "5" },
-    { key: "kyc_required", label: "KYC Required for Withdrawal", placeholder: "true" },
+    { key: "referral_commission_rate", label: "Referral Bonus (%)", placeholder: "5" },
+    { key: "kyc_required_for_withdrawal", label: "KYC Required for Withdrawal", placeholder: "true" },
     { key: "maintenance_mode", label: "Maintenance Mode", placeholder: "false" },
     { key: "announcement_text", label: "Announcement Banner Text", placeholder: "" },
   ];
@@ -716,13 +728,11 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
   const handleSave = async () => {
     setSaving(true);
     try {
-      for (const [key, value] of Object.entries(form)) {
-        await fetch("/api/admin/settings", {
-          method: "PUT", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key, value }),
-        });
-      }
+      await fetch("/api/admin/settings", {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
       queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
       toast({ title: "Settings saved!" });
     } catch (e: any) {

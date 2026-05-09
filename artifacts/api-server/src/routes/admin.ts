@@ -327,7 +327,7 @@ router.get("/admin/withdrawals", requireAdmin, async (req, res): Promise<void> =
 router.post("/admin/withdrawals/:id/approve", requireAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  const { txHash } = req.body;
+  const { txHash } = req.body ?? {};
 
   const [tx] = await db.select().from(transactionsTable).where(eq(transactionsTable.id, id)).limit(1);
   if (!tx) {

@@ -44,4 +44,41 @@ router.get("/transactions", requireAuth, async (req, res): Promise<void> => {
   });
 });
 
+router.get("/wallet/transactions/:id", requireAuth, async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid transaction ID" });
+    return;
+  }
+
+  const [tx] = await db
+    .select()
+    .from(transactionsTable)
+    .where(and(eq(transactionsTable.id, id), eq(transactionsTable.userId, req.session.userId!)))
+    .limit(1);
+
+  if (!tx) {
+    res.status(404).json({ error: "Transaction not found" });
+    return;
+  }
+
+  let metadata: Record<string, string> | null = null;
+  try { if (tx.metadata) metadata = JSON.parse(tx.metadata); } catch {}
+
+  res.json({
+    id: tx.id,
+    type: tx.type,
+    amount: parseFloat(tx.amount),
+    fee: parseFloat(tx.fee ?? "0"),
+    status: tx.status,
+    network: tx.network,
+    txHash: tx.txHash,
+    address: tx.address,
+    note: tx.note,
+    metadata,
+    createdAt: tx.createdAt,
+    updatedAt: tx.updatedAt,
+  });
+});
+
 export default router;
