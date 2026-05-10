@@ -16,6 +16,7 @@ import {
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
+import { processAllInvestments } from "../lib/roi-engine";
 
 const router: IRouter = Router();
 
@@ -703,6 +704,21 @@ router.delete("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> 
   const id = parseInt(raw, 10);
   await db.update(investmentPlansTable).set({ isActive: false }).where(eq(investmentPlansTable.id, id));
   res.json({ success: true });
+});
+
+router.post("/admin/roi/trigger", requireAdmin, async (req, res): Promise<void> => {
+  const { force = true } = req.body as { force?: boolean };
+  try {
+    const result = await processAllInvestments(force);
+    res.json({
+      success: true,
+      processed: result.processed,
+      matured: result.matured,
+      skipped: result.skipped,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "ROI processing failed", message: err?.message ?? String(err) });
+  }
 });
 
 router.get("/admin/settings", requireAdmin, async (req, res): Promise<void> => {

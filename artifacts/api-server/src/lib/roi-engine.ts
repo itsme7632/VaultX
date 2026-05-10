@@ -16,7 +16,7 @@ function randomRoi(minRate: number, maxRate: number): number {
   return minRate + Math.random() * (maxRate - minRate);
 }
 
-export async function processAllInvestments(): Promise<void> {
+export async function processAllInvestments(force = false): Promise<{ processed: number; matured: number; skipped: number }> {
   const now = new Date();
 
   const activeInvestments = await db
@@ -30,6 +30,7 @@ export async function processAllInvestments(): Promise<void> {
 
   let processed = 0;
   let matured = 0;
+  let skipped = 0;
 
   for (const { inv, plan } of activeInvestments) {
     if (!plan) continue;
@@ -38,7 +39,7 @@ export async function processAllInvestments(): Promise<void> {
     const msSinceLast = now.getTime() - lastEarning.getTime();
     const hoursSinceLast = msSinceLast / (1000 * 60 * 60);
 
-    if (hoursSinceLast < 23.5) continue;
+    if (!force && hoursSinceLast < 23.5) { skipped++; continue; }
 
     const endDate = new Date(inv.endDate);
     if (now > endDate) {
@@ -115,7 +116,8 @@ export async function processAllInvestments(): Promise<void> {
     processed++;
   }
 
-  logger.info({ processed, matured }, "ROI cron: cycle complete");
+  logger.info({ processed, matured, skipped }, "ROI cron: cycle complete");
+  return { processed, matured, skipped };
 }
 
 async function processReferralCommission(userId: number, earning: number, planName: string): Promise<void> {

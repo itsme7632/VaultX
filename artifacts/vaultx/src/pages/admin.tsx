@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle } from "lucide-react";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
   useAdminGetUsers, getAdminGetUsersQueryKey,
@@ -59,6 +59,8 @@ export default function AdminPage() {
   const [resetPwModal, setResetPwModal] = useState<{ userId: number; username: string } | null>(null);
   const [resetNewPw, setResetNewPw] = useState("");
   const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", type: "announcement" as AdminBroadcastBodyType });
+  const [roiRunning, setRoiRunning] = useState(false);
+  const [roiResult, setRoiResult] = useState<{ processed: number; matured: number; skipped: number } | null>(null);
   const [wdTxHash, setWdTxHash] = useState("");
   const { data: analytics, isLoading: analyticsLoading } = useAdminGetAnalytics({ query: { queryKey: getAdminGetAnalyticsQueryKey(), staleTime: 30000 } });
   const { data: usersData } = useAdminGetUsers({ search: search || undefined, limit: 20 }, { query: { queryKey: getAdminGetUsersQueryKey({ search: search || undefined, limit: 20 }), staleTime: 20000 } });
@@ -221,6 +223,85 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+
+              {/* ROI Payout Trigger */}
+              <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <Zap size={15} className="text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Manual ROI Payout</p>
+                    <p className="text-[11px] text-muted-foreground">Force-credit daily earnings on all active investments now</p>
+                  </div>
+                </div>
+
+                {roiResult && (
+                  <div className={cn("rounded-xl px-3.5 py-2.5 flex items-start gap-2.5 text-xs", roiResult.processed > 0 ? "bg-emerald-50 border border-emerald-100" : "bg-slate-50 border border-slate-100")}>
+                    {roiResult.processed > 0 ? <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" /> : <AlertCircle size={14} className="text-muted-foreground shrink-0 mt-0.5" />}
+                    <div className="space-y-0.5">
+                      <p className={cn("font-semibold", roiResult.processed > 0 ? "text-emerald-700" : "text-foreground")}>
+                        {roiResult.processed > 0 ? `${roiResult.processed} investment${roiResult.processed !== 1 ? "s" : ""} credited` : "No investments credited"}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {roiResult.matured > 0 && `${roiResult.matured} matured · `}
+                        {roiResult.skipped > 0 ? `${roiResult.skipped} already paid today` : "all processed"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-10 text-xs font-semibold gap-1.5"
+                    disabled={roiRunning}
+                    onClick={async () => {
+                      setRoiRunning(true);
+                      setRoiResult(null);
+                      try {
+                        const r = await adminApi("/admin/roi/trigger", "POST", { force: false });
+                        setRoiResult(r);
+                        queryClient.invalidateQueries({ queryKey: getAdminGetAnalyticsQueryKey() });
+                      } catch (e: any) {
+                        toast({ title: "Error", description: e.message, variant: "destructive" });
+                      } finally {
+                        setRoiRunning(false);
+                      }
+                    }}
+                  >
+                    <RefreshCcw size={13} className={roiRunning ? "animate-spin" : ""} />
+                    Normal Run
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-10 text-xs font-semibold gap-1.5 bg-amber-500 hover:bg-amber-600 text-white"
+                    disabled={roiRunning}
+                    onClick={async () => {
+                      setRoiRunning(true);
+                      setRoiResult(null);
+                      try {
+                        const r = await adminApi("/admin/roi/trigger", "POST", { force: true });
+                        setRoiResult(r);
+                        queryClient.invalidateQueries({ queryKey: getAdminGetAnalyticsQueryKey() });
+                        toast({ title: "ROI Triggered", description: `${r.processed} investment${r.processed !== 1 ? "s" : ""} credited`, });
+                      } catch (e: any) {
+                        toast({ title: "Error", description: e.message, variant: "destructive" });
+                      } finally {
+                        setRoiRunning(false);
+                      }
+                    }}
+                  >
+                    <Zap size={13} className={roiRunning ? "animate-pulse" : ""} />
+                    Force Payout
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  <span className="font-medium">Normal Run</span> — only credits investments that haven't been paid in 24 h.{" "}
+                  <span className="font-medium">Force Payout</span> — credits all active investments immediately regardless of last payout time.
+                </p>
+              </div>
             </div>
           )}
 
