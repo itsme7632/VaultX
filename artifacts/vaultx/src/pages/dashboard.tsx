@@ -166,20 +166,39 @@ export default function DashboardPage() {
               <h3 className="font-semibold text-sm text-foreground">7-Day Earnings</h3>
               <span className="text-xs text-muted-foreground">Last 7 days</span>
             </div>
-            <ResponsiveContainer width="100%" height={100}>
-              <AreaChart data={chartData?.length ? chartData : Array.from({ length: 7 }, (_, i) => ({ date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10), earnings: 0 }))}>
-                <defs>
-                  <linearGradient id="earningsGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(217,91%,60%)" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="hsl(217,91%,60%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(215,20%,55%)" }} tickLine={false} axisLine={false} tickFormatter={(v) => v.slice(5)} />
-                <YAxis hide />
-                <Tooltip formatter={(value: number) => [formatUSDT(value), "Earnings"]} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(214,32%,88%)" }} />
-                <Area type="monotone" dataKey="earnings" stroke="hsl(217,91%,60%)" strokeWidth={2} fill="url(#earningsGrad)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {(() => {
+              const points = chartData?.length ? chartData : Array.from({ length: 7 }, (_, i) => ({ date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10), earnings: 0 }));
+              const hasEarnings = points.some((d: any) => d.earnings > 0);
+              return hasEarnings ? (
+                <ResponsiveContainer width="100%" height={100}>
+                  <AreaChart data={points}>
+                    <defs>
+                      <linearGradient id="earningsGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(217,91%,60%)" stopOpacity={0.2} />
+                        <stop offset="95%" stopColor="hsl(217,91%,60%)" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(215,20%,55%)" }} tickLine={false} axisLine={false} tickFormatter={(v: string) => v.slice(5)} />
+                    <YAxis hide domain={[0, (dataMax: number) => dataMax * 1.3]} />
+                    <Tooltip formatter={(value: number) => [formatUSDT(value), "Earnings"]} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(214,32%,88%)" }} />
+                    <Area type="monotone" dataKey="earnings" stroke="hsl(217,91%,60%)" strokeWidth={2} fill="url(#earningsGrad)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[100px] flex flex-col items-center justify-center gap-1">
+                  <TrendingUp size={20} className="text-muted-foreground/40" />
+                  <p className="text-xs text-muted-foreground">Earnings will appear after your first payout</p>
+                  <div className="flex gap-1 mt-1">
+                    {points.map((d: any) => (
+                      <div key={d.date} className="flex flex-col items-center gap-1">
+                        <div className="w-1.5 h-10 bg-muted rounded-full" />
+                        <span className="text-[9px] text-muted-foreground">{d.date.slice(5)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 

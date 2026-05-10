@@ -12,7 +12,27 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+
+function LiveEarnings({ base, amount, dailyRate }: { base: number; amount: number; dailyRate: number }) {
+  const [earnings, setEarnings] = useState(base);
+  const lastTick = useRef(Date.now());
+
+  useEffect(() => { setEarnings(base); lastTick.current = Date.now(); }, [base]);
+
+  useEffect(() => {
+    if (dailyRate <= 0 || amount <= 0) return;
+    const perMs = (amount * dailyRate) / 24 / 3600 / 1000;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setEarnings((prev) => prev + (now - lastTick.current) * perMs);
+      lastTick.current = Date.now();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [amount, dailyRate]);
+
+  return <span className="tabular-nums">{formatUSDT(earnings)}</span>;
+}
 
 const RISK_COLORS: Record<string, string> = {
   low: "bg-emerald-50 text-emerald-600 border-emerald-200",
@@ -162,8 +182,12 @@ export default function InvestmentsPage() {
                       <p className="font-bold text-foreground text-sm">{formatUSDT(inv.amount)}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Pending Profit</p>
-                      <p className="font-bold text-emerald-600 text-sm">{formatUSDT(inv.pendingEarnings)}</p>
+                      <p className="text-xs text-muted-foreground">Live Earnings</p>
+                      <p className="font-bold text-emerald-600 text-sm">
+                        {inv.status === "active"
+                          ? <LiveEarnings base={inv.pendingEarnings} amount={inv.amount} dailyRate={inv.dailyReturnRate} />
+                          : formatUSDT(inv.pendingEarnings)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Daily ROI</p>
@@ -183,7 +207,7 @@ export default function InvestmentsPage() {
                       <span>{inv.progressPercent.toFixed(0)}% complete</span>
                       <span>Day {Math.max(0, inv.daysTotal - inv.daysRemaining)} of {inv.daysTotal}</span>
                     </div>
-                    <Progress value={inv.progressPercent} className="h-1.5" />
+                    <Progress value={Math.max(inv.status === "active" ? 0.5 : 0, inv.progressPercent)} className="h-1.5" />
                   </div>
                 </div>
               ))
