@@ -1,4 +1,4 @@
-import { eq, and, lte } from "drizzle-orm";
+import { eq, and, lte, count } from "drizzle-orm";
 import {
   db,
   userInvestmentsTable,
@@ -120,6 +120,13 @@ export async function processAllInvestments(force = false): Promise<{ processed:
   return { processed, matured, skipped };
 }
 
+function getTierCommissionRate(totalReferrals: number): number {
+  if (totalReferrals >= 20) return 0.12;
+  if (totalReferrals >= 10) return 0.10;
+  if (totalReferrals >= 5)  return 0.07;
+  return 0.05;
+}
+
 async function processReferralCommission(userId: number, earning: number, planName: string): Promise<void> {
   const [user] = await db
     .select({ referredBy: usersTable.referredBy })
@@ -129,7 +136,13 @@ async function processReferralCommission(userId: number, earning: number, planNa
 
   if (!user?.referredBy) return;
 
-  const commissionRate = 0.05;
+  const [countRow] = await db
+    .select({ total: count(referralsTable.id) })
+    .from(referralsTable)
+    .where(eq(referralsTable.referrerId, user.referredBy));
+  const totalReferrals = countRow?.total ?? 0;
+
+  const commissionRate = getTierCommissionRate(totalReferrals);
   const commission = earning * commissionRate;
   if (commission < 0.0001) return;
 
@@ -155,7 +168,7 @@ async function processReferralCommission(userId: number, earning: number, planNa
     amount: commission.toFixed(8),
     status: "completed",
     txId: generateTxId(),
-    note: `Referral commission (5%) from ${planName} earnings`,
+    note: `Referral commission (${(commissionRate * 100).toFixed(0)}%) from ${planName} earnings`,
   });
 
   await db

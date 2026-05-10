@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, gte } from "drizzle-orm";
+import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
 import {
   db,
   walletsTable,
@@ -84,9 +84,10 @@ router.get("/dashboard/earnings-chart", requireAuth, async (req, res): Promise<v
       .where(
         and(
           eq(transactionsTable.userId, req.session.userId!),
-          eq(transactionsTable.type, "earning"),
+          inArray(transactionsTable.type, ["earning", "reinvest", "referral"]),
           eq(transactionsTable.status, "completed"),
-          gte(transactionsTable.createdAt, dayStart)
+          gte(transactionsTable.createdAt, dayStart),
+          lte(transactionsTable.createdAt, dayEnd)
         )
       );
 
@@ -94,8 +95,8 @@ router.get("/dashboard/earnings-chart", requireAuth, async (req, res): Promise<v
 
     result.push({
       date: dateStr,
-      earnings: parseFloat(earnings.toFixed(2)),
-      balance: parseFloat(earnings.toFixed(2)),
+      earnings: parseFloat(earnings.toFixed(4)),
+      label: date.toLocaleDateString("en-US", { weekday: "short" }),
     });
   }
 

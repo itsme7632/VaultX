@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Check, Share2, Users, DollarSign, Trophy } from "lucide-react";
+import { Copy, Check, Share2, Users, DollarSign, Trophy, ChevronRight, Star } from "lucide-react";
 import {
   useGetReferralStats, getGetReferralStatsQueryKey,
   useGetReferralHistory, getGetReferralHistoryQueryKey,
@@ -109,6 +109,91 @@ export default function ReferralsPage() {
             </div>
           ))}
         </div>
+
+        {/* Commission Tier Card */}
+        {(() => {
+          const total = stats?.totalReferrals ?? 0;
+          const tierLabel = (stats as any)?.tierLabel ?? "Bronze";
+          const nextTierAt = (stats as any)?.nextTierAt ?? null;
+          const rate = stats?.commissionRate ?? 0.05;
+
+          const tierConfig: Record<string, { color: string; bg: string; bar: string; icon: string }> = {
+            Bronze:  { color: "text-amber-700",  bg: "bg-amber-50  border-amber-200",  bar: "bg-amber-500",  icon: "🥉" },
+            Silver:  { color: "text-slate-600",  bg: "bg-slate-50  border-slate-200",  bar: "bg-slate-400",  icon: "🥈" },
+            Gold:    { color: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200", bar: "bg-yellow-500", icon: "🥇" },
+            Diamond: { color: "text-cyan-600",   bg: "bg-cyan-50   border-cyan-200",   bar: "bg-cyan-500",   icon: "💎" },
+          };
+          const cfg = tierConfig[tierLabel] ?? tierConfig.Bronze;
+
+          const tiers = [
+            { label: "Bronze",  min: 0,  rate: 0.05 },
+            { label: "Silver",  min: 5,  rate: 0.07 },
+            { label: "Gold",    min: 10, rate: 0.10 },
+            { label: "Diamond", min: 20, rate: 0.12 },
+          ];
+
+          const progressPct = nextTierAt
+            ? Math.min(100, (total / nextTierAt) * 100)
+            : 100;
+
+          return (
+            <div className={cn("border rounded-2xl p-4 shadow-sm space-y-3", cfg.bg)}>
+              {/* Current tier */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{cfg.icon}</span>
+                  <div>
+                    <p className={cn("font-bold text-base leading-tight", cfg.color)}>{tierLabel} Tier</p>
+                    <p className="text-xs text-muted-foreground">{(rate * 100).toFixed(0)}% commission per referral earning</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-muted-foreground">Current rate</p>
+                  <p className={cn("font-bold text-xl", cfg.color)}>{(rate * 100).toFixed(0)}%</p>
+                </div>
+              </div>
+
+              {/* Progress to next tier */}
+              {nextTierAt !== null && (
+                <div>
+                  <div className="flex justify-between text-[11px] text-muted-foreground mb-1.5">
+                    <span>{total} referral{total !== 1 ? "s" : ""}</span>
+                    <span>{nextTierAt - total} more to next tier</span>
+                  </div>
+                  <div className="h-2 bg-white/70 rounded-full overflow-hidden border border-white">
+                    <div
+                      className={cn("h-full rounded-full transition-all duration-700", cfg.bar)}
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5">
+                    Reach {nextTierAt} referrals to unlock higher commission
+                  </p>
+                </div>
+              )}
+              {nextTierAt === null && (
+                <p className="text-[11px] text-cyan-600 font-semibold">You're at the highest tier! 🎉</p>
+              )}
+
+              {/* Tier ladder */}
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                {tiers.map((t) => {
+                  const isActive = tierLabel === t.label;
+                  const isPast = total >= t.min && tierLabel !== t.label;
+                  const tc = tierConfig[t.label];
+                  return (
+                    <div key={t.label} className={cn("rounded-xl p-2 text-center border transition-all", isActive ? tc.bg : "bg-white/50 border-transparent opacity-70")}>
+                      <p className="text-base leading-none">{tc.icon}</p>
+                      <p className={cn("text-[9px] font-bold mt-1", isActive ? tc.color : "text-muted-foreground")}>{t.label}</p>
+                      <p className={cn("text-[9px] font-semibold mt-0.5", isActive ? tc.color : "text-muted-foreground")}>{(t.rate * 100).toFixed(0)}%</p>
+                      <p className="text-[8px] text-muted-foreground mt-0.5">{t.min}+ refs</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Tabs */}
         <div className="flex bg-muted rounded-xl p-1">

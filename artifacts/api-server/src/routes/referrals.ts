@@ -5,7 +5,22 @@ import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-const COMMISSION_RATE = 0.05;
+const TIERS = [
+  { min: 20, rate: 0.12, label: "Diamond" },
+  { min: 10, rate: 0.10, label: "Gold" },
+  { min: 5,  rate: 0.07, label: "Silver" },
+  { min: 0,  rate: 0.05, label: "Bronze" },
+] as const;
+
+function getTier(total: number) {
+  return TIERS.find((t) => total >= t.min) ?? TIERS[TIERS.length - 1];
+}
+
+function getNextTier(total: number) {
+  const thresholds = [5, 10, 20];
+  const next = thresholds.find((t) => total < t);
+  return next ?? null;
+}
 
 router.get("/referrals", requireAuth, async (req, res): Promise<void> => {
   const [user] = await db
@@ -24,14 +39,20 @@ router.get("/referrals", requireAuth, async (req, res): Promise<void> => {
     0
   );
   const activeReferrals = referrals.filter((r) => r.status === "active").length;
+  const total = referrals.length;
+  const currentTier = getTier(total);
+  const nextTierAt = getNextTier(total);
 
   res.json({
     code: user.referralCode,
-    totalReferrals: referrals.length,
+    totalReferrals: total,
     activeReferrals,
     totalEarned,
     pendingEarnings: 0,
-    commissionRate: COMMISSION_RATE,
+    commissionRate: currentTier.rate,
+    tierLabel: currentTier.label,
+    nextTierAt,
+    tiers: TIERS.map((t) => ({ ...t })),
   });
 });
 

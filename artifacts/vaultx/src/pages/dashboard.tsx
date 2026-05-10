@@ -7,7 +7,10 @@ import {
   useGetDashboardActivity, getGetDashboardActivityQueryKey,
 } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid, Cell,
+} from "recharts";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -160,47 +163,134 @@ export default function DashboardPage() {
         </div>
 
         {/* Earnings chart */}
-        {chartData !== undefined && (
-          <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm text-foreground">7-Day Earnings</h3>
-              <span className="text-xs text-muted-foreground">Last 7 days</span>
-            </div>
-            {(() => {
-              const points = chartData?.length ? chartData : Array.from({ length: 7 }, (_, i) => ({ date: new Date(Date.now() - (6 - i) * 86400000).toISOString().slice(0, 10), earnings: 0 }));
-              const hasEarnings = points.some((d: any) => d.earnings > 0);
-              return hasEarnings ? (
-                <ResponsiveContainer width="100%" height={100}>
-                  <AreaChart data={points}>
-                    <defs>
-                      <linearGradient id="earningsGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(217,91%,60%)" stopOpacity={0.2} />
-                        <stop offset="95%" stopColor="hsl(217,91%,60%)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(215,20%,55%)" }} tickLine={false} axisLine={false} tickFormatter={(v: string) => v.slice(5)} />
-                    <YAxis hide domain={[0, (dataMax: number) => dataMax * 1.3]} />
-                    <Tooltip formatter={(value: number) => [formatUSDT(value), "Earnings"]} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid hsl(214,32%,88%)" }} />
-                    <Area type="monotone" dataKey="earnings" stroke="hsl(217,91%,60%)" strokeWidth={2} fill="url(#earningsGrad)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[100px] flex flex-col items-center justify-center gap-1">
-                  <TrendingUp size={20} className="text-muted-foreground/40" />
-                  <p className="text-xs text-muted-foreground">Earnings will appear after your first payout</p>
-                  <div className="flex gap-1 mt-1">
-                    {points.map((d: any) => (
-                      <div key={d.date} className="flex flex-col items-center gap-1">
-                        <div className="w-1.5 h-10 bg-muted rounded-full" />
-                        <span className="text-[9px] text-muted-foreground">{d.date.slice(5)}</span>
-                      </div>
-                    ))}
-                  </div>
+        {chartData !== undefined && (() => {
+          const points: any[] = chartData?.length
+            ? chartData
+            : Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(Date.now() - (6 - i) * 86400000);
+                return {
+                  date: d.toISOString().slice(0, 10),
+                  label: d.toLocaleDateString("en-US", { weekday: "short" }),
+                  earnings: 0,
+                };
+              });
+          const hasEarnings = points.some((d: any) => d.earnings > 0);
+          const weekTotal = points.reduce((s: number, d: any) => s + (d.earnings ?? 0), 0);
+          const maxVal = Math.max(...points.map((d: any) => d.earnings ?? 0), 0.001);
+          const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "short" });
+
+          const CustomTooltip = ({ active, payload, label }: any) => {
+            if (!active || !payload?.length) return null;
+            return (
+              <div className="bg-white border border-border rounded-xl shadow-lg px-3 py-2 text-xs">
+                <p className="text-muted-foreground font-medium mb-0.5">{label}</p>
+                <p className="font-bold text-emerald-600">{formatUSDT(payload[0]?.value ?? 0)}</p>
+              </div>
+            );
+          };
+
+          return (
+            <div className="bg-white border border-border rounded-2xl p-4 shadow-sm overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <p className="font-semibold text-sm text-foreground">7-Day Earnings</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Includes ROI, reinvest &amp; referral income</p>
                 </div>
-              );
-            })()}
-          </div>
-        )}
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Weekly total</p>
+                  <p className={cn("text-base font-bold", hasEarnings ? "text-emerald-600" : "text-muted-foreground")}>
+                    {hasEarnings ? formatUSDT(weekTotal) : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Chart */}
+              <div className="relative mt-3">
+                <svg width="0" height="0" className="absolute">
+                  <defs>
+                    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(142,76%,42%)" stopOpacity={1} />
+                      <stop offset="100%" stopColor="hsl(142,76%,42%)" stopOpacity={0.4} />
+                    </linearGradient>
+                    <linearGradient id="barGradGhost" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(215,20%,88%)" stopOpacity={1} />
+                      <stop offset="100%" stopColor="hsl(215,20%,88%)" stopOpacity={0.3} />
+                    </linearGradient>
+                    <filter id="barGlow">
+                      <feGaussianBlur stdDeviation="2" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
+                </svg>
+
+                <ResponsiveContainer width="100%" height={160}>
+                  <ComposedChart data={points} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barCategoryGap="28%">
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(214,32%,94%)" />
+                    <XAxis
+                      dataKey="label"
+                      tick={({ x, y, payload }: any) => {
+                        const isToday = payload.value === todayLabel;
+                        return (
+                          <text x={x} y={y + 12} textAnchor="middle" fill={isToday ? "hsl(217,91%,55%)" : "hsl(215,20%,55%)"} fontSize={10} fontWeight={isToday ? 700 : 400}>
+                            {payload.value}
+                          </text>
+                        );
+                      }}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis hide domain={[0, maxVal * 1.4]} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(214,32%,97%)", radius: 6 } as any} />
+                    <Bar dataKey="earnings" radius={[6, 6, 3, 3]} maxBarSize={32}>
+                      {points.map((entry: any, index: number) => {
+                        const isToday = entry.label === todayLabel;
+                        return (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={entry.earnings > 0 ? (isToday ? "url(#barGrad)" : "hsl(142,60%,50%)") : "url(#barGradGhost)"}
+                            opacity={entry.earnings > 0 ? 1 : 0.6}
+                          />
+                        );
+                      })}
+                    </Bar>
+                    {hasEarnings && (
+                      <Line
+                        type="monotone"
+                        dataKey="earnings"
+                        stroke="hsl(217,91%,60%)"
+                        strokeWidth={1.5}
+                        dot={{ fill: "hsl(217,91%,60%)", r: 3, strokeWidth: 0 }}
+                        activeDot={{ r: 5, fill: "hsl(217,91%,60%)", stroke: "white", strokeWidth: 2 }}
+                      />
+                    )}
+                  </ComposedChart>
+                </ResponsiveContainer>
+
+                {!hasEarnings && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
+                    <div className="bg-white/90 rounded-xl px-4 py-2 flex items-center gap-2">
+                      <TrendingUp size={14} className="text-muted-foreground/50" />
+                      <p className="text-xs text-muted-foreground">Earnings appear after first ROI payout</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer legend */}
+              <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
+                  <span className="text-[10px] text-muted-foreground">Daily earnings</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-6 h-0.5 bg-primary rounded-full" />
+                  <span className="text-[10px] text-muted-foreground">Trend</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Market ticker */}
         {market && market.length > 0 && (
