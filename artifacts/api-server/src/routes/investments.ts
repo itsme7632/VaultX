@@ -226,6 +226,7 @@ router.post("/investments/:id/claim", requireAuth, async (req, res): Promise<voi
     .set({
       pendingEarnings: "0",
       totalEarned: (parseFloat(investment.totalEarned) + pending).toFixed(8),
+      lastEarningAt: new Date(),
     })
     .where(eq(userInvestmentsTable.id, id));
 
@@ -300,6 +301,7 @@ router.post("/investments/:id/reinvest", requireAuth, async (req, res): Promise<
       amount: newAmount.toFixed(8),
       pendingEarnings: "0",
       totalEarned: (parseFloat(result.inv.totalEarned) + pending).toFixed(8),
+      lastEarningAt: new Date(),
     })
     .where(eq(userInvestmentsTable.id, id))
     .returning();

@@ -29,16 +29,20 @@ export default function ReferralsPage() {
     query: { queryKey: getGetReferralLeaderboardQueryKey(), staleTime: 300000 },
   });
 
+  const referralLink = stats?.code
+    ? `${window.location.origin}/signup?ref=${stats.code}`
+    : null;
+
   const handleCopy = () => {
-    if (!stats?.code) return;
-    navigator.clipboard.writeText(stats.code);
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleShare = () => {
-    if (!stats?.code) return;
-    const text = `Join VaultX and start earning crypto! Use my referral code: ${stats.code}`;
+    if (!referralLink) return;
+    const text = `Join VaultX and start earning crypto! Sign up with my link:\n${referralLink}`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
   };
@@ -50,12 +54,22 @@ export default function ReferralsPage() {
       <div className="px-4 pt-5 pb-6 space-y-5">
         {/* Referral code card */}
         <div className="bg-gradient-to-br from-purple-600 to-purple-800 rounded-2xl p-5 text-white shadow-lg">
-          <p className="text-purple-200 text-xs uppercase tracking-widest mb-2">Your Referral Code</p>
+          <p className="text-purple-200 text-xs uppercase tracking-widest mb-1">Your Invite Link</p>
           {statsLoading ? (
-            <Skeleton className="h-10 w-40 bg-white/20 mb-3" />
+            <Skeleton className="h-8 w-40 bg-white/20 mb-3" />
           ) : (
-            <p className="text-4xl font-bold tracking-widest mb-3">{stats?.code ?? "---"}</p>
+            <p className="text-2xl font-bold tracking-widest mb-1">{stats?.code ?? "---"}</p>
           )}
+          {/* Invite link display */}
+          <div className="bg-white/10 rounded-xl px-3 py-2 mb-3 mt-2">
+            {statsLoading ? (
+              <Skeleton className="h-4 w-full bg-white/20" />
+            ) : (
+              <p className="text-purple-100 text-[11px] font-mono break-all leading-relaxed">
+                {referralLink ?? "Loading…"}
+              </p>
+            )}
+          </div>
           <p className="text-purple-200 text-xs mb-4">
             Earn {((stats?.commissionRate ?? 0.05) * 100).toFixed(0)}% commission on every referred user's investment
           </p>
@@ -64,10 +78,10 @@ export default function ReferralsPage() {
               size="sm"
               className="bg-white/20 hover:bg-white/30 text-white border-0 h-9 gap-1.5"
               onClick={handleCopy}
-              data-testid="button-copy-code"
+              data-testid="button-copy-link"
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? "Copied!" : "Copy Code"}
+              {copied ? "Copied!" : "Copy Link"}
             </Button>
             <Button
               size="sm"

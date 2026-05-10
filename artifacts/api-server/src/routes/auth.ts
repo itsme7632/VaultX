@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
 import { eq, or } from "drizzle-orm";
-import { db, usersTable, passwordResetTokensTable } from "@workspace/db";
+import { db, usersTable, passwordResetTokensTable, referralsTable } from "@workspace/db";
 import { ensureWallet } from "../lib/wallet";
 import { generateReferralCode } from "../lib/referral";
 import { requireAuth } from "../middlewares/auth";
@@ -106,6 +106,15 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
     .returning();
 
   await ensureWallet(user.id);
+
+  if (referredById) {
+    await db.insert(referralsTable).values({
+      referrerId: referredById,
+      referredId: user.id,
+      commissionAmount: "0",
+      status: "pending",
+    });
+  }
 
   req.session.userId = user.id;
   req.session.isAdmin = user.isAdmin;

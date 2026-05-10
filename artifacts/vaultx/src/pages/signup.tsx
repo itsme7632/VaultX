@@ -258,6 +258,8 @@ export default function SignupPage() {
   const { toast } = useToast();
   const signup = useSignup();
 
+  const refFromUrl = new URLSearchParams(window.location.search).get("ref") ?? "";
+
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -269,7 +271,7 @@ export default function SignupPage() {
       whatsapp: "",
       password: "",
       confirmPassword: "",
-      referralCode: "",
+      referralCode: refFromUrl.toUpperCase(),
     },
   });
 
