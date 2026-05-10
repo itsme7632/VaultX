@@ -6,6 +6,7 @@ import {
   userInvestmentsTable,
   transactionsTable,
   referralsTable,
+  usersTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 
