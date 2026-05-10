@@ -7,32 +7,12 @@ import {
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LiveCounter } from "@/components/LiveCounter";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
-import { useState, useEffect, useRef } from "react";
-
-function LiveEarnings({ base, amount, dailyRate }: { base: number; amount: number; dailyRate: number }) {
-  const [earnings, setEarnings] = useState(base);
-  const lastTick = useRef(Date.now());
-
-  useEffect(() => { setEarnings(base); lastTick.current = Date.now(); }, [base]);
-
-  useEffect(() => {
-    if (dailyRate <= 0 || amount <= 0) return;
-    const perMs = (amount * dailyRate) / 24 / 3600 / 1000;
-    const interval = setInterval(() => {
-      const now = Date.now();
-      setEarnings((prev) => prev + (now - lastTick.current) * perMs);
-      lastTick.current = Date.now();
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [amount, dailyRate]);
-
-  return <span className="tabular-nums">{formatUSDT(earnings)}</span>;
-}
+import { useState } from "react";
 
 const RISK_COLORS: Record<string, string> = {
   low: "bg-emerald-50 text-emerald-600 border-emerald-200",
@@ -61,8 +41,13 @@ export default function InvestmentsPage() {
     query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
   });
 
+  // Same query key + refetchInterval as Portfolio page — they share the cache
   const { data: userInvestments, isLoading: uiLoading } = useGetUserInvestments({
-    query: { queryKey: getGetUserInvestmentsQueryKey(), staleTime: 30000 },
+    query: {
+      queryKey: getGetUserInvestmentsQueryKey(),
+      staleTime: 15000,
+      refetchInterval: 30000,
+    },
   });
 
   const { data: wallet } = useGetWallet({
@@ -162,55 +147,77 @@ export default function InvestmentsPage() {
         {tab === "active" && (
           <div className="space-y-4">
             {uiLoading ? (
-              [1, 2].map((i) => <Skeleton key={i} className="h-40 rounded-2xl" />)
+              [1, 2].map((i) => <Skeleton key={i} className="h-44 rounded-2xl" />)
             ) : userInvestments?.length ? (
-              userInvestments.map((inv: any) => (
-                <div key={inv.id} className="bg-white border border-border rounded-2xl p-5 shadow-sm">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-bold text-foreground">{inv.planName}</h3>
-                      <p className="text-xs text-muted-foreground">{formatDate(inv.startDate)} – {formatDate(inv.endDate)}</p>
-                    </div>
-                    <Badge variant="outline" className={cn("text-xs capitalize font-medium", inv.status === "active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "")}>
-                      {inv.status}
-                    </Badge>
-                  </div>
+              userInvestments.map((inv: any) => {
+                const elapsed = Math.max(0, inv.daysTotal - inv.daysRemaining);
+                const progressPct = Math.max(inv.status === "active" ? 2 : 0, inv.progressPercent);
 
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Invested</p>
-                      <p className="font-bold text-foreground text-sm">{formatUSDT(inv.amount)}</p>
+                return (
+                  <div key={inv.id} className="bg-white border border-border rounded-2xl p-5 shadow-sm">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-bold text-foreground">{inv.planName}</h3>
+                        <p className="text-xs text-muted-foreground">{formatDate(inv.startDate)} – {formatDate(inv.endDate)}</p>
+                      </div>
+                      <Badge variant="outline" className={cn("text-xs capitalize font-medium", inv.status === "active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "")}>
+                        {inv.status}
+                      </Badge>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Live Earnings</p>
-                      <p className="font-bold text-emerald-600 text-sm">
-                        {inv.status === "active"
-                          ? <LiveEarnings base={inv.pendingEarnings} amount={inv.amount} dailyRate={inv.dailyReturnRate} />
-                          : formatUSDT(inv.pendingEarnings)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Daily ROI</p>
-                      <p className="font-semibold text-primary text-sm">{((inv.minRoiRate ?? 0.025) * 100).toFixed(1)}% – {((inv.maxRoiRate ?? 0.030) * 100).toFixed(1)}%</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Days Left</p>
-                      <p className="font-semibold text-foreground text-sm flex items-center gap-1">
-                        <Clock size={12} />
-                        {inv.daysRemaining}d
-                      </p>
-                    </div>
-                  </div>
 
-                  <div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-                      <span>{inv.progressPercent.toFixed(0)}% complete</span>
-                      <span>Day {Math.max(0, inv.daysTotal - inv.daysRemaining)} of {inv.daysTotal}</span>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Invested</p>
+                        <p className="font-bold text-foreground text-sm">{formatUSDT(inv.amount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Live Profit</p>
+                        <p className="font-bold text-sm">
+                          {inv.status === "active" ? (
+                            <LiveCounter
+                              pendingEarnings={inv.pendingEarnings}
+                              dailyRate={inv.dailyReturnRate}
+                              principal={inv.amount}
+                              lastEarningAt={inv.lastEarningAt ?? null}
+                              startDate={inv.startDate}
+                              decimals={4}
+                            />
+                          ) : (
+                            <span className="text-foreground">{formatUSDT(inv.pendingEarnings)}</span>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Daily ROI</p>
+                        <p className="font-semibold text-primary text-sm">
+                          {((inv.minRoiRate ?? 0.025) * 100).toFixed(1)}% – {((inv.maxRoiRate ?? 0.030) * 100).toFixed(1)}%
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Days Left</p>
+                        <p className="font-semibold text-foreground text-sm flex items-center gap-1">
+                          <Clock size={12} />
+                          {inv.daysRemaining}d
+                        </p>
+                      </div>
                     </div>
-                    <Progress value={Math.max(inv.status === "active" ? 0.5 : 0, inv.progressPercent)} className="h-1.5" />
+
+                    {/* Progress bar */}
+                    <div>
+                      <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                        <span>{inv.progressPercent.toFixed(1)}% complete</span>
+                        <span>Day {elapsed} of {inv.daysTotal}</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full transition-all duration-500"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-12 bg-white border border-border rounded-2xl">
                 <Wallet size={32} className="text-muted-foreground mx-auto mb-3" />

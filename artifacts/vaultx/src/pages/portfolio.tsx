@@ -1,4 +1,3 @@
-import { useEffect, useState, useRef } from "react";
 import {
   TrendingUp, Clock, RefreshCcw, ArrowDownLeft, Calendar, Target,
   Zap, RotateCcw, CheckCircle,
@@ -9,94 +8,15 @@ import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LiveCounter, PayoutCountdown } from "@/components/LiveCounter";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
-
-// ─── Live counter — uses stateRef so the interval never goes stale ─────────
-function LiveCounter({
-  pendingEarnings,
-  dailyRate,
-  principal,
-  lastEarningAt,
-  startDate,
-}: {
-  pendingEarnings: number;
-  dailyRate: number;
-  principal: number;
-  lastEarningAt: string | null;
-  startDate: string;
-}) {
-  const stateRef = useRef({ pendingEarnings, dailyRate, principal, lastEarningAt, startDate });
-  stateRef.current = { pendingEarnings, dailyRate, principal, lastEarningAt, startDate };
-
-  const computeBase = () => {
-    const { pendingEarnings: pe, dailyRate: dr, principal: p, lastEarningAt: lea, startDate: sd } = stateRef.current;
-    const perMs = p > 0 && dr > 0 ? (p * dr) / 86400000 : 0;
-    if (perMs <= 0) return pe;
-    const ref = lea ? new Date(lea) : new Date(sd);
-    const elapsed = Math.max(0, Date.now() - ref.getTime());
-    return pe + perMs * elapsed;
-  };
-
-  const [value, setValue] = useState(computeBase);
-
-  // Reset to accurate server value when data refreshes (e.g. after cron credits ROI)
-  const prevKey = useRef(`${pendingEarnings}|${lastEarningAt}`);
-  useEffect(() => {
-    const key = `${pendingEarnings}|${lastEarningAt}`;
-    if (key !== prevKey.current) {
-      prevKey.current = key;
-      setValue(computeBase());
-    }
-  });
-
-  // Tick every second using latest values via ref — runs once on mount
-  useEffect(() => {
-    const id = setInterval(() => {
-      const { dailyRate: dr, principal: p } = stateRef.current;
-      const perMs = p > 0 && dr > 0 ? (p * dr) / 86400000 : 0;
-      if (perMs > 0) setValue((v) => v + perMs * 1000);
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <span className="tabular-nums font-bold text-emerald-600">
-      {formatUSDT(value, 6)}
-    </span>
-  );
-}
-
-// ─── Countdown to next payout ─────────────────────────────────────────────
-function Countdown({ nextPayoutAt }: { nextPayoutAt: string }) {
-  const getLeft = () => Math.max(0, new Date(nextPayoutAt).getTime() - Date.now());
-  const [left, setLeft] = useState(getLeft);
-
-  useEffect(() => {
-    setLeft(getLeft());
-    const id = setInterval(() => setLeft(getLeft()), 1000);
-    return () => clearInterval(id);
-  }, [nextPayoutAt]);
-
-  if (left <= 0) {
-    return <span className="text-emerald-500 font-semibold text-xs">Processing soon…</span>;
-  }
-
-  const h = Math.floor(left / 3600000);
-  const m = Math.floor((left % 3600000) / 60000);
-  const s = Math.floor((left % 60000) / 1000);
-
-  return (
-    <span className="tabular-nums font-mono text-xs font-semibold text-foreground">
-      {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
-    </span>
-  );
-}
 
 // ─── Main page ────────────────────────────────────────────────────────────
 export default function PortfolioPage() {
@@ -261,7 +181,7 @@ export default function PortfolioPage() {
                         <Clock size={13} className="text-primary shrink-0" />
                         <p className="text-xs text-muted-foreground">Next payout</p>
                       </div>
-                      <Countdown nextPayoutAt={inv.nextPayoutAt} />
+                      <PayoutCountdown nextPayoutAt={inv.nextPayoutAt} />
                     </div>
 
                     {/* Dates row */}
