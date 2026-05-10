@@ -1,18 +1,10 @@
 import { Link } from "wouter";
 import { ArrowLeft, MessageCircle, Phone, HeadphonesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
-import { settingsApi } from "@workspace/api-client-react";
 
 export default function ForgotPasswordPage() {
-  const { data: settings } = useQuery({
-    queryKey: ["settings-public"],
-    queryFn: () => settingsApi.getPublicSettings(),
-    staleTime: 60000,
-  });
-
-  const telegram = settings?.supportTelegram || "https://t.me/vaultxsupport";
-  const whatsapp = settings?.supportWhatsapp || "https://wa.me/vaultxsupport";
+  const telegram = "https://t.me/vaultxsupport";
+  const whatsapp = "https://wa.me/vaultxsupport";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-white flex flex-col items-center justify-center px-5">
