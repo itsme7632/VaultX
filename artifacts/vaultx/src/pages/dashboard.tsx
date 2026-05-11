@@ -3,19 +3,15 @@ import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, 
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetMarketPrices, getGetMarketPricesQueryKey,
-  useGetEarningsChart, getGetEarningsChartQueryKey,
   useGetDashboardActivity, getGetDashboardActivityQueryKey,
 } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ComposedChart, Bar, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, CartesianGrid, Cell,
-} from "recharts";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDateTime } from "@/lib/format";
 import { Link } from "wouter";
+import { LiveActivityFeed } from "@/components/LiveActivityFeed";
 
 function LiveEarnings({ base, rate }: { base: number; rate: number }) {
   const [earnings, setEarnings] = useState(base);
@@ -89,10 +85,6 @@ export default function DashboardPage() {
   const { data: market } = useGetMarketPrices({
     query: { queryKey: getGetMarketPricesQueryKey(), staleTime: 60000 },
   });
-  const { data: chartData } = useGetEarningsChart(
-    { days: 7 },
-    { query: { queryKey: getGetEarningsChartQueryKey({ days: 7 }), staleTime: 60000 } }
-  );
   const { data: activity } = useGetDashboardActivity({
     query: { queryKey: getGetDashboardActivityQueryKey(), staleTime: 30000 },
   });
@@ -162,135 +154,8 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Earnings chart */}
-        {chartData !== undefined && (() => {
-          const points: any[] = chartData?.length
-            ? chartData
-            : Array.from({ length: 7 }, (_, i) => {
-                const d = new Date(Date.now() - (6 - i) * 86400000);
-                return {
-                  date: d.toISOString().slice(0, 10),
-                  label: d.toLocaleDateString("en-US", { weekday: "short" }),
-                  earnings: 0,
-                };
-              });
-          const hasEarnings = points.some((d: any) => d.earnings > 0);
-          const weekTotal = points.reduce((s: number, d: any) => s + (d.earnings ?? 0), 0);
-          const maxVal = Math.max(...points.map((d: any) => d.earnings ?? 0), 0.001);
-          const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "short" });
-
-          const CustomTooltip = ({ active, payload, label }: any) => {
-            if (!active || !payload?.length) return null;
-            return (
-              <div className="bg-white border border-border rounded-xl shadow-lg px-3 py-2 text-xs">
-                <p className="text-muted-foreground font-medium mb-0.5">{label}</p>
-                <p className="font-bold text-emerald-600">{formatUSDT(payload[0]?.value ?? 0)}</p>
-              </div>
-            );
-          };
-
-          return (
-            <div className="bg-white border border-border rounded-2xl p-4 shadow-sm overflow-hidden">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-1">
-                <div>
-                  <p className="font-semibold text-sm text-foreground">7-Day Earnings</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Includes ROI, reinvest &amp; referral income</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Weekly total</p>
-                  <p className={cn("text-base font-bold", hasEarnings ? "text-emerald-600" : "text-muted-foreground")}>
-                    {hasEarnings ? formatUSDT(weekTotal) : "—"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Chart */}
-              <div className="relative mt-3">
-                <svg width="0" height="0" className="absolute">
-                  <defs>
-                    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(142,76%,42%)" stopOpacity={1} />
-                      <stop offset="100%" stopColor="hsl(142,76%,42%)" stopOpacity={0.4} />
-                    </linearGradient>
-                    <linearGradient id="barGradGhost" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(215,20%,88%)" stopOpacity={1} />
-                      <stop offset="100%" stopColor="hsl(215,20%,88%)" stopOpacity={0.3} />
-                    </linearGradient>
-                    <filter id="barGlow">
-                      <feGaussianBlur stdDeviation="2" result="blur" />
-                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                    </filter>
-                  </defs>
-                </svg>
-
-                <ResponsiveContainer width="100%" height={160}>
-                  <ComposedChart data={points} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barCategoryGap="28%">
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(214,32%,94%)" />
-                    <XAxis
-                      dataKey="label"
-                      tick={({ x, y, payload }: any) => {
-                        const isToday = payload.value === todayLabel;
-                        return (
-                          <text x={x} y={y + 12} textAnchor="middle" fill={isToday ? "hsl(217,91%,55%)" : "hsl(215,20%,55%)"} fontSize={10} fontWeight={isToday ? 700 : 400}>
-                            {payload.value}
-                          </text>
-                        );
-                      }}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis hide domain={[0, maxVal * 1.4]} />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(214,32%,97%)", radius: 6 } as any} />
-                    <Bar dataKey="earnings" radius={[6, 6, 3, 3]} maxBarSize={32}>
-                      {points.map((entry: any, index: number) => {
-                        const isToday = entry.label === todayLabel;
-                        return (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={entry.earnings > 0 ? (isToday ? "url(#barGrad)" : "hsl(142,60%,50%)") : "url(#barGradGhost)"}
-                            opacity={entry.earnings > 0 ? 1 : 0.6}
-                          />
-                        );
-                      })}
-                    </Bar>
-                    {hasEarnings && (
-                      <Line
-                        type="monotone"
-                        dataKey="earnings"
-                        stroke="hsl(217,91%,60%)"
-                        strokeWidth={1.5}
-                        dot={{ fill: "hsl(217,91%,60%)", r: 3, strokeWidth: 0 }}
-                        activeDot={{ r: 5, fill: "hsl(217,91%,60%)", stroke: "white", strokeWidth: 2 }}
-                      />
-                    )}
-                  </ComposedChart>
-                </ResponsiveContainer>
-
-                {!hasEarnings && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
-                    <div className="bg-white/90 rounded-xl px-4 py-2 flex items-center gap-2">
-                      <TrendingUp size={14} className="text-muted-foreground/50" />
-                      <p className="text-xs text-muted-foreground">Earnings appear after first ROI payout</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer legend */}
-              <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-                  <span className="text-[10px] text-muted-foreground">Daily earnings</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-0.5 bg-primary rounded-full" />
-                  <span className="text-[10px] text-muted-foreground">Trend</span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {/* Live Activity Feed */}
+        <LiveActivityFeed />
 
         {/* Market ticker */}
         {market && market.length > 0 && (

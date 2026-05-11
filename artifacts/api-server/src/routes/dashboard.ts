@@ -104,6 +104,42 @@ router.get("/dashboard/earnings-chart", requireAuth, async (req, res): Promise<v
   res.json(result);
 });
 
+router.get("/dashboard/live-activity", requireAuth, async (req, res): Promise<void> => {
+  const since = new Date(Date.now() - 72 * 60 * 60 * 1000);
+
+  const txs = await db
+    .select({
+      id: transactionsTable.id,
+      type: transactionsTable.type,
+      amount: transactionsTable.amount,
+      createdAt: transactionsTable.createdAt,
+      username: usersTable.username,
+    })
+    .from(transactionsTable)
+    .leftJoin(usersTable, eq(transactionsTable.userId, usersTable.id))
+    .where(
+      and(
+        inArray(transactionsTable.type, ["deposit", "withdrawal", "investment", "earning", "reinvest", "referral"]),
+        eq(transactionsTable.status, "completed"),
+        gte(transactionsTable.createdAt, since),
+      )
+    )
+    .orderBy(desc(transactionsTable.createdAt))
+    .limit(20);
+
+  res.json(
+    txs.map((t) => ({
+      id: `real-${t.id}`,
+      type: t.type,
+      amount: parseFloat(t.amount),
+      username: t.username
+        ? t.username.slice(0, 2) + "***" + (t.username.length > 4 ? t.username.slice(-1) : "")
+        : "u***r",
+      createdAt: t.createdAt,
+    }))
+  );
+});
+
 router.get("/dashboard/activity", requireAuth, async (req, res): Promise<void> => {
   const txs = await db
     .select()
