@@ -331,17 +331,17 @@ export function LiveActivityFeed() {
 
     // Stagger seed timestamps naturally — clustered, not perfectly spaced
     const now = Date.now();
+    let prevTs = now;
     const seed = Array.from({ length: 10 }, (_, i) => {
-      // Natural clustering: some close together, some further apart
-      const spread = i === 0 ? 0
-        : i < 3  ? 15_000  + Math.random() * 45_000
-        : i < 6  ? 90_000  + Math.random() * 120_000
-        :          300_000 + Math.random() * 300_000;
-      const baseTs = i === 0 ? now
-        : seed?.[i - 1]?.ts !== undefined
-          ? (seed as FeedItem[])[i - 1].ts - spread
-          : now - spread;
-      return genItem(baseTs, `seed-${i}`);
+      if (i > 0) {
+        const spread = i < 3
+          ? 15_000  + Math.random() * 45_000
+          : i < 6
+            ? 90_000  + Math.random() * 120_000
+            : 300_000 + Math.random() * 300_000;
+        prevTs = prevTs - spread;
+      }
+      return genItem(prevTs, `seed-${i}`);
     });
 
     cache.items       = seed;
