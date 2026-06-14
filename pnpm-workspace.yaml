@@ -159,4 +159,8 @@ overrides:
   "@expo/ngrok-bin>@expo/ngrok-bin-win32-x64": "-"
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
-  esbuild: "0.27.3"
+  esbuild: "0.28.1"
+  # qs >=6.15.2 fixes GHSA-q8mj-m7cp-5q26 (DoS via stringify with null/undefined in comma-format arrays)
+  qs: ">=6.15.2"
+  # brace-expansion >=5.0.6 fixes GHSA-jxxr-4gwj-5jf2 (large numeric range bypasses max DoS protection)
+  brace-expansion: ">=5.0.6"
