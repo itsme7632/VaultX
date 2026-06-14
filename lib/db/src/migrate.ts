@@ -312,12 +312,17 @@ const COLUMN_MIGRATIONS_SQL = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "transactions_tx_id_unique" ON "transactions"("tx_id") WHERE "tx_id" IS NOT NULL`,
 ];
 
+const sslConfig =
+  process.env.NODE_ENV === "production"
+    ? { ssl: { rejectUnauthorized: false } }
+    : {};
+
 export async function runMigrations(): Promise<void> {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL must be set");
   }
 
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ...sslConfig });
 
   try {
     for (const sql of TABLES_SQL) {
@@ -338,7 +343,7 @@ export async function runMigrations(): Promise<void> {
 export async function backfillTransactionIds(): Promise<void> {
   if (!process.env.DATABASE_URL) return;
 
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ...sslConfig });
   try {
     const { rows } = await pool.query(
       `SELECT id FROM transactions WHERE tx_id IS NULL ORDER BY id`
