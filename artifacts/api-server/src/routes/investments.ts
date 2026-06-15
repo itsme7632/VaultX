@@ -1,11 +1,12 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import {
   db,
   investmentPlansTable,
   userInvestmentsTable,
   walletsTable,
   transactionsTable,
+  notificationsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -187,6 +188,12 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
     note: `Invested ${amount} USDT in ${plan.name}`,
   });
 
+  await db.insert(notificationsTable).values({
+    userId: req.session.userId!,
+    type: "investment",
+    title: "Investment Started",
+    message: `Your ${amount} USDT investment in ${plan.name} is now active. Daily ROI: ${(midRoi * 100).toFixed(2)}% — profits will be ready in 24 hours.`,
+  });
 
   res.status(201).json(
     computeInvestmentView(investment, plan.name, plan.minRoiRate ?? undefined, plan.maxRoiRate ?? undefined),
@@ -214,13 +221,10 @@ router.post("/investments/:id/claim", requireAuth, async (req, res): Promise<voi
     return;
   }
 
+  // Only clear pendingEarnings — totalEarned is already updated by the ROI engine
   await db
     .update(userInvestmentsTable)
-    .set({
-      pendingEarnings: "0",
-      totalEarned: (parseFloat(investment.totalEarned) + pending).toFixed(8),
-      lastEarningAt: new Date(),
-    })
+    .set({ pendingEarnings: "0" })
     .where(eq(userInvestmentsTable.id, id));
 
   const [wallet] = await db
@@ -248,7 +252,6 @@ router.post("/investments/:id/claim", requireAuth, async (req, res): Promise<voi
     txId: generateTxId(),
     note: `Earnings claimed from investment #${id}`,
   });
-
 
   res.json({ amountClaimed: pending, newBalance });
 });
@@ -282,13 +285,12 @@ router.post("/investments/:id/reinvest", requireAuth, async (req, res): Promise<
 
   const newAmount = parseFloat(result.inv.amount) + pending;
 
+  // Only update amount and clear pendingEarnings — totalEarned already tracked by ROI engine
   const [updated] = await db
     .update(userInvestmentsTable)
     .set({
       amount: newAmount.toFixed(8),
       pendingEarnings: "0",
-      totalEarned: (parseFloat(result.inv.totalEarned) + pending).toFixed(8),
-      lastEarningAt: new Date(),
     })
     .where(eq(userInvestmentsTable.id, id))
     .returning();
@@ -342,13 +344,10 @@ router.post("/investments/:id/compound", requireAuth, async (req, res): Promise<
 
   const newAmount = parseFloat(result.inv.amount) + pending;
 
+  // Only update amount, clear pending — totalEarned already tracked by ROI engine
   const [updated] = await db
     .update(userInvestmentsTable)
-    .set({
-      amount: newAmount.toFixed(8),
-      pendingEarnings: "0",
-      totalEarned: (parseFloat(result.inv.totalEarned) + pending).toFixed(8),
-    })
+    .set({ amount: newAmount.toFixed(8), pendingEarnings: "0" })
     .where(eq(userInvestmentsTable.id, id))
     .returning();
 
@@ -359,6 +358,34 @@ router.post("/investments/:id/compound", requireAuth, async (req, res): Promise<
       result.planMinRoi ?? undefined,
       result.planMaxRoi ?? undefined,
     ),
+  );
+});
+
+router.get("/investments/earnings-history", requireAuth, async (req, res): Promise<void> => {
+  const { limit = "90" } = req.query as { limit?: string };
+  const userId = req.session.userId!;
+
+  const txs = await db
+    .select()
+    .from(transactionsTable)
+    .where(
+      and(
+        eq(transactionsTable.userId, userId),
+        inArray(transactionsTable.type, ["earning", "reinvest"]),
+        eq(transactionsTable.status, "completed"),
+      )
+    )
+    .orderBy(desc(transactionsTable.createdAt))
+    .limit(parseInt(limit, 10));
+
+  res.json(
+    txs.map((t) => ({
+      id: t.id,
+      type: t.type,
+      amount: parseFloat(t.amount),
+      note: t.note,
+      createdAt: t.createdAt,
+    }))
   );
 });
 

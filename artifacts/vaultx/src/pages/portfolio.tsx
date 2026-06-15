@@ -1,13 +1,13 @@
 import {
   TrendingUp, Clock, RefreshCcw, ArrowDownLeft, Calendar, Target,
-  Zap, RotateCcw, CheckCircle,
+  Zap, RotateCcw, CheckCircle, ChevronDown, ChevronUp, ArrowDownRight, BarChart2,
 } from "lucide-react";
 import {
   useGetUserInvestments, getGetUserInvestmentsQueryKey,
   useClaimEarnings, useToggleAutoCompound,
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,122 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
 
-// ─── Main page ────────────────────────────────────────────────────────────
+function EarningsHistory() {
+  const [open, setOpen] = useState(false);
+
+  const { data: history, isLoading } = useQuery({
+    queryKey: ["earnings-history"],
+    queryFn: () =>
+      fetch("/api/investments/earnings-history?limit=90", { credentials: "include" })
+        .then((r) => r.json()),
+    enabled: open,
+    staleTime: 60000,
+  });
+
+  const rows: { id: number; type: string; amount: number; note: string; createdAt: string }[] =
+    history ?? [];
+
+  const totalClaimed = rows.filter((r) => r.type === "earning").reduce((s, r) => s + r.amount, 0);
+  const totalReinvested = rows.filter((r) => r.type === "reinvest").reduce((s, r) => s + r.amount, 0);
+
+  const grouped: Record<string, typeof rows> = {};
+  rows.forEach((r) => {
+    const day = new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    if (!grouped[day]) grouped[day] = [];
+    grouped[day].push(r);
+  });
+
+  return (
+    <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
+      <button
+        type="button"
+        onClick={() => setOpen((p) => !p)}
+        className="w-full flex items-center justify-between px-4 py-4 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+            <BarChart2 size={15} className="text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Earnings Breakdown</p>
+            <p className="text-[11px] text-muted-foreground">Day-by-day claim &amp; reinvest history</p>
+          </div>
+        </div>
+        {open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-border">
+          {/* Summary strip */}
+          <div className="grid grid-cols-2 gap-px bg-border">
+            <div className="bg-emerald-50 px-4 py-3">
+              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Claimed</p>
+              <p className="font-bold text-emerald-600 text-sm mt-0.5">{formatUSDT(totalClaimed)}</p>
+            </div>
+            <div className="bg-blue-50 px-4 py-3">
+              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Reinvested</p>
+              <p className="font-bold text-primary text-sm mt-0.5">{formatUSDT(totalReinvested)}</p>
+            </div>
+          </div>
+
+          {/* Day-by-day rows */}
+          {isLoading ? (
+            <div className="p-4 space-y-2">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 rounded-lg" />)}
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="px-4 py-8 text-center">
+              <RotateCcw size={20} className="text-muted-foreground mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground">No earnings history yet</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border max-h-80 overflow-y-auto">
+              {Object.entries(grouped).map(([day, dayRows]) => {
+                const dayClaimed = dayRows.filter((r) => r.type === "earning").reduce((s, r) => s + r.amount, 0);
+                const dayReinvested = dayRows.filter((r) => r.type === "reinvest").reduce((s, r) => s + r.amount, 0);
+                const dayTotal = dayClaimed + dayReinvested;
+                return (
+                  <div key={day} className="px-4 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[11px] font-semibold text-foreground">{day}</p>
+                      <p className="text-[11px] font-bold text-primary">+{formatUSDT(dayTotal)}</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      {dayRows.map((r) => (
+                        <div key={r.id} className="flex items-center gap-2">
+                          <div className={cn(
+                            "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
+                            r.type === "earning" ? "bg-emerald-100" : "bg-blue-100"
+                          )}>
+                            {r.type === "earning"
+                              ? <ArrowDownRight size={10} className="text-emerald-600" />
+                              : <RefreshCcw size={10} className="text-primary" />
+                            }
+                          </div>
+                          <p className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">
+                            {r.type === "earning" ? "Claimed" : "Reinvested"}
+                            {r.note ? ` · ${r.note.replace(/Earnings claimed from |Reinvested .+ into /i, "inv ")}` : ""}
+                          </p>
+                          <p className={cn(
+                            "text-[11px] font-semibold shrink-0",
+                            r.type === "earning" ? "text-emerald-600" : "text-primary"
+                          )}>
+                            +{formatUSDT(r.amount)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PortfolioPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -38,6 +153,7 @@ export default function PortfolioPage() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: getGetUserInvestmentsQueryKey() });
     queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ["earnings-history"] });
   };
 
   const handleClaim = (id: number, amount: number) => {
@@ -102,10 +218,10 @@ export default function PortfolioPage() {
         {/* Summary grid */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Active Capital", val: formatUSDT(totalValue), sub: `${activeInvestments.length} plan${activeInvestments.length !== 1 ? "s" : ""}`, color: "text-primary", bg: "bg-primary/8" },
-            { label: "Claimable Profit", val: formatUSDT(totalPending), sub: "Ready to claim", color: "text-emerald-600", bg: "bg-emerald-50" },
-            { label: "Total Earned", val: formatUSDT(totalEarned), sub: "All time", color: "text-purple-600", bg: "bg-purple-50" },
-            { label: "Est. Daily ROI", val: formatUSDT(summary?.dailyEarnings ?? 0), sub: "Per day", color: "text-amber-600", bg: "bg-amber-50" },
+            { label: "Active Capital", val: formatUSDT(totalValue), sub: `${activeInvestments.length} plan${activeInvestments.length !== 1 ? "s" : ""}`, color: "text-primary" },
+            { label: "Claimable Profit", val: formatUSDT(totalPending), sub: "Ready to claim", color: "text-emerald-600" },
+            { label: "Total Earned", val: formatUSDT(totalEarned), sub: "All time (ROI generated)", color: "text-purple-600" },
+            { label: "Est. Daily ROI", val: formatUSDT(summary?.dailyEarnings ?? 0), sub: "Per day", color: "text-amber-600" },
           ].map(({ label, val, sub, color }) => (
             <div key={label} className="bg-white border border-border rounded-xl p-3.5 shadow-sm">
               <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
@@ -166,7 +282,7 @@ export default function PortfolioPage() {
                         </div>
                       </div>
                       <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Earned</p>
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total ROI Generated</p>
                         <p className="font-semibold text-primary text-sm mt-1">{formatUSDT(inv.totalEarned)}</p>
                       </div>
                       <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
@@ -225,7 +341,7 @@ export default function PortfolioPage() {
                       <Zap size={16} className="text-primary/40" />
                     </div>
 
-                    {/* Auto-reinvest toggle — uses standard headless toggle pattern */}
+                    {/* Auto-reinvest toggle */}
                     <div className="flex items-center justify-between py-3 px-3.5 bg-slate-50 border border-slate-100 rounded-xl">
                       <div className="flex-1 min-w-0 mr-3">
                         <p className="text-xs font-semibold text-foreground">Auto-Reinvest</p>
@@ -306,6 +422,9 @@ export default function PortfolioPage() {
           </div>
         ) : null}
 
+        {/* Earnings Breakdown */}
+        <EarningsHistory />
+
         {/* Completed investments */}
         {completedInvestments.length > 0 && (
           <div>
@@ -334,7 +453,6 @@ export default function PortfolioPage() {
           </div>
         )}
 
-        {/* Empty history state */}
         {!isLoading && investments?.length === 0 && (
           <div className="text-center py-6">
             <RotateCcw size={20} className="text-muted-foreground mx-auto mb-2" />

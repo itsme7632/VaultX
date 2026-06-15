@@ -107,8 +107,8 @@ export async function processAllInvestments(force = false): Promise<{ processed:
     await db.insert(notificationsTable).values({
       userId: inv.userId,
       type: "earning",
-      title: "Daily ROI Credited",
-      message: `+${earning.toFixed(2)} USDT (${(dailyRate * 100).toFixed(2)}% ROI) credited to your ${plan.name} investment.`,
+      title: "Daily Profit Ready! 💰",
+      message: `+${earning.toFixed(2)} USDT added to your ${plan.name} plan. Visit Portfolio to claim to wallet or reinvest to earn more.`,
     });
 
     await processReferralCommission(inv.userId, earning, plan.name);

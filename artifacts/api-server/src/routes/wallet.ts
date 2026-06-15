@@ -314,6 +314,12 @@ router.post("/wallet/transfer", requireAuth, async (req, res): Promise<void> => 
     note: `Received from @${senderUser?.username ?? "user"}`,
   });
 
+  await db.insert(notificationsTable).values({
+    userId: recipient.id,
+    type: "transaction",
+    title: "Transfer Received",
+    message: `You received ${amount} USDT from @${senderUser?.username ?? "user"}.`,
+  });
 
   res.status(201).json({
     id: tx.id,
