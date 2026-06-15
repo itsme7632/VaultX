@@ -14,9 +14,11 @@ import adminRouter from "./admin";
 import newsRouter from "./news";
 import supportRouter from "./support";
 import depositNetworksRouter from "./deposit-networks";
+import publicSettingsRouter from "./public-settings";
 
 const router: IRouter = Router();
 
+router.use(publicSettingsRouter);
 router.use(healthRouter);
 router.use(authRouter);
 router.use(usersRouter);

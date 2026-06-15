@@ -1,4 +1,4 @@
-import { TrendingUp, Shield, Zap, CheckCircle, ArrowRight, Clock, Wallet } from "lucide-react";
+import { TrendingUp, Shield, Zap, CheckCircle, ArrowRight, Clock, Wallet, Star } from "lucide-react";
 import {
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
   useGetUserInvestments, getGetUserInvestmentsQueryKey,
@@ -79,14 +79,20 @@ export default function InvestmentsPage() {
           <div className="space-y-4">
             {plansLoading ? (
               [1, 2, 3].map((i) => <Skeleton key={i} className="h-56 rounded-2xl" />)
-            ) : plans?.map((plan: any) => {
+            ) : [...(plans ?? [])].sort((a: any, b: any) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)).map((plan: any) => {
               const RiskIcon = RISK_ICONS[plan.riskLevel] ?? Shield;
               const minRoi = plan.minRoiRate ?? 0.025;
               const maxRoi = plan.maxRoiRate ?? 0.030;
               const gradient = PLAN_GRADIENTS[plan.id] ?? "from-slate-600 to-slate-800";
 
               return (
-                <div key={plan.id} className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div key={plan.id} className={cn("bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow", plan.isFeatured ? "border-amber-300 ring-2 ring-amber-200" : "border-border")}>
+                  {plan.isFeatured && (
+                    <div className="bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-1.5 flex items-center gap-1.5">
+                      <Star size={11} className="text-white fill-white" />
+                      <p className="text-white text-[11px] font-bold tracking-wide uppercase">Featured Plan</p>
+                    </div>
+                  )}
                   <div className={cn("bg-gradient-to-r p-5 text-white", gradient)}>
                     <div className="flex items-start justify-between">
                       <div>

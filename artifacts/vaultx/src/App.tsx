@@ -1,10 +1,11 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/lib/auth";
+import { AuthProvider, useAuth } from "@/lib/auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { setBaseUrl } from "@workspace/api-client-react";
+import { Wrench } from "lucide-react";
 
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
@@ -120,6 +121,36 @@ function Router() {
   );
 }
 
+function MaintenanceBanner() {
+  const { user, isLoading: authLoading } = useAuth();
+  const { data: settings, isLoading: settingsLoading } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
+  if (authLoading || settingsLoading) return null;
+
+  const isAdmin = (user as any)?.isAdmin;
+  const inMaintenance = settings?.maintenance_mode === "true";
+
+  if (!inMaintenance || isAdmin) return null;
+
+  return (
+    <div className="fixed inset-0 z-[9999] bg-slate-900 flex flex-col items-center justify-center px-6 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center mb-6">
+        <Wrench size={28} className="text-amber-400" />
+      </div>
+      <h1 className="text-2xl font-bold text-white mb-2">Under Maintenance</h1>
+      <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
+        We're currently performing scheduled maintenance. Please check back shortly — we'll be up and running again soon.
+      </p>
+      <p className="mt-6 text-xs text-slate-500">{settings?.platform_name ?? "VaultX"} Team</p>
+    </div>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -127,6 +158,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
             <Router />
+            <MaintenanceBanner />
           </AuthProvider>
         </WouterRouter>
         <Toaster />

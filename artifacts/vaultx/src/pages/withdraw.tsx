@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Shield, AlertCircle, Clock, Copy, Check, X } from "lucide-react";
 import { useGetWallet, getGetWalletQueryKey, useCreateWithdrawal, getGetTransactionsQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { SubPageLayout } from "@/components/SubPageLayout";
 import { Button } from "@/components/ui/button";
@@ -24,17 +24,23 @@ export default function WithdrawPage() {
   const [copiedAddr, setCopiedAddr] = useState(false);
 
   const { data: wallet } = useGetWallet({ query: { queryKey: getGetWalletQueryKey(), staleTime: 30000 } });
+  const { data: platformSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
+    staleTime: 60000,
+  });
   const withdraw = useCreateWithdrawal();
 
   const networks = wallet?.addresses ?? [];
-  const feePercent = 1.5;
+  const feePercent = parseFloat(platformSettings?.withdrawal_fee_percent ?? "1.5");
+  const minWithdrawal = parseFloat(platformSettings?.min_withdrawal ?? "10");
   const wdAmountNum = parseFloat(wdAmount) || 0;
   const wdFee = wdAmountNum * feePercent / 100;
   const wdNet = Math.max(0, wdAmountNum - wdFee);
   const balance = wallet?.balance ?? 0;
 
   const hasError = wdAmountNum > 0 && wdAmountNum > balance;
-  const belowMin = wdAmountNum > 0 && wdAmountNum < 10;
+  const belowMin = wdAmountNum > 0 && wdAmountNum < minWithdrawal;
   const canProceed = wdAmount && wdAddress.trim().length > 8 && wdNetwork && !hasError && !belowMin && wdAmountNum > 0;
 
   const handleSetMax = () => setWdAmount(String(parseFloat(String(balance)).toFixed(2)));
@@ -106,7 +112,7 @@ export default function WithdrawPage() {
                 className={cn("h-12 text-base rounded-xl", hasError && "border-destructive")}
               />
               {hasError && <p className="text-xs text-destructive mt-1.5 px-1">Insufficient balance</p>}
-              {belowMin && <p className="text-xs text-destructive mt-1.5 px-1">Minimum withdrawal is 10.00 USDT</p>}
+              {belowMin && <p className="text-xs text-destructive mt-1.5 px-1">Minimum withdrawal is {formatUSDT(minWithdrawal)}</p>}
             </div>
 
             {/* Fee breakdown */}
@@ -155,7 +161,7 @@ export default function WithdrawPage() {
               {[
                 "Withdrawals are reviewed within 24 hours",
                 `A ${feePercent}% processing fee applies`,
-                "Minimum withdrawal is 10.00 USDT",
+                `Minimum withdrawal is ${formatUSDT(minWithdrawal)}`,
                 "Processing takes up to 2 business days",
               ].map((info) => (
                 <div key={info} className="flex items-start gap-1.5">

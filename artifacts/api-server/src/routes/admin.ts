@@ -528,6 +528,43 @@ router.post("/admin/deposits/:id/approve", requireAdmin, async (req, res): Promi
     message: `Your deposit of ${parseFloat(tx.amount).toFixed(2)} USDT has been confirmed and credited to your wallet.`,
   });
 
+  const [depositor] = await db.select().from(usersTable).where(eq(usersTable.id, tx.userId)).limit(1);
+  if (depositor?.referredBy) {
+    const [commSetting] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, "referral_commission_rate")).limit(1);
+    const commRate = parseFloat(commSetting?.value ?? "5") / 100;
+    const commAmount = parseFloat(tx.amount) * commRate;
+
+    if (commAmount > 0) {
+      const [referrerWallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, depositor.referredBy)).limit(1);
+      if (referrerWallet) {
+        await db.update(walletsTable).set({
+          balance: (parseFloat(referrerWallet.balance) + commAmount).toFixed(8),
+        }).where(eq(walletsTable.userId, depositor.referredBy));
+      }
+
+      await db.update(referralsTable).set({
+        commissionAmount: commAmount.toFixed(8),
+        status: "active",
+      }).where(and(eq(referralsTable.referrerId, depositor.referredBy), eq(referralsTable.referredId, tx.userId)));
+
+      await db.insert(transactionsTable).values({
+        userId: depositor.referredBy,
+        type: "referral",
+        amount: commAmount.toFixed(8),
+        status: "completed",
+        txId: `REF-${tx.id}`,
+        note: `Referral commission (${(commRate * 100).toFixed(1)}%) from @${depositor.username ?? "user"} deposit`,
+      });
+
+      await db.insert(notificationsTable).values({
+        userId: depositor.referredBy,
+        type: "transaction",
+        title: "Referral Commission Earned",
+        message: `You earned ${commAmount.toFixed(2)} USDT referral commission from @${depositor.username ?? "user"}'s deposit.`,
+      });
+    }
+  }
+
   res.json({ success: true });
 });
 

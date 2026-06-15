@@ -104,10 +104,12 @@ router.post("/wallet/deposit", requireAuth, async (req, res): Promise<void> => {
   }
 
   const [networkRecord] = await db.select().from(depositNetworksTable).where(eq(depositNetworksTable.network, network)).limit(1);
-  const minDeposit = networkRecord ? parseFloat(networkRecord.minDeposit) : 10;
+  const networkMinDeposit = networkRecord ? parseFloat(networkRecord.minDeposit) : 10;
+  const globalMinDeposit = parseFloat(await getSetting("min_deposit", "10"));
+  const minDeposit = Math.max(networkMinDeposit, globalMinDeposit);
 
   if (amount < minDeposit) {
-    res.status(400).json({ error: "Below minimum", message: `Minimum deposit is ${minDeposit} USDT for ${network}` });
+    res.status(400).json({ error: "Below minimum", message: `Minimum deposit is ${minDeposit} USDT` });
     return;
   }
 
