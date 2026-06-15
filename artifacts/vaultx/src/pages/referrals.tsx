@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Copy, Check, Share2, Users, DollarSign, Trophy,
-  TrendingUp, Wallet, ChevronDown, ChevronUp, ArrowDownCircle,
+  TrendingUp, Wallet, ChevronDown, ChevronUp, ArrowDownCircle, GitBranch,
 } from "lucide-react";
 import {
   useGetReferralStats, getGetReferralStatsQueryKey,
@@ -11,16 +11,9 @@ import {
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-
-function formatMoney(v: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency", currency: "USD",
-    minimumFractionDigits: 2, maximumFractionDigits: 2,
-  }).format(v);
-}
+import { formatUSDT } from "@/lib/format";
 
 async function claimReferralEarnings() {
   const res = await fetch("/api/referrals/claim", { method: "POST", credentials: "include" });
@@ -54,7 +47,7 @@ export default function ReferralsPage() {
   const { mutate: claimEarnings, isPending: claiming } = useMutation({
     mutationFn: claimReferralEarnings,
     onSuccess: (data) => {
-      setClaimMsg(`✅ ${formatMoney(data.amountClaimed)} credited to your wallet!`);
+      setClaimMsg(`✅ ${formatUSDT(data.amountClaimed)} credited to your wallet!`);
       qc.invalidateQueries({ queryKey: getGetReferralStatsQueryKey() });
       setTimeout(() => setClaimMsg(null), 5000);
     },
@@ -85,15 +78,6 @@ export default function ReferralsPage() {
 
   const RANK_COLORS = ["text-amber-500", "text-slate-400", "text-amber-700"];
 
-  const tierConfig: Record<string, { color: string; bg: string; bar: string; icon: string }> = {
-    Bronze:  { color: "text-amber-700",  bg: "bg-amber-50  border-amber-200",  bar: "bg-amber-500",  icon: "🥉" },
-    Silver:  { color: "text-slate-600",  bg: "bg-slate-50  border-slate-200",  bar: "bg-slate-400",  icon: "🥈" },
-    Gold:    { color: "text-yellow-600", bg: "bg-yellow-50 border-yellow-200", bar: "bg-yellow-500", icon: "🥇" },
-    Diamond: { color: "text-cyan-600",   bg: "bg-cyan-50   border-cyan-200",   bar: "bg-cyan-500",   icon: "💎" },
-  };
-  const tierLabel = (stats as any)?.tierLabel ?? "Bronze";
-  const cfg = tierConfig[tierLabel] ?? tierConfig.Bronze;
-
   return (
     <AppLayout title="Referrals">
       <div className="px-4 pt-5 pb-24 space-y-4">
@@ -114,7 +98,7 @@ export default function ReferralsPage() {
             )}
           </div>
           <p className="text-purple-200 text-xs mb-4">
-            Earn <span className="text-white font-bold">{((stats?.commissionRate ?? 0.05) * 100).toFixed(0)}%</span> on every referral's deposits & investment returns
+            Earn up to <span className="text-white font-bold">{((stats?.commissionRate ?? 0.05) * 100).toFixed(0)}%</span> on deposits &amp; investment returns across 3 levels
           </p>
           <div className="flex gap-2">
             <Button size="sm" className="bg-white/20 hover:bg-white/30 text-white border-0 h-9 gap-1.5" onClick={handleCopy}>
@@ -146,7 +130,7 @@ export default function ReferralsPage() {
                   <Skeleton className="h-7 w-28 mt-0.5" />
                 ) : (
                   <p className={cn("text-2xl font-bold leading-tight", pendingEarnings > 0 ? "text-emerald-700" : "text-foreground")}>
-                    {formatMoney(pendingEarnings)}
+                    {formatUSDT(pendingEarnings)}
                   </p>
                 )}
               </div>
@@ -182,7 +166,7 @@ export default function ReferralsPage() {
           {[
             { label: "Total Referred", value: statsLoading ? "..." : (stats?.totalReferrals ?? 0), icon: Users, color: "text-primary" },
             { label: "Active", value: statsLoading ? "..." : (stats?.activeReferrals ?? 0), icon: TrendingUp, color: "text-accent" },
-            { label: "Total Earned", value: statsLoading ? "..." : formatMoney(stats?.totalEarned ?? 0), icon: DollarSign, color: "text-purple-500" },
+            { label: "Total Earned", value: statsLoading ? "..." : formatUSDT(stats?.totalEarned ?? 0), icon: DollarSign, color: "text-purple-500" },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-white border border-border rounded-xl p-3 text-center shadow-sm">
               <Icon size={16} className={cn("mx-auto mb-1.5", color)} />
@@ -192,60 +176,55 @@ export default function ReferralsPage() {
           ))}
         </div>
 
-        {/* Tier card */}
+        {/* 3-Level commission card */}
         {(() => {
-          const total = stats?.totalReferrals ?? 0;
-          const nextTierAt = (stats as any)?.nextTierAt ?? null;
-          const rate = stats?.commissionRate ?? 0.05;
-          const progressPct = nextTierAt ? Math.min(100, (total / nextTierAt) * 100) : 100;
-          const tiers = [
-            { label: "Bronze", min: 0, rate: 0.05 },
-            { label: "Silver", min: 5, rate: 0.07 },
-            { label: "Gold", min: 10, rate: 0.10 },
-            { label: "Diamond", min: 20, rate: 0.12 },
+          const levels: any[] = (stats as any)?.levels ?? [
+            { level: 1, depositRate: 5, roiRate: 5 },
+            { level: 2, depositRate: 3, roiRate: 3 },
+            { level: 3, depositRate: 1, roiRate: 1 },
+          ];
+          const levelConfig = [
+            { label: "Level 1", desc: "Direct Referrals", icon: "👤", color: "text-purple-600", bg: "bg-purple-50 border-purple-200" },
+            { label: "Level 2", desc: "Referrals' Referrals", icon: "👥", color: "text-blue-600", bg: "bg-blue-50 border-blue-200" },
+            { label: "Level 3", desc: "3rd Degree Network", icon: "🌐", color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-200" },
           ];
           return (
-            <div className={cn("border rounded-2xl p-4 shadow-sm space-y-3", cfg.bg)}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{cfg.icon}</span>
-                  <div>
-                    <p className={cn("font-bold text-base leading-tight", cfg.color)}>{tierLabel} Tier</p>
-                    <p className="text-xs text-muted-foreground">{(rate * 100).toFixed(0)}% on deposits &amp; investment returns</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-muted-foreground">Rate</p>
-                  <p className={cn("font-bold text-xl", cfg.color)}>{(rate * 100).toFixed(0)}%</p>
-                </div>
+            <div className="border rounded-2xl p-4 shadow-sm space-y-3 bg-white">
+              <div className="flex items-center gap-2 mb-1">
+                <GitBranch size={16} className="text-purple-500" />
+                <p className="font-bold text-sm text-foreground">3-Level Referral Network</p>
               </div>
-              {nextTierAt !== null && (
-                <div>
-                  <div className="flex justify-between text-[11px] text-muted-foreground mb-1.5">
-                    <span>{total} referral{total !== 1 ? "s" : ""}</span>
-                    <span>{nextTierAt - total} more to next tier</span>
-                  </div>
-                  <div className="h-2 bg-white/70 rounded-full overflow-hidden border border-white">
-                    <div className={cn("h-full rounded-full transition-all duration-700", cfg.bar)} style={{ width: `${progressPct}%` }} />
-                  </div>
-                </div>
-              )}
-              {nextTierAt === null && (
-                <p className="text-[11px] text-cyan-600 font-semibold">🎉 You're at the highest tier!</p>
-              )}
-              <div className="grid grid-cols-4 gap-1.5 pt-1">
-                {tiers.map((t) => {
-                  const isActive = tierLabel === t.label;
-                  const tc = tierConfig[t.label];
+              <div className="space-y-2">
+                {levels.map((lvl, i) => {
+                  const lc = levelConfig[i];
                   return (
-                    <div key={t.label} className={cn("rounded-xl p-2 text-center border transition-all", isActive ? tc.bg : "bg-white/50 border-transparent opacity-60")}>
-                      <p className="text-base leading-none">{tc.icon}</p>
-                      <p className={cn("text-[9px] font-bold mt-1", isActive ? tc.color : "text-muted-foreground")}>{t.label}</p>
-                      <p className={cn("text-[9px] font-semibold", isActive ? tc.color : "text-muted-foreground")}>{(t.rate * 100).toFixed(0)}%</p>
+                    <div key={lvl.level} className={cn("rounded-xl border p-3", lc.bg)}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{lc.icon}</span>
+                          <div>
+                            <p className={cn("font-bold text-sm leading-tight", lc.color)}>{lc.label}</p>
+                            <p className="text-[10px] text-muted-foreground">{lc.desc}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3 text-right">
+                          <div>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide">Deposit</p>
+                            <p className={cn("font-bold text-base leading-tight", lc.color)}>{lvl.depositRate.toFixed(1)}%</p>
+                          </div>
+                          <div>
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-wide">ROI</p>
+                            <p className={cn("font-bold text-base leading-tight", lc.color)}>{lvl.roiRate.toFixed(1)}%</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
               </div>
+              <p className="text-[10px] text-muted-foreground text-center pt-1">
+                Earn commission on your network up to 3 levels deep
+              </p>
             </div>
           );
         })()}
@@ -297,7 +276,7 @@ export default function ReferralsPage() {
                         </p>
                       </div>
                       <div className="text-right mr-2">
-                        <p className="text-base font-bold text-emerald-600">{formatMoney(row.totalEarned)}</p>
+                        <p className="text-base font-bold text-emerald-600">{formatUSDT(row.totalEarned)}</p>
                         <p className="text-[10px] text-muted-foreground">total earned</p>
                       </div>
                       {isExpanded ? <ChevronUp size={14} className="text-muted-foreground flex-shrink-0" /> : <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />}
@@ -311,14 +290,14 @@ export default function ReferralsPage() {
                               <ArrowDownCircle size={12} className="text-blue-500" />
                               <p className="text-[10px] text-muted-foreground font-medium">From Deposits</p>
                             </div>
-                            <p className="text-sm font-bold text-blue-600">{formatMoney(fromDeposits)}</p>
+                            <p className="text-sm font-bold text-blue-600">{formatUSDT(fromDeposits)}</p>
                           </div>
                           <div className="bg-white rounded-xl p-3 border border-border">
                             <div className="flex items-center gap-1.5 mb-1">
                               <TrendingUp size={12} className="text-emerald-500" />
                               <p className="text-[10px] text-muted-foreground font-medium">From Investments</p>
                             </div>
-                            <p className="text-sm font-bold text-emerald-600">{formatMoney(fromInvestments)}</p>
+                            <p className="text-sm font-bold text-emerald-600">{formatUSDT(fromInvestments)}</p>
                           </div>
                         </div>
                         {userTxs.length > 0 && (
@@ -330,7 +309,7 @@ export default function ReferralsPage() {
                                   {t.source === "deposit" ? "💰" : "📈"}{" "}
                                   {t.source === "deposit" ? "Deposit commission" : `${t.planOrNote ?? "Investment"} ROI`}
                                 </span>
-                                <span className="font-semibold text-foreground">{formatMoney(t.amount)}</span>
+                                <span className="font-semibold text-foreground">{formatUSDT(t.amount)}</span>
                               </div>
                             ))}
                           </div>
@@ -372,7 +351,7 @@ export default function ReferralsPage() {
                         {new Date(t.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </p>
                     </div>
-                    <p className="text-sm font-bold text-emerald-600 flex-shrink-0">{formatMoney(t.amount)}</p>
+                    <p className="text-sm font-bold text-emerald-600 flex-shrink-0">{formatUSDT(t.amount)}</p>
                   </div>
                 ))}
               </div>
@@ -398,7 +377,7 @@ export default function ReferralsPage() {
                       <p className="text-sm font-medium text-foreground">@{row.username}</p>
                       <p className="text-xs text-muted-foreground">{row.totalReferrals} referrals</p>
                     </div>
-                    <p className="text-sm font-bold text-accent">{formatMoney(row.totalEarned)}</p>
+                    <p className="text-sm font-bold text-accent">{formatUSDT(row.totalEarned)}</p>
                   </div>
                 ))}
               </div>

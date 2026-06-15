@@ -1,4 +1,4 @@
-import { eq, and, lte, count, sql } from "drizzle-orm";
+import { eq, and, count, sql } from "drizzle-orm";
 import {
   db,
   userInvestmentsTable,
@@ -8,12 +8,18 @@ import {
   notificationsTable,
   referralsTable,
   usersTable,
+  platformSettingsTable,
 } from "@workspace/db";
 import { logger } from "./logger";
 import { generateTxId } from "./generate-tx-id";
 
 function randomRoi(minRate: number, maxRate: number): number {
   return minRate + Math.random() * (maxRate - minRate);
+}
+
+async function getSetting(key: string, fallback: string): Promise<string> {
+  const [s] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, key)).limit(1);
+  return s?.value ?? fallback;
 }
 
 export async function processAllInvestments(force = false): Promise<{ processed: number; matured: number; skipped: number }> {
@@ -120,63 +126,73 @@ export async function processAllInvestments(force = false): Promise<{ processed:
   return { processed, matured, skipped };
 }
 
-function getTierCommissionRate(totalReferrals: number): number {
-  if (totalReferrals >= 20) return 0.12;
-  if (totalReferrals >= 10) return 0.10;
-  if (totalReferrals >= 5)  return 0.07;
-  return 0.05;
+async function creditReferralCommission(
+  referrerId: number,
+  amount: number,
+  level: number,
+  sourceUsername: string,
+  planName: string,
+  ratePercent: number
+): Promise<void> {
+  const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, referrerId)).limit(1);
+  if (!wallet) return;
+
+  await db.update(walletsTable).set({
+    referralPendingEarnings: sql`referral_pending_earnings + ${amount.toFixed(8)}`,
+  }).where(eq(walletsTable.userId, referrerId));
+
+  await db.insert(transactionsTable).values({
+    userId: referrerId,
+    type: "referral",
+    amount: amount.toFixed(8),
+    status: "completed",
+    txId: generateTxId(),
+    note: `L${level} referral commission (${ratePercent.toFixed(1)}%) from ${planName} earnings`,
+  });
 }
 
 async function processReferralCommission(userId: number, earning: number, planName: string): Promise<void> {
-  const [user] = await db
-    .select({ referredBy: usersTable.referredBy })
-    .from(usersTable)
-    .where(eq(usersTable.id, userId))
-    .limit(1);
+  const l1RateRaw = parseFloat(await getSetting("referral_l1_roi_rate", "5"));
+  const l2RateRaw = parseFloat(await getSetting("referral_l2_roi_rate", "3"));
+  const l3RateRaw = parseFloat(await getSetting("referral_l3_roi_rate", "1"));
 
+  const l1Rate = l1RateRaw / 100;
+  const l2Rate = l2RateRaw / 100;
+  const l3Rate = l3RateRaw / 100;
+
+  const [user] = await db.select({ referredBy: usersTable.referredBy, username: usersTable.username })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
   if (!user?.referredBy) return;
 
-  const [countRow] = await db
-    .select({ total: count(referralsTable.id) })
-    .from(referralsTable)
-    .where(eq(referralsTable.referrerId, user.referredBy));
-  const totalReferrals = countRow?.total ?? 0;
+  const l1Id = user.referredBy;
+  const l1Commission = earning * l1Rate;
+  if (l1Commission >= 0.0001) {
+    await creditReferralCommission(l1Id, l1Commission, 1, user.username ?? "user", planName, l1RateRaw);
+    await db.update(referralsTable).set({
+      commissionAmount: sql`commission_amount + ${l1Commission.toFixed(8)}`,
+      status: "paid",
+    }).where(and(eq(referralsTable.referrerId, l1Id), eq(referralsTable.referredId, userId)));
+  }
 
-  const commissionRate = getTierCommissionRate(totalReferrals);
-  const commission = earning * commissionRate;
-  if (commission < 0.0001) return;
+  if (l2Rate <= 0) return;
+  const [l1User] = await db.select({ referredBy: usersTable.referredBy, username: usersTable.username })
+    .from(usersTable).where(eq(usersTable.id, l1Id)).limit(1);
+  if (!l1User?.referredBy) return;
 
-  const [referrerWallet] = await db
-    .select()
-    .from(walletsTable)
-    .where(eq(walletsTable.userId, user.referredBy))
-    .limit(1);
+  const l2Id = l1User.referredBy;
+  const l2Commission = earning * l2Rate;
+  if (l2Commission >= 0.0001) {
+    await creditReferralCommission(l2Id, l2Commission, 2, user.username ?? "user", planName, l2RateRaw);
+  }
 
-  if (!referrerWallet) return;
+  if (l3Rate <= 0) return;
+  const [l2User] = await db.select({ referredBy: usersTable.referredBy })
+    .from(usersTable).where(eq(usersTable.id, l2Id)).limit(1);
+  if (!l2User?.referredBy) return;
 
-  await db
-    .update(walletsTable)
-    .set({
-      referralPendingEarnings: sql`referral_pending_earnings + ${commission.toFixed(8)}`,
-    })
-    .where(eq(walletsTable.userId, user.referredBy));
-
-  await db.insert(transactionsTable).values({
-    userId: user.referredBy,
-    type: "referral",
-    amount: commission.toFixed(8),
-    status: "completed",
-    txId: generateTxId(),
-    note: `Referral commission (${(commissionRate * 100).toFixed(0)}%) from ${planName} earnings`,
-  });
-
-  await db
-    .update(referralsTable)
-    .set({ commissionAmount: sql`commission_amount + ${commission.toFixed(8)}`, status: "paid" })
-    .where(
-      and(
-        eq(referralsTable.referrerId, user.referredBy),
-        eq(referralsTable.referredId, userId)
-      )
-    );
+  const l3Id = l2User.referredBy;
+  const l3Commission = earning * l3Rate;
+  if (l3Commission >= 0.0001) {
+    await creditReferralCommission(l3Id, l3Commission, 3, user.username ?? "user", planName, l3RateRaw);
+  }
 }

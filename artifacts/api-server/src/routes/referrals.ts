@@ -1,26 +1,30 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, count, sum, and, sql } from "drizzle-orm";
-import { db, usersTable, referralsTable, walletsTable, transactionsTable, notificationsTable } from "@workspace/db";
+import { db, usersTable, referralsTable, walletsTable, transactionsTable, notificationsTable, platformSettingsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
 
 const router: IRouter = Router();
 
-const TIERS = [
-  { min: 20, rate: 0.12, label: "Diamond" },
-  { min: 10, rate: 0.10, label: "Gold" },
-  { min: 5,  rate: 0.07, label: "Silver" },
-  { min: 0,  rate: 0.05, label: "Bronze" },
-] as const;
-
-function getTier(total: number) {
-  return TIERS.find((t) => total >= t.min) ?? TIERS[TIERS.length - 1];
+async function getSetting(key: string, fallback: string): Promise<string> {
+  const [s] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, key)).limit(1);
+  return s?.value ?? fallback;
 }
 
-function getNextTier(total: number) {
+const TIER_THRESHOLDS = [
+  { min: 20, label: "Diamond" },
+  { min: 10, label: "Gold" },
+  { min: 5,  label: "Silver" },
+  { min: 0,  label: "Bronze" },
+] as const;
+
+function getTierLabel(total: number): string {
+  return TIER_THRESHOLDS.find((t) => total >= t.min)?.label ?? "Bronze";
+}
+
+function getNextTierAt(total: number): number | null {
   const thresholds = [5, 10, 20];
-  const next = thresholds.find((t) => total < t);
-  return next ?? null;
+  return thresholds.find((t) => total < t) ?? null;
 }
 
 router.get("/referrals", requireAuth, async (req, res): Promise<void> => {
@@ -47,9 +51,25 @@ router.get("/referrals", requireAuth, async (req, res): Promise<void> => {
   );
   const activeReferrals = referrals.filter((r) => r.status !== "pending").length;
   const total = referrals.length;
-  const currentTier = getTier(total);
-  const nextTierAt = getNextTier(total);
+  const tierLabel = getTierLabel(total);
+  const nextTierAt = getNextTierAt(total);
   const pendingEarnings = wallet ? parseFloat(wallet.referralPendingEarnings) : 0;
+
+  const [
+    l1DepositRate,
+    l2DepositRate,
+    l3DepositRate,
+    l1RoiRate,
+    l2RoiRate,
+    l3RoiRate,
+  ] = await Promise.all([
+    getSetting("referral_l1_deposit_rate", "5"),
+    getSetting("referral_l2_deposit_rate", "3"),
+    getSetting("referral_l3_deposit_rate", "1"),
+    getSetting("referral_l1_roi_rate", "5"),
+    getSetting("referral_l2_roi_rate", "3"),
+    getSetting("referral_l3_roi_rate", "1"),
+  ]);
 
   res.json({
     code: user.referralCode,
@@ -57,10 +77,14 @@ router.get("/referrals", requireAuth, async (req, res): Promise<void> => {
     activeReferrals,
     totalEarned,
     pendingEarnings,
-    commissionRate: currentTier.rate,
-    tierLabel: currentTier.label,
+    commissionRate: parseFloat(l1DepositRate) / 100,
+    tierLabel,
     nextTierAt,
-    tiers: TIERS.map((t) => ({ ...t })),
+    levels: [
+      { level: 1, depositRate: parseFloat(l1DepositRate), roiRate: parseFloat(l1RoiRate) },
+      { level: 2, depositRate: parseFloat(l2DepositRate), roiRate: parseFloat(l2RoiRate) },
+      { level: 3, depositRate: parseFloat(l3DepositRate), roiRate: parseFloat(l3RoiRate) },
+    ],
   });
 });
 

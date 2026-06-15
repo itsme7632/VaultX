@@ -1,13 +1,15 @@
 import { useEffect, useState, useRef } from "react";
-import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, ArrowRight } from "lucide-react";
+import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, ArrowRight, Users, Copy, Check } from "lucide-react";
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetMarketPrices, getGetMarketPricesQueryKey,
   useGetDashboardActivity, getGetDashboardActivityQueryKey,
+  useGetReferralStats, getGetReferralStatsQueryKey,
 } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDateTime } from "@/lib/format";
 import { Link } from "wouter";
@@ -78,6 +80,77 @@ const activityTypeBg: Record<string, string> = {
   transfer: "bg-blue-50",
   referral: "bg-purple-50",
 };
+
+function ReferralWidget() {
+  const [copied, setCopied] = useState(false);
+  const { data: stats, isLoading } = useGetReferralStats({
+    query: { queryKey: getGetReferralStatsQueryKey(), staleTime: 30000 },
+  });
+
+  const pendingEarnings = (stats as any)?.pendingEarnings ?? 0;
+  const referralLink = stats?.code
+    ? `${window.location.origin}/signup?ref=${stats.code}`
+    : null;
+
+  const handleCopy = () => {
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+            <Users size={15} className="text-white" />
+          </div>
+          <div>
+            <p className="text-[10px] text-purple-200 uppercase tracking-widest font-medium">Referral Earnings</p>
+            {isLoading ? (
+              <Skeleton className="h-6 w-24 bg-white/20 mt-0.5" />
+            ) : (
+              <p className={cn("text-xl font-bold leading-tight", pendingEarnings > 0 ? "text-emerald-300" : "text-white")}>
+                {formatUSDT(pendingEarnings)}
+              </p>
+            )}
+          </div>
+        </div>
+        <Link href="/referrals">
+          <Button size="sm" variant="ghost" className="text-purple-200 hover:text-white hover:bg-white/10 h-8 px-3 text-xs gap-1">
+            View <ArrowRight size={11} />
+          </Button>
+        </Link>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 bg-white/10 rounded-lg px-3 py-1.5 min-w-0">
+          {isLoading ? (
+            <Skeleton className="h-3 w-full bg-white/20" />
+          ) : (
+            <p className="text-[10px] text-purple-100 font-mono truncate">{referralLink ?? "Loading…"}</p>
+          )}
+        </div>
+        <Button
+          size="sm"
+          onClick={handleCopy}
+          disabled={!referralLink || isLoading}
+          className="bg-white/20 hover:bg-white/30 text-white border-0 h-8 px-3 gap-1.5 flex-shrink-0"
+        >
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+          <span className="text-xs">{copied ? "Copied!" : "Copy"}</span>
+        </Button>
+      </div>
+      {pendingEarnings > 0 && (
+        <Link href="/referrals">
+          <p className="text-[10px] text-emerald-300 mt-2 font-medium text-center animate-pulse">
+            💰 Tap "View" to claim your pending earnings →
+          </p>
+        </Link>
+      )}
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -190,6 +263,9 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* Referral Widget */}
+        <ReferralWidget />
 
         {/* Live Activity Feed */}
         <LiveActivityFeed />

@@ -530,35 +530,65 @@ router.post("/admin/deposits/:id/approve", requireAdmin, async (req, res): Promi
 
   const [depositor] = await db.select().from(usersTable).where(eq(usersTable.id, tx.userId)).limit(1);
   if (depositor?.referredBy) {
-    const [commSetting] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, "referral_commission_rate")).limit(1);
-    const commRate = parseFloat(commSetting?.value ?? "5") / 100;
-    const commAmount = parseFloat(tx.amount) * commRate;
+    const depositAmount = parseFloat(tx.amount);
+    const depositorUsername = depositor.username ?? "user";
 
-    if (commAmount > 0) {
+    const getDepositSetting = async (key: string, fallback: string) => {
+      const [s] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, key)).limit(1);
+      return s?.value ?? fallback;
+    };
+
+    const l1RateRaw = parseFloat(await getDepositSetting("referral_l1_deposit_rate", "5"));
+    const l2RateRaw = parseFloat(await getDepositSetting("referral_l2_deposit_rate", "3"));
+    const l3RateRaw = parseFloat(await getDepositSetting("referral_l3_deposit_rate", "1"));
+
+    const applyDepositCommission = async (referrerId: number, level: number, rateRaw: number) => {
+      const rate = rateRaw / 100;
+      const amount = depositAmount * rate;
+      if (amount < 0.0001) return;
+
       await db.update(walletsTable).set({
-        referralPendingEarnings: sql`referral_pending_earnings + ${commAmount.toFixed(8)}`,
-      }).where(eq(walletsTable.userId, depositor.referredBy));
-
-      await db.update(referralsTable).set({
-        commissionAmount: sql`commission_amount + ${commAmount.toFixed(8)}`,
-        status: "active",
-      }).where(and(eq(referralsTable.referrerId, depositor.referredBy), eq(referralsTable.referredId, tx.userId)));
+        referralPendingEarnings: sql`referral_pending_earnings + ${amount.toFixed(8)}`,
+      }).where(eq(walletsTable.userId, referrerId));
 
       await db.insert(transactionsTable).values({
-        userId: depositor.referredBy,
+        userId: referrerId,
         type: "referral",
-        amount: commAmount.toFixed(8),
+        amount: amount.toFixed(8),
         status: "completed",
-        txId: `REF-${tx.id}`,
-        note: `Referral commission (${(commRate * 100).toFixed(1)}%) from @${depositor.username ?? "user"} deposit`,
+        txId: `REF-${tx.id}-L${level}`,
+        note: `L${level} referral commission (${rateRaw.toFixed(1)}%) from @${depositorUsername} deposit`,
       });
 
       await db.insert(notificationsTable).values({
-        userId: depositor.referredBy,
+        userId: referrerId,
         type: "transaction",
         title: "Referral Commission Earned",
-        message: `You earned ${commAmount.toFixed(2)} USDT referral commission from @${depositor.username ?? "user"}'s deposit.`,
+        message: `You earned ${amount.toFixed(2)} USDT L${level} referral commission from @${depositorUsername}'s deposit.`,
       });
+    };
+
+    const l1Id = depositor.referredBy;
+    await applyDepositCommission(l1Id, 1, l1RateRaw);
+
+    await db.update(referralsTable).set({
+      commissionAmount: sql`commission_amount + ${((depositAmount * l1RateRaw) / 100).toFixed(8)}`,
+      status: "active",
+    }).where(and(eq(referralsTable.referrerId, l1Id), eq(referralsTable.referredId, tx.userId)));
+
+    if (l2RateRaw > 0) {
+      const [l1User] = await db.select({ referredBy: usersTable.referredBy }).from(usersTable).where(eq(usersTable.id, l1Id)).limit(1);
+      if (l1User?.referredBy) {
+        const l2Id = l1User.referredBy;
+        await applyDepositCommission(l2Id, 2, l2RateRaw);
+
+        if (l3RateRaw > 0) {
+          const [l2User] = await db.select({ referredBy: usersTable.referredBy }).from(usersTable).where(eq(usersTable.id, l2Id)).limit(1);
+          if (l2User?.referredBy) {
+            await applyDepositCommission(l2User.referredBy, 3, l3RateRaw);
+          }
+        }
+      }
     }
   }
 

@@ -876,8 +876,16 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
     { key: "min_deposit", label: "Min. Deposit (USDT)", placeholder: "10" },
     { key: "min_withdrawal", label: "Min. Withdrawal (USDT)", placeholder: "10" },
     { key: "withdrawal_fee_percent", label: "Withdrawal Fee (%)", placeholder: "1.5" },
-    { key: "referral_commission_rate", label: "Referral Bonus (%)", placeholder: "5" },
     { key: "announcement_text", label: "Announcement Banner Text", placeholder: "" },
+  ];
+
+  const REFERRAL_FIELDS = [
+    { key: "referral_l1_deposit_rate", label: "Level 1 — Deposit Commission (%)", placeholder: "5", desc: "Direct referral's deposit" },
+    { key: "referral_l2_deposit_rate", label: "Level 2 — Deposit Commission (%)", placeholder: "3", desc: "Referral's referral deposit" },
+    { key: "referral_l3_deposit_rate", label: "Level 3 — Deposit Commission (%)", placeholder: "1", desc: "3rd degree network deposit" },
+    { key: "referral_l1_roi_rate", label: "Level 1 — ROI Commission (%)", placeholder: "5", desc: "Direct referral's investment ROI" },
+    { key: "referral_l2_roi_rate", label: "Level 2 — ROI Commission (%)", placeholder: "3", desc: "Referral's referral ROI" },
+    { key: "referral_l3_roi_rate", label: "Level 3 — ROI Commission (%)", placeholder: "1", desc: "3rd degree network ROI" },
   ];
 
   const TOGGLE_FIELDS = [
@@ -940,6 +948,37 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
 
         <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save All Settings"}
+        </Button>
+      </div>
+
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Network size={14} className="text-purple-500" />
+          <p className="text-sm font-bold text-foreground">3-Level Referral Commissions</p>
+        </div>
+        <p className="text-xs text-muted-foreground -mt-1">Set deposit &amp; ROI commission rates for each referral level independently.</p>
+
+        <div className="grid grid-cols-2 gap-3">
+          {REFERRAL_FIELDS.map(({ key, label, placeholder, desc }) => (
+            <div key={key}>
+              <Label className="text-xs text-muted-foreground">{label}</Label>
+              <p className="text-[10px] text-muted-foreground/70 mb-1">{desc}</p>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={form[key] ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                placeholder={placeholder}
+                className="h-9 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+
+        <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : "Save Referral Rates"}
         </Button>
       </div>
 
