@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
   useAdminGetUsers, getAdminGetUsersQueryKey,
@@ -867,7 +868,7 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
     }
   }, [settingsData]);
 
-  const FIELDS = [
+  const TEXT_FIELDS = [
     { key: "platform_name", label: "Platform Name", placeholder: "VaultX" },
     { key: "support_email", label: "Support Email", placeholder: "support@vaultx.com" },
     { key: "support_telegram", label: "Telegram Link", placeholder: "https://t.me/vaultx" },
@@ -876,19 +877,26 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
     { key: "min_withdrawal", label: "Min. Withdrawal (USDT)", placeholder: "10" },
     { key: "withdrawal_fee_percent", label: "Withdrawal Fee (%)", placeholder: "1.5" },
     { key: "referral_commission_rate", label: "Referral Bonus (%)", placeholder: "5" },
-    { key: "kyc_required_for_withdrawal", label: "KYC Required for Withdrawal", placeholder: "true" },
-    { key: "maintenance_mode", label: "Maintenance Mode", placeholder: "false" },
     { key: "announcement_text", label: "Announcement Banner Text", placeholder: "" },
+  ];
+
+  const TOGGLE_FIELDS = [
+    { key: "maintenance_mode", label: "Maintenance Mode", description: "Disable access for all non-admin users" },
+    { key: "kyc_required_for_withdrawal", label: "KYC Required for Withdrawal", description: "Block withdrawals until KYC is approved" },
   ];
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetch("/api/admin/settings", {
+      const res = await fetch("/api/admin/settings", {
         method: "PUT", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message ?? "Failed to save settings");
+      }
       queryClient.invalidateQueries({ queryKey: ["admin-settings"] });
       toast({ title: "Settings saved!" });
     } catch (e: any) {
@@ -902,17 +910,34 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
     <div className="space-y-4">
       <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
         <p className="text-sm font-bold text-foreground">Platform Settings</p>
-        {FIELDS.map(({ key, label, placeholder }) => (
-          <div key={key}>
-            <Label className="text-xs text-muted-foreground">{label}</Label>
-            <Input
-              value={form[key] ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-              placeholder={placeholder}
-              className="mt-1 h-9 text-sm"
+
+        {TOGGLE_FIELDS.map(({ key, label, description }) => (
+          <div key={key} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+            <div>
+              <p className="text-sm font-medium text-foreground">{label}</p>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+            <Switch
+              checked={form[key] === "true"}
+              onCheckedChange={(checked) => setForm((f) => ({ ...f, [key]: checked ? "true" : "false" }))}
             />
           </div>
         ))}
+
+        <div className="pt-1 space-y-3">
+          {TEXT_FIELDS.map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <Label className="text-xs text-muted-foreground">{label}</Label>
+              <Input
+                value={form[key] ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                placeholder={placeholder}
+                className="mt-1 h-9 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+
         <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save All Settings"}
         </Button>

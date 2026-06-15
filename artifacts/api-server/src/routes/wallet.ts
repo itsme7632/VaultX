@@ -158,6 +158,12 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
+  const kycRequired = await getSetting("kyc_required_for_withdrawal", "false");
+  if (kycRequired === "true" && user?.kycStatus !== "approved") {
+    res.status(403).json({ error: "KYC required", message: "You must complete KYC verification before making a withdrawal." });
+    return;
+  }
+
   const minWithdrawal = parseFloat(await getSetting("min_withdrawal", "10"));
   if (amount < minWithdrawal) {
     res.status(400).json({ error: "Below minimum", message: `Minimum withdrawal is ${minWithdrawal} USDT` });

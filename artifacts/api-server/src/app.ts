@@ -1,9 +1,10 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import { pool } from "@workspace/db";
+import { pool, db, platformSettingsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { startCronJobs } from "./lib/cron";
@@ -65,6 +66,34 @@ app.use(
   }),
 );
 
+async function maintenanceMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const EXEMPT_PATHS = ["/api/health", "/api/auth/login", "/api/auth/register", "/api/auth/logout"];
+  const isAdminRoute = req.path.startsWith("/api/admin");
+  const isExempt = EXEMPT_PATHS.some((p) => req.path === p);
+
+  if (isAdminRoute || isExempt) {
+    next();
+    return;
+  }
+
+  if (req.session?.isAdmin) {
+    next();
+    return;
+  }
+
+  try {
+    const [setting] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, "maintenance_mode")).limit(1);
+    if (setting?.value === "true") {
+      res.status(503).json({ error: "Maintenance", message: "The platform is currently under maintenance. Please try again later." });
+      return;
+    }
+  } catch {
+  }
+
+  next();
+}
+
+app.use(maintenanceMiddleware);
 app.use("/api", router);
 
 startCronJobs();
