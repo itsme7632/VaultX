@@ -63,6 +63,8 @@ export default function AdminPage() {
   const [roiRunning, setRoiRunning] = useState(false);
   const [roiResult, setRoiResult] = useState<{ processed: number; matured: number; skipped: number } | null>(null);
   const [wdTxHash, setWdTxHash] = useState("");
+  const [userDetail, setUserDetail] = useState<any>(null);
+  const [userDetailLoading, setUserDetailLoading] = useState(false);
   const { data: analytics, isLoading: analyticsLoading } = useAdminGetAnalytics({ query: { queryKey: getAdminGetAnalyticsQueryKey(), staleTime: 30000 } });
   const { data: usersData } = useAdminGetUsers({ search: search || undefined, limit: 20 }, { query: { queryKey: getAdminGetUsersQueryKey({ search: search || undefined, limit: 20 }), staleTime: 20000 } });
   const { data: kycData } = useAdminGetKycSubmissions({ status: kycFilter }, { query: { queryKey: getAdminGetKycSubmissionsQueryKey({ status: kycFilter }), staleTime: 20000 } });
@@ -170,6 +172,20 @@ export default function AdminPage() {
   const handleAdjust = () => {
     if (!adjustModal) return;
     adjustBalance.mutate({ id: adjustModal.userId, data: { amount: parseFloat(adjustAmount), reason: adjustReason } }, { onSuccess: () => { setAdjustModal(null); setAdjustAmount(""); setAdjustReason(""); queryClient.invalidateQueries({ queryKey: getAdminGetUsersQueryKey({}) }); }, onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }) });
+  };
+
+  const openUserModal = async (u: any) => {
+    setUserModal(u);
+    setUserDetail(null);
+    setUserDetailLoading(true);
+    try {
+      const detail = await adminApi(`/admin/users/${u.id}`);
+      setUserDetail(detail);
+    } catch {
+      // fallback to list data
+    } finally {
+      setUserDetailLoading(false);
+    }
   };
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
@@ -325,7 +341,7 @@ export default function AdminPage() {
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <Badge variant="outline" className={cn("text-[9px]", u.kycStatus === "approved" ? "text-emerald-600 bg-emerald-50" : "")}>{u.kycStatus}</Badge>
-                      <button onClick={() => setUserModal(u)} className="p-1.5 rounded-lg hover:bg-muted"><ChevronRight size={13} /></button>
+                      <button onClick={() => openUserModal(u)} className="p-1.5 rounded-lg hover:bg-muted"><ChevronRight size={13} /></button>
                     </div>
                   </div>
                 )) : <div className="py-8 text-center text-sm text-muted-foreground">No users found</div>}
@@ -654,58 +670,146 @@ export default function AdminPage() {
       </Dialog>
 
       {/* User modal */}
-      <Dialog open={!!userModal} onOpenChange={(o) => !o && setUserModal(null)}>
+      <Dialog open={!!userModal} onOpenChange={(o) => { if (!o) { setUserModal(null); setUserDetail(null); } }}>
         <DialogContent className="max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Manage User — @{userModal?.username}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                {userModal?.fullName?.charAt(0) ?? "U"}
+              </div>
+              @{userModal?.username}
+            </DialogTitle>
+          </DialogHeader>
           {userModal && (
-            <div className="space-y-3 pt-2">
-              <div className="bg-muted/50 rounded-xl p-3 grid grid-cols-2 gap-2 text-xs">
-                <div><p className="text-muted-foreground">Balance</p><p className="font-bold text-primary">{formatUSDT(userModal.balance)}</p></div>
-                <div><p className="text-muted-foreground">Deposited</p><p className="font-bold">{formatUSDT(userModal.totalDeposited)}</p></div>
-                <div><p className="text-muted-foreground">Withdrawn</p><p className="font-bold">{formatUSDT(userModal.totalWithdrawn)}</p></div>
-                <div><p className="text-muted-foreground">KYC</p><p className="font-bold capitalize">{userModal.kycStatus}</p></div>
+            <div className="space-y-4 pt-1">
+
+              {/* Identity info */}
+              <div className="bg-muted/40 rounded-xl p-3 space-y-1.5 text-xs">
+                <div className="flex justify-between"><span className="text-muted-foreground">Full Name</span><span className="font-medium">{userModal.fullName}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="font-medium truncate max-w-[180px]">{userModal.email}</span></div>
+                {userModal.whatsapp && <div className="flex justify-between"><span className="text-muted-foreground">WhatsApp</span><span className="font-medium">{userModal.whatsapp}</span></div>}
+                {userModal.country && <div className="flex justify-between"><span className="text-muted-foreground">Country</span><span className="font-medium">{userModal.country}</span></div>}
+                <div className="flex justify-between"><span className="text-muted-foreground">Member ID</span><span className="font-mono font-medium">#{userModal.displayId}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Joined</span><span className="font-medium">{formatDate(userModal.createdAt)}</span></div>
+                <div className="flex justify-between items-center"><span className="text-muted-foreground">KYC</span>
+                  <Badge variant="outline" className={cn("text-[9px] capitalize", userModal.kycStatus === "approved" ? "bg-emerald-50 text-emerald-600" : userModal.kycStatus === "rejected" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{userModal.kycStatus}</Badge>
+                </div>
               </div>
 
+              {/* Financial stats */}
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Financial Overview</p>
+                {userDetailLoading ? (
+                  <div className="grid grid-cols-2 gap-2">{[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { label: "Wallet Balance", value: formatUSDT((userDetail ?? userModal).balance), color: "text-primary" },
+                      { label: "Total Deposited", value: formatUSDT((userDetail ?? userModal).totalDeposited), color: "text-emerald-600" },
+                      { label: "Total Withdrawn", value: formatUSDT((userDetail ?? userModal).totalWithdrawn), color: "text-red-500" },
+                      { label: "Total Earnings", value: formatUSDT((userDetail ?? userModal).totalEarnings ?? 0), color: "text-amber-500" },
+                      { label: "Investment Profit", value: formatUSDT(userDetail?.totalInvestmentProfit ?? 0), color: "text-purple-500" },
+                      { label: "Referral Earnings", value: formatUSDT(userDetail?.referralPendingEarnings ?? 0), color: "text-blue-500" },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className="bg-white border border-border rounded-xl p-2.5">
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                        <p className={cn("text-sm font-bold mt-0.5", color)}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Investment summary */}
+              {userDetail && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Investments</p>
+                  <div className="grid grid-cols-3 gap-2 mb-2">
+                    <div className="bg-white border border-border rounded-xl p-2.5 text-center">
+                      <p className="text-[9px] text-muted-foreground">Active</p>
+                      <p className="text-sm font-bold text-emerald-600">{userDetail.activeInvestmentsCount}</p>
+                    </div>
+                    <div className="bg-white border border-border rounded-xl p-2.5 text-center">
+                      <p className="text-[9px] text-muted-foreground">Total</p>
+                      <p className="text-sm font-bold">{userDetail.totalInvestmentsCount}</p>
+                    </div>
+                    <div className="bg-white border border-border rounded-xl p-2.5 text-center">
+                      <p className="text-[9px] text-muted-foreground">Referrals</p>
+                      <p className="text-sm font-bold text-blue-500">{userDetail.referralCount}</p>
+                    </div>
+                  </div>
+                  {userDetail.investments?.filter((i: any) => i.status === "active").length > 0 && (
+                    <div className="space-y-1.5">
+                      {userDetail.investments.filter((i: any) => i.status === "active").map((inv: any) => (
+                        <div key={inv.id} className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 flex justify-between items-center">
+                          <div>
+                            <p className="text-xs font-semibold text-emerald-800">{inv.planName}</p>
+                            <p className="text-[10px] text-emerald-600">Earned: {formatUSDT(inv.totalEarned)}</p>
+                          </div>
+                          <p className="text-sm font-bold text-emerald-700">{formatUSDT(inv.amount)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Recent transactions */}
+              {userDetail?.recentTransactions?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Recent Transactions</p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {userDetail.recentTransactions.map((t: any) => (
+                      <div key={t.id} className="flex items-center justify-between bg-muted/30 rounded-xl px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium capitalize text-foreground">{t.type.replace("_", " ")}</p>
+                          {t.note && <p className="text-[10px] text-muted-foreground truncate max-w-[160px]">{t.note}</p>}
+                          <p className="text-[10px] text-muted-foreground">{formatDateTime(t.createdAt)}</p>
+                        </div>
+                        <p className={cn("text-xs font-bold shrink-0 ml-2", t.type === "withdrawal" ? "text-red-500" : "text-emerald-600")}>
+                          {t.type === "withdrawal" ? "-" : "+"}{formatUSDT(t.amount)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Login / IP info */}
               {(userModal.ipAddress || userModal.lastLoginIp) && (
                 <div className="bg-muted/30 rounded-xl p-3 text-xs space-y-1">
                   {userModal.ipAddress && <p><span className="text-muted-foreground">Reg. IP: </span><span className="font-mono">{userModal.ipAddress}</span></p>}
-                  {userModal.lastLoginIp && <p><span className="text-muted-foreground">Last Login IP: </span><span className="font-mono">{userModal.lastLoginIp}</span></p>}
+                  {userModal.lastLoginIp && <p><span className="text-muted-foreground">Last IP: </span><span className="font-mono">{userModal.lastLoginIp}</span></p>}
                   {userModal.lastLoginAt && <p><span className="text-muted-foreground">Last Login: </span>{formatDateTime(userModal.lastLoginAt)}</p>}
                 </div>
               )}
 
+              {/* Lock controls */}
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">Lock Controls</p>
-                <label className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-xl">
-                  <span className="text-sm">Lock Withdrawals</span>
-                  <input type="checkbox" checked={userModal.withdrawalLocked} onChange={(e) => setUserModal({ ...userModal, withdrawalLocked: e.target.checked })} className="w-4 h-4" />
-                </label>
-                <label className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-xl">
-                  <span className="text-sm">Lock Transfers</span>
-                  <input type="checkbox" checked={userModal.transferLocked} onChange={(e) => setUserModal({ ...userModal, transferLocked: e.target.checked })} className="w-4 h-4" />
-                </label>
-                <label className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-xl">
-                  <span className="text-sm">Lock WhatsApp</span>
-                  <input type="checkbox" checked={userModal.whatsappLocked ?? false} onChange={(e) => setUserModal({ ...userModal, whatsappLocked: e.target.checked })} className="w-4 h-4" />
-                </label>
-                <label className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-xl">
-                  <span className="text-sm">Admin Access</span>
-                  <input type="checkbox" checked={userModal.isAdmin} onChange={(e) => setUserModal({ ...userModal, isAdmin: e.target.checked })} className="w-4 h-4" />
-                </label>
-                <label className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-xl">
-                  <span className="text-sm">Account Active</span>
-                  <input type="checkbox" checked={userModal.isActive} onChange={(e) => setUserModal({ ...userModal, isActive: e.target.checked })} className="w-4 h-4" />
-                </label>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Account Controls</p>
+                {[
+                  { label: "Lock Withdrawals", key: "withdrawalLocked" },
+                  { label: "Lock Transfers", key: "transferLocked" },
+                  { label: "Lock WhatsApp", key: "whatsappLocked" },
+                  { label: "Admin Access", key: "isAdmin" },
+                  { label: "Account Active", key: "isActive" },
+                ].map(({ label, key }) => (
+                  <label key={key} className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-xl">
+                    <span className="text-sm">{label}</span>
+                    <input type="checkbox" checked={userModal[key] ?? false} onChange={(e) => setUserModal({ ...userModal, [key]: e.target.checked })} className="w-4 h-4" />
+                  </label>
+                ))}
               </div>
 
+              {/* Action buttons */}
               <div className="flex gap-2 flex-wrap">
-                <Button size="sm" variant="outline" className="text-xs h-8 flex-1" onClick={() => { setAdjustModal({ userId: userModal.id, username: userModal.username }); setUserModal(null); }}>Adjust Balance</Button>
+                <Button size="sm" variant="outline" className="text-xs h-8 flex-1" onClick={() => { setAdjustModal({ userId: userModal.id, username: userModal.username }); setUserModal(null); setUserDetail(null); }}>Adjust Balance</Button>
                 <Button size="sm" variant="outline" className="text-xs h-8 flex-1" onClick={() => reset2fa.mutate(userModal.id)}>Reset 2FA</Button>
-                <Button size="sm" variant="outline" className="text-xs h-8 flex-1 gap-1 text-amber-600 border-amber-300 hover:bg-amber-50" onClick={() => { setResetPwModal({ userId: userModal.id, username: userModal.username }); setUserModal(null); }}><KeyRound size={11} />Reset Password</Button>
+                <Button size="sm" variant="outline" className="text-xs h-8 flex-1 gap-1 text-amber-600 border-amber-300 hover:bg-amber-50" onClick={() => { setResetPwModal({ userId: userModal.id, username: userModal.username }); setUserModal(null); setUserDetail(null); }}><KeyRound size={11} />Reset Password</Button>
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setUserModal(null)}>Cancel</Button>
+                <Button variant="outline" className="flex-1" onClick={() => { setUserModal(null); setUserDetail(null); }}>Cancel</Button>
                 <Button className="flex-1" onClick={() => updateUser.mutate(userModal)} disabled={updateUser.isPending}>Save Changes</Button>
               </div>
             </div>
@@ -877,6 +981,7 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
     { key: "min_withdrawal", label: "Min. Withdrawal (USDT)", placeholder: "10" },
     { key: "withdrawal_fee_percent", label: "Withdrawal Fee (%)", placeholder: "1.5" },
     { key: "signup_bonus_amount", label: "Signup Bonus Amount (USDT)", placeholder: "10" },
+    { key: "first_deposit_bonus_percent", label: "First Deposit Bonus (%)", placeholder: "10" },
     { key: "announcement_text", label: "Announcement Banner Text", placeholder: "" },
   ];
 
@@ -893,6 +998,7 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
     { key: "maintenance_mode", label: "Maintenance Mode", description: "Disable access for all non-admin users" },
     { key: "kyc_required_for_withdrawal", label: "KYC Required for Withdrawal", description: "Block withdrawals until KYC is approved" },
     { key: "signup_bonus_enabled", label: "Signup Bonus", description: "Credit a welcome bonus to every new user on registration" },
+    { key: "first_deposit_bonus_enabled", label: "First Deposit Bonus", description: "Credit a bonus % when a user makes their first ever deposit" },
   ];
 
   const handleSave = async () => {

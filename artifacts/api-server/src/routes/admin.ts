@@ -95,31 +95,58 @@ router.get("/admin/users/:id", requireAdmin, async (req, res): Promise<void> => 
     return;
   }
 
-  const investments = await db
-    .select({ inv: userInvestmentsTable, planName: investmentPlansTable.name })
-    .from(userInvestmentsTable)
-    .leftJoin(investmentPlansTable, eq(userInvestmentsTable.planId, investmentPlansTable.id))
-    .where(eq(userInvestmentsTable.userId, id))
-    .orderBy(desc(userInvestmentsTable.createdAt))
-    .limit(10);
+  const [investments, referralCountRow, recentTxs, activeInvSummary, totalInvSummary] = await Promise.all([
+    db.select({ inv: userInvestmentsTable, planName: investmentPlansTable.name })
+      .from(userInvestmentsTable)
+      .leftJoin(investmentPlansTable, eq(userInvestmentsTable.planId, investmentPlansTable.id))
+      .where(eq(userInvestmentsTable.userId, id))
+      .orderBy(desc(userInvestmentsTable.createdAt))
+      .limit(10),
 
-  const referralCount = await db
-    .select({ c: count() })
-    .from(referralsTable)
-    .where(eq(referralsTable.referrerId, id));
+    db.select({ c: count() }).from(referralsTable).where(eq(referralsTable.referrerId, id)),
+
+    db.select().from(transactionsTable)
+      .where(eq(transactionsTable.userId, id))
+      .orderBy(desc(transactionsTable.createdAt))
+      .limit(15),
+
+    db.select({ c: count(), s: sum(userInvestmentsTable.amount) })
+      .from(userInvestmentsTable)
+      .where(and(eq(userInvestmentsTable.userId, id), eq(userInvestmentsTable.status, "active"))),
+
+    db.select({ c: count(), earned: sum(userInvestmentsTable.totalEarned) })
+      .from(userInvestmentsTable)
+      .where(eq(userInvestmentsTable.userId, id)),
+  ]);
+
+  const wallet = result.wallet;
 
   res.json({
-    ...serializeUser(result.user, result.wallet),
-    referralCount: referralCount[0]?.c ?? 0,
+    ...serializeUser(result.user, wallet),
+    referralPendingEarnings: parseFloat(wallet?.referralPendingEarnings ?? "0"),
+    referralCount: referralCountRow[0]?.c ?? 0,
+    activeInvestmentsCount: activeInvSummary[0]?.c ?? 0,
+    activeInvestmentsValue: parseFloat(activeInvSummary[0]?.s ?? "0"),
+    totalInvestmentsCount: totalInvSummary[0]?.c ?? 0,
+    totalInvestmentProfit: parseFloat(totalInvSummary[0]?.earned ?? "0"),
     investments: investments.map((r) => ({
       id: r.inv.id,
-      planName: r.planName,
+      planName: r.planName ?? "Unknown",
       amount: parseFloat(r.inv.amount),
       totalEarned: parseFloat(r.inv.totalEarned),
       pendingEarnings: parseFloat(r.inv.pendingEarnings),
       status: r.inv.status,
       startDate: r.inv.startDate,
       endDate: r.inv.endDate,
+    })),
+    recentTransactions: recentTxs.map((t) => ({
+      id: t.id,
+      type: t.type,
+      amount: parseFloat(t.amount),
+      status: t.status,
+      note: t.note,
+      txId: t.txId,
+      createdAt: t.createdAt,
     })),
   });
 });
@@ -587,6 +614,54 @@ router.post("/admin/deposits/:id/approve", requireAdmin, async (req, res): Promi
           if (l2User?.referredBy) {
             await applyDepositCommission(l2User.referredBy, 3, l3RateRaw);
           }
+        }
+      }
+    }
+  }
+
+  // First-deposit bonus
+  const getSetting = async (key: string, fallback: string) => {
+    const [s] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, key)).limit(1);
+    return s?.value ?? fallback;
+  };
+  const bonusEnabled = (await getSetting("first_deposit_bonus_enabled", "false")) === "true";
+  if (bonusEnabled) {
+    const bonusPct = parseFloat(await getSetting("first_deposit_bonus_percent", "10"));
+    if (bonusPct > 0) {
+      // Count prior completed deposits for this user (excluding the one just approved)
+      const [prior] = await db
+        .select({ c: count() })
+        .from(transactionsTable)
+        .where(and(
+          eq(transactionsTable.userId, tx.userId),
+          eq(transactionsTable.type, "deposit"),
+          eq(transactionsTable.status, "completed"),
+          sql`${transactionsTable.id} != ${id}`,
+        ));
+      const priorCount = prior?.c ?? 0;
+      if (priorCount === 0) {
+        const bonusAmount = parseFloat(tx.amount) * (bonusPct / 100);
+        if (bonusAmount >= 0.01) {
+          const [bonusWallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, tx.userId)).limit(1);
+          if (bonusWallet) {
+            await db.update(walletsTable).set({
+              balance: (parseFloat(bonusWallet.balance) + bonusAmount).toFixed(8),
+            }).where(eq(walletsTable.userId, tx.userId));
+          }
+          await db.insert(transactionsTable).values({
+            userId: tx.userId,
+            type: "earning",
+            amount: bonusAmount.toFixed(8),
+            status: "completed",
+            txId: `FDB-${tx.id}`,
+            note: `First deposit bonus (${bonusPct}%)`,
+          });
+          await db.insert(notificationsTable).values({
+            userId: tx.userId,
+            type: "transaction",
+            title: "🎉 First Deposit Bonus!",
+            message: `You've received a ${bonusAmount.toFixed(2)} USDT first deposit bonus (${bonusPct}% of your deposit).`,
+          });
         }
       }
     }
