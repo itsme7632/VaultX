@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
-import { eq, or } from "drizzle-orm";
-import { db, usersTable, passwordResetTokensTable, referralsTable } from "@workspace/db";
+import { eq, or, sql } from "drizzle-orm";
+import { db, usersTable, passwordResetTokensTable, referralsTable, walletsTable, transactionsTable, notificationsTable, platformSettingsTable } from "@workspace/db";
 import { ensureWallet } from "../lib/wallet";
 import { generateReferralCode } from "../lib/referral";
 import { requireAuth } from "../middlewares/auth";
@@ -114,6 +114,35 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
       commissionAmount: "0",
       status: "pending",
     });
+  }
+
+  const [bonusEnabled] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, "signup_bonus_enabled")).limit(1);
+  const [bonusAmount] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, "signup_bonus_amount")).limit(1);
+
+  if (bonusEnabled?.value === "true") {
+    const bonus = parseFloat(bonusAmount?.value ?? "0");
+    if (bonus > 0) {
+      await db.update(walletsTable).set({
+        balance: sql`balance + ${bonus.toFixed(8)}`,
+        totalEarnings: sql`total_earnings + ${bonus.toFixed(8)}`,
+      }).where(eq(walletsTable.userId, user.id));
+
+      await db.insert(transactionsTable).values({
+        userId: user.id,
+        type: "earning",
+        amount: bonus.toFixed(8),
+        status: "completed",
+        txId: `SIGNUP-BONUS-${user.id}`,
+        note: `Welcome signup bonus`,
+      });
+
+      await db.insert(notificationsTable).values({
+        userId: user.id,
+        type: "announcement",
+        title: "🎉 Welcome Bonus Credited!",
+        message: `You've received a ${bonus.toFixed(2)} USDT signup bonus. Start investing and grow your portfolio!`,
+      });
+    }
   }
 
   req.session.userId = user.id;

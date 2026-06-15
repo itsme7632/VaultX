@@ -876,6 +876,7 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
     { key: "min_deposit", label: "Min. Deposit (USDT)", placeholder: "10" },
     { key: "min_withdrawal", label: "Min. Withdrawal (USDT)", placeholder: "10" },
     { key: "withdrawal_fee_percent", label: "Withdrawal Fee (%)", placeholder: "1.5" },
+    { key: "signup_bonus_amount", label: "Signup Bonus Amount (USDT)", placeholder: "10" },
     { key: "announcement_text", label: "Announcement Banner Text", placeholder: "" },
   ];
 
@@ -891,6 +892,7 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
   const TOGGLE_FIELDS = [
     { key: "maintenance_mode", label: "Maintenance Mode", description: "Disable access for all non-admin users" },
     { key: "kyc_required_for_withdrawal", label: "KYC Required for Withdrawal", description: "Block withdrawals until KYC is approved" },
+    { key: "signup_bonus_enabled", label: "Signup Bonus", description: "Credit a welcome bonus to every new user on registration" },
   ];
 
   const handleSave = async () => {
