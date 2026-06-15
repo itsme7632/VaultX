@@ -127,12 +127,6 @@ router.post("/wallet/deposit", requireAuth, async (req, res): Promise<void> => {
     metadata,
   } as any).returning();
 
-  await db.insert(notificationsTable).values({
-    userId: req.session.userId!,
-    type: "transaction",
-    title: "Deposit Submitted",
-    message: `Your deposit of ${amount} USDT via ${network} is pending confirmation.`,
-  });
 
   res.status(201).json({
     id: tx.id,
@@ -197,12 +191,6 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
     note: `Withdrawal via ${network} (fee: ${fee.toFixed(2)} USDT)`,
   }).returning();
 
-  await db.insert(notificationsTable).values({
-    userId: req.session.userId!,
-    type: "transaction",
-    title: "Withdrawal Requested",
-    message: `Your withdrawal of ${netAmount.toFixed(2)} USDT via ${network} is pending admin approval.`,
-  });
 
   res.status(201).json({
     id: tx.id,
@@ -326,12 +314,6 @@ router.post("/wallet/transfer", requireAuth, async (req, res): Promise<void> => 
     note: `Received from @${senderUser?.username ?? "user"}`,
   });
 
-  await db.insert(notificationsTable).values({
-    userId: recipient.id,
-    type: "transaction",
-    title: "Transfer Received",
-    message: `You received ${amount} USDT from @${senderUser?.username ?? "user"}.`,
-  });
 
   res.status(201).json({
     id: tx.id,

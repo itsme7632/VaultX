@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatUSDT, formatDateTime } from "@/lib/format";
 import { Link } from "wouter";
 import { LiveActivityFeed } from "@/components/LiveActivityFeed";
+import { useAuth } from "@/lib/auth";
 
 function LiveEarnings({ base, rate }: { base: number; rate: number }) {
   const [earnings, setEarnings] = useState(base);
@@ -79,6 +80,7 @@ const activityTypeBg: Record<string, string> = {
 };
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const { data: summary, isLoading: summaryLoading } = useGetDashboardSummary({
     query: { queryKey: getGetDashboardSummaryQueryKey(), staleTime: 30000 },
   });
@@ -116,6 +118,14 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <div className="px-4 pt-5 pb-24 space-y-5">
+        {/* Welcome */}
+        <div>
+          <p className="text-xs text-muted-foreground font-medium">Good day,</p>
+          <h1 className="text-xl font-bold text-foreground leading-tight">
+            {user ? `@${user.username}` : <Skeleton className="h-6 w-32 inline-block" />}
+          </h1>
+        </div>
+
         {/* Balance hero */}
         <div className="bg-gradient-to-br from-primary via-blue-500 to-blue-700 rounded-2xl p-5 text-white shadow-lg">
           <p className="text-blue-100 text-xs font-medium uppercase tracking-widest mb-1">Total Balance</p>

@@ -6,7 +6,6 @@ import {
   userInvestmentsTable,
   walletsTable,
   transactionsTable,
-  notificationsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -188,12 +187,6 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
     note: `Invested ${amount} USDT in ${plan.name}`,
   });
 
-  await db.insert(notificationsTable).values({
-    userId: req.session.userId!,
-    type: "investment",
-    title: "Investment Started",
-    message: `Your ${amount} USDT investment in ${plan.name} has started. Expected daily ROI: ${(midRoi * 100).toFixed(2)}%`,
-  });
 
   res.status(201).json(
     computeInvestmentView(investment, plan.name, plan.minRoiRate ?? undefined, plan.maxRoiRate ?? undefined),
@@ -256,12 +249,6 @@ router.post("/investments/:id/claim", requireAuth, async (req, res): Promise<voi
     note: `Earnings claimed from investment #${id}`,
   });
 
-  await db.insert(notificationsTable).values({
-    userId: req.session.userId!,
-    type: "earning",
-    title: "Profit Claimed",
-    message: `${pending.toFixed(2)} USDT profit has been added to your wallet balance.`,
-  });
 
   res.json({ amountClaimed: pending, newBalance });
 });
@@ -315,12 +302,6 @@ router.post("/investments/:id/reinvest", requireAuth, async (req, res): Promise<
     note: `Reinvested ${pending.toFixed(2)} USDT into ${result.planName ?? "investment"} #${id}`,
   });
 
-  await db.insert(notificationsTable).values({
-    userId: req.session.userId!,
-    type: "earning",
-    title: "Profit Reinvested",
-    message: `${pending.toFixed(2)} USDT reinvested into your ${result.planName} plan. New principal: ${newAmount.toFixed(2)} USDT.`,
-  });
 
   res.json(
     computeInvestmentView(
