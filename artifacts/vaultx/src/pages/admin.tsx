@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
   useAdminGetUsers, getAdminGetUsersQueryKey,
@@ -940,6 +941,35 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
 
         <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save All Settings"}
+        </Button>
+      </div>
+
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <p className="text-sm font-bold text-foreground">Instructions &amp; Rules</p>
+        <p className="text-xs text-muted-foreground -mt-1">Each line becomes one step. Leave empty to use the default instructions.</p>
+
+        <div>
+          <Label className="text-xs text-muted-foreground">Deposit Instructions (one step per line)</Label>
+          <Textarea
+            value={form["deposit_instructions"] ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, deposit_instructions: e.target.value }))}
+            placeholder={"Open your wallet app\nSend USDT to the address shown\nPaste the TX hash\nUpload your screenshot"}
+            className="mt-1 text-sm min-h-[100px] resize-none"
+          />
+        </div>
+
+        <div>
+          <Label className="text-xs text-muted-foreground">Withdrawal Rules (one rule per line)</Label>
+          <Textarea
+            value={form["withdrawal_instructions"] ?? ""}
+            onChange={(e) => setForm((f) => ({ ...f, withdrawal_instructions: e.target.value }))}
+            placeholder={"Withdrawals are reviewed within 24 hours\nA processing fee applies to all withdrawals\nProcessing takes up to 2 business days"}
+            className="mt-1 text-sm min-h-[100px] resize-none"
+          />
+        </div>
+
+        <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : "Save Instructions"}
         </Button>
       </div>
     </div>

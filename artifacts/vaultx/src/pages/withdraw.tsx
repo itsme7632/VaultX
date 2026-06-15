@@ -29,6 +29,12 @@ export default function WithdrawPage() {
     queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
     staleTime: 60000,
   });
+
+  const customRules: string[] = (() => {
+    const raw = platformSettings?.withdrawal_instructions?.trim();
+    if (!raw) return [];
+    return raw.split("\n").map((s: string) => s.trim()).filter(Boolean);
+  })();
   const withdraw = useCreateWithdrawal();
 
   const networks = wallet?.addresses ?? [];
@@ -158,12 +164,12 @@ export default function WithdrawPage() {
                 <Clock size={13} className="text-amber-600 shrink-0" />
                 <p className="text-xs font-bold text-amber-700">Processing Information</p>
               </div>
-              {[
+              {(customRules.length > 0 ? customRules : [
                 "Withdrawals are reviewed within 24 hours",
                 `A ${feePercent}% processing fee applies`,
                 `Minimum withdrawal is ${formatUSDT(minWithdrawal)}`,
                 "Processing takes up to 2 business days",
-              ].map((info) => (
+              ]).map((info: string) => (
                 <div key={info} className="flex items-start gap-1.5">
                   <div className="w-1 h-1 rounded-full bg-amber-400 mt-2 shrink-0" />
                   <p className="text-[12px] text-amber-700">{info}</p>
