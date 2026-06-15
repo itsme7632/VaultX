@@ -26,6 +26,9 @@ export const walletsTable = pgTable("wallets", {
   totalEarnings: numeric("total_earnings", { precision: 18, scale: 8 })
     .notNull()
     .default("0"),
+  referralPendingEarnings: numeric("referral_pending_earnings", { precision: 18, scale: 8 })
+    .notNull()
+    .default("0"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

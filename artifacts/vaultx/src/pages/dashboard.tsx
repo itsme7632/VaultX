@@ -119,12 +119,39 @@ export default function DashboardPage() {
     <AppLayout>
       <div className="px-4 pt-5 pb-24 space-y-5">
         {/* Welcome */}
-        <div>
-          <p className="text-xs text-muted-foreground font-medium">Good day,</p>
-          <h1 className="text-xl font-bold text-foreground leading-tight">
-            {user ? `@${user.username}` : <Skeleton className="h-6 w-32 inline-block" />}
-          </h1>
-        </div>
+        {(() => {
+          const hour = new Date().getHours();
+          const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+          const emoji = hour < 12 ? "☀️" : hour < 17 ? "🌤️" : "🌙";
+          return (
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                {user ? (
+                  <span className="text-white font-bold text-base">
+                    {user.username?.[0]?.toUpperCase() ?? "?"}
+                  </span>
+                ) : (
+                  <Skeleton className="w-11 h-11 rounded-full" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-muted-foreground font-medium leading-none mb-0.5">
+                  {emoji} {greeting}
+                </p>
+                {user ? (
+                  <h1 className="text-lg font-bold text-foreground leading-tight truncate">
+                    @{user.username}
+                  </h1>
+                ) : (
+                  <Skeleton className="h-6 w-32 mt-0.5" />
+                )}
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  {new Date().toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Balance hero */}
         <div className="bg-gradient-to-br from-primary via-blue-500 to-blue-700 rounded-2xl p-5 text-white shadow-lg">

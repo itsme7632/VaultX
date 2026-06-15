@@ -1,4 +1,4 @@
-import { eq, and, lte, count } from "drizzle-orm";
+import { eq, and, lte, count, sql } from "drizzle-orm";
 import {
   db,
   userInvestmentsTable,
@@ -157,8 +157,7 @@ async function processReferralCommission(userId: number, earning: number, planNa
   await db
     .update(walletsTable)
     .set({
-      balance: (parseFloat(referrerWallet.balance) + commission).toFixed(8),
-      totalEarnings: (parseFloat(referrerWallet.totalEarnings) + commission).toFixed(8),
+      referralPendingEarnings: sql`referral_pending_earnings + ${commission.toFixed(8)}`,
     })
     .where(eq(walletsTable.userId, user.referredBy));
 
@@ -173,7 +172,7 @@ async function processReferralCommission(userId: number, earning: number, planNa
 
   await db
     .update(referralsTable)
-    .set({ commissionAmount: commission.toFixed(8), status: "paid" })
+    .set({ commissionAmount: sql`commission_amount + ${commission.toFixed(8)}`, status: "paid" })
     .where(
       and(
         eq(referralsTable.referrerId, user.referredBy),

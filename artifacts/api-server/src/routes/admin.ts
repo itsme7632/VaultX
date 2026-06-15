@@ -535,15 +535,12 @@ router.post("/admin/deposits/:id/approve", requireAdmin, async (req, res): Promi
     const commAmount = parseFloat(tx.amount) * commRate;
 
     if (commAmount > 0) {
-      const [referrerWallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, depositor.referredBy)).limit(1);
-      if (referrerWallet) {
-        await db.update(walletsTable).set({
-          balance: (parseFloat(referrerWallet.balance) + commAmount).toFixed(8),
-        }).where(eq(walletsTable.userId, depositor.referredBy));
-      }
+      await db.update(walletsTable).set({
+        referralPendingEarnings: sql`referral_pending_earnings + ${commAmount.toFixed(8)}`,
+      }).where(eq(walletsTable.userId, depositor.referredBy));
 
       await db.update(referralsTable).set({
-        commissionAmount: commAmount.toFixed(8),
+        commissionAmount: sql`commission_amount + ${commAmount.toFixed(8)}`,
         status: "active",
       }).where(and(eq(referralsTable.referrerId, depositor.referredBy), eq(referralsTable.referredId, tx.userId)));
 
