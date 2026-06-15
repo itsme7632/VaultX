@@ -287,7 +287,6 @@ const ActivityRow = memo(function ActivityRow({
           <span className="font-semibold text-slate-800">@{item.username}</span>
           {" "}
           <span className="text-slate-500">{item.action}</span>
-          {" "}<span className="text-[11px]">{item.flag}</span>
         </p>
         <p className="text-[10px] text-slate-400 mt-[2px] tabular-nums">
           {timeAgo(item.ts)}
