@@ -30,6 +30,7 @@ import NewsPage, { NewsArticlePage } from "@/pages/news";
 import SupportPage, { SupportTicketPage } from "@/pages/support";
 import TransactionPage from "@/pages/transaction";
 import NotFound from "@/pages/not-found";
+import AboutPage from "@/pages/about";
 
 setBaseUrl(null);
 
@@ -114,6 +115,9 @@ function Router() {
       </Route>
       <Route path="/transaction/:id">
         <ProtectedRoute><TransactionPage /></ProtectedRoute>
+      </Route>
+      <Route path="/about">
+        <ProtectedRoute><AboutPage /></ProtectedRoute>
       </Route>
 
       <Route component={NotFound} />

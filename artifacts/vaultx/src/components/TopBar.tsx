@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, User, Shield, FileCheck, Settings, LifeBuoy, LogOut, ChevronRight, LayoutDashboard } from "lucide-react";
+import { Bell, User, Shield, FileCheck, Settings, LifeBuoy, LogOut, ChevronRight, LayoutDashboard, Info } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useLogout, useGetNotifications, getGetNotificationsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,6 +49,7 @@ export function TopBar({ title }: { title?: string }) {
     { icon: FileCheck, label: "KYC Verification", href: "/kyc" },
     { icon: Settings, label: "Settings", href: "/settings" },
     { icon: Bell, label: "Notifications", href: "/notifications", badge: unreadCount },
+    { icon: Info, label: "About Us", href: "/about" },
     ...(user?.isAdmin ? [{ icon: LayoutDashboard, label: "Admin Panel", href: "/admin" }] : []),
   ];
 

@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-import { Shield, FileCheck, User, Bell, ChevronRight, HelpCircle, LogOut, Newspaper, MessageCircle, Info, Download } from "lucide-react";
+import { Shield, FileCheck, User, Bell, ChevronRight, HelpCircle, LogOut, Newspaper, MessageCircle, Info, Download, Globe } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
@@ -100,6 +100,7 @@ export default function SettingsPage() {
           <div className="divide-y divide-border">
             <SettingsItem icon={Newspaper} label="News & Updates" description="Platform announcements" onClick={() => setLocation("/news")} />
             <SettingsItem icon={MessageCircle} label="Help & Support" description="Support tickets and FAQ" onClick={() => setLocation("/support")} />
+            <SettingsItem icon={Globe} label="About Us" description="Platform info, mission & FAQ" onClick={() => setLocation("/about")} />
             {apkInfo && (
               <a href="/api/apk/download" className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 active:bg-muted/50 transition-colors">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50">

@@ -17,6 +17,7 @@ import depositNetworksRouter from "./deposit-networks";
 import publicSettingsRouter from "./public-settings";
 import storageRouter from "./storage";
 import apkRouter from "./apk";
+import aboutRouter from "./about";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(supportRouter);
 router.use(depositNetworksRouter);
 router.use(storageRouter);
 router.use(apkRouter);
+router.use(aboutRouter);
 
 export default router;

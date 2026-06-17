@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Upload, Download } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Upload, Download, Info } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "mobile-app";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "mobile-app" | "about";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -77,6 +77,7 @@ export default function AdminPage() {
   const { data: settingsData } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" });
   const { data: resetLogs } = useQuery({ queryKey: ["admin-reset-logs"], queryFn: () => adminApi("/admin/password-reset-logs"), staleTime: 30000, enabled: tab === "logs" });
   const { data: apkReleases, refetch: refetchApk } = useQuery({ queryKey: ["admin-apk"], queryFn: () => adminApi("/admin/apk"), staleTime: 30000, enabled: tab === "mobile-app" });
+  const { data: aboutData, refetch: refetchAbout } = useQuery({ queryKey: ["admin-about"], queryFn: () => adminApi("/admin/about"), staleTime: 30000, enabled: tab === "about" });
 
   const approveKyc = useAdminApproveKyc();
   const rejectKyc = useAdminRejectKyc();
@@ -200,6 +201,7 @@ export default function AdminPage() {
     { id: "news", label: "News", icon: Newspaper },
     { id: "broadcast", label: "Broadcast", icon: Bell },
     { id: "mobile-app", label: "Mobile App", icon: Smartphone },
+    { id: "about", label: "About Us", icon: Info },
     { id: "settings", label: "Settings", icon: Settings },
     { id: "logs", label: "Logs", icon: FileText },
   ];
@@ -596,6 +598,10 @@ export default function AdminPage() {
             <MobileAppTab releases={apkReleases ?? []} onRefresh={refetchApk} toast={toast} />
           )}
 
+          {tab === "about" && (
+            <AboutTab data={aboutData} onRefresh={refetchAbout} toast={toast} />
+          )}
+
           {tab === "settings" && (
             <SettingsTab settingsData={settingsData} toast={toast} />
           )}
@@ -960,6 +966,94 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
     </AppLayout>
+  );
+}
+
+function AboutTab({ data, onRefresh, toast }: { data: any; onRefresh: () => void; toast: any }) {
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (data) setForm(data);
+  }, [data]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/about", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      toast({ title: "About Us content saved" });
+      onRefresh();
+    } catch {
+      toast({ title: "Error", description: "Failed to save", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const FIELDS = [
+    { key: "about_hero_title", label: "Hero Title", placeholder: "About VaultX", multiline: false },
+    { key: "about_hero_subtitle", label: "Hero Subtitle", placeholder: "A Modern Digital Investment Platform…", multiline: false },
+    { key: "about_hero_description", label: "Hero Description", placeholder: "VaultX is a digital investment platform…", multiline: true },
+    { key: "about_mission_text", label: "Mission Text", placeholder: "At VaultX, our mission is to…", multiline: true },
+    { key: "about_security_text", label: "Security & Compliance Text", placeholder: "VaultX prioritizes platform security…", multiline: true },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Info size={15} className="text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">About Us Content</p>
+            <p className="text-[11px] text-muted-foreground">Edit the text displayed on the public About Us page</p>
+          </div>
+        </div>
+
+        {FIELDS.map(({ key, label, placeholder, multiline }) => (
+          <div key={key}>
+            <Label className="text-xs text-muted-foreground">{label}</Label>
+            {multiline ? (
+              <Textarea
+                value={form[key] ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                placeholder={placeholder}
+                className="mt-1 text-sm min-h-[80px] resize-none"
+              />
+            ) : (
+              <Input
+                value={form[key] ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                placeholder={placeholder}
+                className="mt-1 h-9 text-sm"
+              />
+            )}
+          </div>
+        ))}
+
+        <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : "Save About Us Content"}
+        </Button>
+      </div>
+
+      <div className="bg-muted/30 border border-border rounded-2xl p-4 space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Note</p>
+        <p className="text-xs text-muted-foreground">Contact information (email, Telegram, WhatsApp) is pulled from the Settings tab. Platform statistics are always live from the database.</p>
+        <button
+          className="text-xs text-primary font-semibold flex items-center gap-1 mt-1"
+          onClick={() => window.open("/about", "_self")}
+        >
+          Preview About Page →
+        </button>
+      </div>
+    </div>
   );
 }
 
