@@ -1077,37 +1077,33 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
     setUploading(true);
     setProgress(0);
     try {
-      // Step 1: get presigned upload URL
-      const urlRes = await fetch("/api/admin/apk/upload-url", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-      if (!urlRes.ok) throw new Error("Failed to get upload URL");
-      const { uploadURL, objectPath } = await urlRes.json();
+      const formData = new FormData();
+      formData.append("apk", file);
+      formData.append("version", version.trim());
+      if (releaseNotes.trim()) formData.append("releaseNotes", releaseNotes.trim());
 
-      // Step 2: PUT file directly to GCS
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 80));
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 95));
         });
-        xhr.addEventListener("load", () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`))));
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            try {
+              const body = JSON.parse(xhr.responseText);
+              reject(new Error(body.error || `Upload failed (${xhr.status})`));
+            } catch {
+              reject(new Error(`Upload failed (${xhr.status})`));
+            }
+          }
+        });
         xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
-        xhr.open("PUT", uploadURL);
-        xhr.setRequestHeader("Content-Type", "application/vnd.android.package-archive");
-        xhr.send(file);
+        xhr.open("POST", "/api/admin/apk/upload");
+        xhr.withCredentials = true;
+        xhr.send(formData);
       });
-      setProgress(90);
-
-      // Step 3: save metadata
-      const metaRes = await fetch("/api/admin/apk", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version: version.trim(), fileName: file.name, fileSize: file.size, objectPath, releaseNotes: releaseNotes.trim() || undefined }),
-      });
-      if (!metaRes.ok) throw new Error("Failed to save APK metadata");
 
       setProgress(100);
       toast({ title: "APK Uploaded", description: `v${version} is now the active release.` });
