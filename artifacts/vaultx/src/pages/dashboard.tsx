@@ -82,20 +82,18 @@ const activityTypeBg: Record<string, string> = {
 };
 
 function DownloadAppCard() {
-  const { data: settings } = useQuery({
-    queryKey: ["public-settings"],
-    queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
+  const { data: apkInfo } = useQuery({
+    queryKey: ["apk-latest"],
+    queryFn: () => fetch("/api/apk/latest", { credentials: "include" }).then((r) => r.ok ? r.json() : null),
     staleTime: 60000,
+    retry: false,
   });
 
-  const url = settings?.app_download_url?.trim();
-  if (!url) return null;
+  if (!apkInfo) return null;
 
   return (
     <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
+      href="/api/apk/download"
       className="flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl px-4 py-3.5 shadow-md hover:opacity-95 transition-opacity"
     >
       <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
@@ -103,7 +101,7 @@ function DownloadAppCard() {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-white font-semibold text-sm leading-tight">Get the Mobile App</p>
-        <p className="text-slate-400 text-[11px] mt-0.5">Download for the best experience</p>
+        <p className="text-slate-400 text-[11px] mt-0.5">v{apkInfo.version} · {apkInfo.fileSize ? `${(apkInfo.fileSize / (1024 * 1024)).toFixed(1)} MB` : "Android APK"}</p>
       </div>
       <div className="flex items-center gap-1.5 bg-primary text-white text-xs font-semibold px-3 py-2 rounded-xl shrink-0">
         <Download size={13} />

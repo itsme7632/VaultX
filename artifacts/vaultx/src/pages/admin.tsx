@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Upload, Download } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "mobile-app";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -76,6 +76,7 @@ export default function AdminPage() {
   const { data: depData, isLoading: depLoading } = useQuery({ queryKey: ["admin-deposits", depFilter], queryFn: () => adminApi(`/admin/deposits?status=${depFilter}`), staleTime: 20000, enabled: tab === "deposits" });
   const { data: settingsData } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" });
   const { data: resetLogs } = useQuery({ queryKey: ["admin-reset-logs"], queryFn: () => adminApi("/admin/password-reset-logs"), staleTime: 30000, enabled: tab === "logs" });
+  const { data: apkReleases, refetch: refetchApk } = useQuery({ queryKey: ["admin-apk"], queryFn: () => adminApi("/admin/apk"), staleTime: 30000, enabled: tab === "mobile-app" });
 
   const approveKyc = useAdminApproveKyc();
   const rejectKyc = useAdminRejectKyc();
@@ -198,6 +199,7 @@ export default function AdminPage() {
     { id: "networks", label: "Networks", icon: Network },
     { id: "news", label: "News", icon: Newspaper },
     { id: "broadcast", label: "Broadcast", icon: Bell },
+    { id: "mobile-app", label: "Mobile App", icon: Smartphone },
     { id: "settings", label: "Settings", icon: Settings },
     { id: "logs", label: "Logs", icon: FileText },
   ];
@@ -590,6 +592,10 @@ export default function AdminPage() {
           )}
 
           {/* SETTINGS */}
+          {tab === "mobile-app" && (
+            <MobileAppTab releases={apkReleases ?? []} onRefresh={refetchApk} toast={toast} />
+          )}
+
           {tab === "settings" && (
             <SettingsTab settingsData={settingsData} toast={toast} />
           )}
@@ -954,6 +960,207 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
     </AppLayout>
+  );
+}
+
+function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefresh: () => void; toast: any }) {
+  const [version, setVersion] = useState("");
+  const [releaseNotes, setReleaseNotes] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleUpload = async () => {
+    if (!file || !version.trim()) {
+      toast({ title: "Missing fields", description: "Version and APK file are required.", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    setProgress(0);
+    try {
+      // Step 1: get presigned upload URL
+      const urlRes = await fetch("/api/admin/apk/upload-url", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      // Step 2: PUT file directly to GCS
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 80));
+        });
+        xhr.addEventListener("load", () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`))));
+        xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
+        xhr.open("PUT", uploadURL);
+        xhr.setRequestHeader("Content-Type", "application/vnd.android.package-archive");
+        xhr.send(file);
+      });
+      setProgress(90);
+
+      // Step 3: save metadata
+      const metaRes = await fetch("/api/admin/apk", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ version: version.trim(), fileName: file.name, fileSize: file.size, objectPath, releaseNotes: releaseNotes.trim() || undefined }),
+      });
+      if (!metaRes.ok) throw new Error("Failed to save APK metadata");
+
+      setProgress(100);
+      toast({ title: "APK Uploaded", description: `v${version} is now the active release.` });
+      setVersion(""); setReleaseNotes(""); setFile(null); setProgress(0);
+      onRefresh();
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this release?")) return;
+    try {
+      await adminApi(`/admin/apk/${id}`, "DELETE");
+      onRefresh();
+      toast({ title: "Release deleted" });
+    } catch {
+      toast({ title: "Error", description: "Failed to delete release", variant: "destructive" });
+    }
+  };
+
+  const handleActivate = async (id: number) => {
+    try {
+      await adminApi(`/admin/apk/${id}/activate`, "POST");
+      onRefresh();
+      toast({ title: "Release activated" });
+    } catch {
+      toast({ title: "Error", description: "Failed to activate release", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Upload new APK */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Upload size={15} className="text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Upload New APK</p>
+            <p className="text-[11px] text-muted-foreground">The uploaded version will become the active release</p>
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-xs text-muted-foreground">Version *</Label>
+          <Input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="e.g. 1.2.0" className="mt-1 h-9 text-sm" disabled={uploading} />
+        </div>
+
+        <div>
+          <Label className="text-xs text-muted-foreground">Release Notes</Label>
+          <Textarea value={releaseNotes} onChange={(e) => setReleaseNotes(e.target.value)} placeholder="What's new in this version…" className="mt-1 text-sm min-h-[70px] resize-none" disabled={uploading} />
+        </div>
+
+        <div>
+          <Label className="text-xs text-muted-foreground">APK File *</Label>
+          <div className="mt-1 border-2 border-dashed border-border rounded-xl p-4 text-center relative cursor-pointer hover:border-primary/50 transition-colors">
+            <input
+              type="file"
+              accept=".apk,application/vnd.android.package-archive"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              disabled={uploading}
+            />
+            {file ? (
+              <div>
+                <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{formatBytes(file.size)}</p>
+              </div>
+            ) : (
+              <div>
+                <Smartphone size={20} className="mx-auto text-muted-foreground mb-1" />
+                <p className="text-xs text-muted-foreground">Tap to choose APK file</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {uploading && progress > 0 && (
+          <div>
+            <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+              <span>Uploading…</span><span>{progress}%</span>
+            </div>
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-primary transition-all duration-200 rounded-full" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        )}
+
+        <Button className="w-full h-10 font-semibold gap-2" onClick={handleUpload} disabled={uploading || !file || !version.trim()}>
+          {uploading ? "Uploading…" : <><Upload size={15} /> Upload & Activate</>}
+        </Button>
+      </div>
+
+      {/* Release history */}
+      <div className="space-y-3">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Release History</p>
+        {releases.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground bg-white border border-border rounded-2xl">No APK releases yet</div>
+        ) : (
+          releases.map((r: any) => (
+            <div key={r.id} className={cn("bg-white border rounded-2xl p-4 shadow-sm", r.isActive ? "border-primary/40" : "border-border")}>
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center", r.isActive ? "bg-emerald-50" : "bg-muted/50")}>
+                    <Smartphone size={14} className={r.isActive ? "text-emerald-600" : "text-muted-foreground"} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-foreground">v{r.version}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatBytes(r.fileSize)} · {new Date(r.uploadedAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {r.isActive && <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-0 px-2 py-0.5">Active</Badge>}
+                  {!r.isActive && (
+                    <Button size="sm" variant="outline" className="h-7 text-[10px] px-2" onClick={() => handleActivate(r.id)}>Activate</Button>
+                  )}
+                  <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-red-500 border-red-200 hover:bg-red-50" onClick={() => handleDelete(r.id)}>
+                    <Trash2 size={12} />
+                  </Button>
+                </div>
+              </div>
+              {r.releaseNotes && <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-2.5 py-1.5 mt-1">{r.releaseNotes}</p>}
+              <p className="text-[10px] text-muted-foreground/70 mt-1.5 truncate font-mono">{r.fileName}</p>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Download link for testing */}
+      {releases.some((r: any) => r.isActive) && (
+        <div className="bg-slate-50 border border-border rounded-2xl p-4 shadow-sm">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Test Download</p>
+          <a
+            href="/api/apk/download"
+            className="flex items-center gap-2 text-primary text-sm font-medium hover:underline"
+          >
+            <Download size={14} />
+            Download active APK
+          </a>
+          <p className="text-[10px] text-muted-foreground mt-1">Auth-protected. Users download from their dashboard/settings.</p>
+        </div>
+      )}
+    </div>
   );
 }
 

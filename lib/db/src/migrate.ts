@@ -223,6 +223,17 @@ const TABLES_SQL = [
     "details" text,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
+
+  `CREATE TABLE IF NOT EXISTS "app_releases" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "version" text NOT NULL,
+    "file_name" text NOT NULL,
+    "file_size" integer NOT NULL,
+    "object_path" text NOT NULL,
+    "release_notes" text,
+    "is_active" boolean DEFAULT false NOT NULL,
+    "uploaded_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
 ];
 
 const FOREIGN_KEYS_SQL = [
