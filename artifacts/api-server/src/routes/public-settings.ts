@@ -17,6 +17,7 @@ const PUBLIC_KEYS = [
   "support_whatsapp",
   "deposit_instructions",
   "withdrawal_instructions",
+  "app_download_url",
 ];
 
 router.get("/settings/public", async (_req, res): Promise<void> => {
@@ -41,6 +42,7 @@ router.get("/settings/public", async (_req, res): Promise<void> => {
     support_whatsapp: "",
     deposit_instructions: "",
     withdrawal_instructions: "",
+    app_download_url: "",
   };
 
   for (const key of PUBLIC_KEYS) {

@@ -982,6 +982,7 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
     { key: "withdrawal_fee_percent", label: "Withdrawal Fee (%)", placeholder: "1.5" },
     { key: "signup_bonus_amount", label: "Signup Bonus Amount (USDT)", placeholder: "10" },
     { key: "first_deposit_bonus_percent", label: "First Deposit Bonus (%)", placeholder: "10" },
+    { key: "app_download_url", label: "App Download Link", placeholder: "https://play.google.com/store/apps/..." },
     { key: "announcement_text", label: "Announcement Banner Text", placeholder: "" },
   ];
 
