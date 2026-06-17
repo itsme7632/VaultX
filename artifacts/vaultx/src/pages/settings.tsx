@@ -1,7 +1,7 @@
 import { useLocation } from "wouter";
-import { Shield, FileCheck, User, Bell, ChevronRight, HelpCircle, LogOut, Newspaper, MessageCircle, Info } from "lucide-react";
+import { Shield, FileCheck, User, Bell, ChevronRight, HelpCircle, LogOut, Newspaper, MessageCircle, Info, Download } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -52,6 +52,13 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const logout = useLogout();
 
+  const { data: publicSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
+    staleTime: 60000,
+  });
+  const appDownloadUrl = publicSettings?.app_download_url?.trim();
+
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => { queryClient.clear(); setLocation("/login"); },
@@ -93,6 +100,18 @@ export default function SettingsPage() {
           <div className="divide-y divide-border">
             <SettingsItem icon={Newspaper} label="News & Updates" description="Platform announcements" onClick={() => setLocation("/news")} />
             <SettingsItem icon={MessageCircle} label="Help & Support" description="Support tickets and FAQ" onClick={() => setLocation("/support")} />
+            {appDownloadUrl && (
+              <a href={appDownloadUrl} target="_blank" rel="noopener noreferrer" className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 active:bg-muted/50 transition-colors">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50">
+                  <Download size={16} className="text-emerald-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">Download Mobile App</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Get the native app for the best experience</p>
+                </div>
+                <ChevronRight size={15} className="text-muted-foreground shrink-0" />
+              </a>
+            )}
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, ArrowRight, Users, Copy, Check } from "lucide-react";
+import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, ArrowRight, Users, Copy, Check, Smartphone, Download } from "lucide-react";
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetMarketPrices, getGetMarketPricesQueryKey,
@@ -80,6 +80,38 @@ const activityTypeBg: Record<string, string> = {
   transfer: "bg-blue-50",
   referral: "bg-purple-50",
 };
+
+function DownloadAppCard() {
+  const { data: settings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
+    staleTime: 60000,
+  });
+
+  const url = settings?.app_download_url?.trim();
+  if (!url) return null;
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl px-4 py-3.5 shadow-md hover:opacity-95 transition-opacity"
+    >
+      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+        <Smartphone size={20} className="text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-white font-semibold text-sm leading-tight">Get the Mobile App</p>
+        <p className="text-slate-400 text-[11px] mt-0.5">Download for the best experience</p>
+      </div>
+      <div className="flex items-center gap-1.5 bg-primary text-white text-xs font-semibold px-3 py-2 rounded-xl shrink-0">
+        <Download size={13} />
+        Download
+      </div>
+    </a>
+  );
+}
 
 function ReferralWidget() {
   const [copied, setCopied] = useState(false);
@@ -263,6 +295,9 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+
+        {/* Download App */}
+        <DownloadAppCard />
 
         {/* Referral Widget */}
         <ReferralWidget />
