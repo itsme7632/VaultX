@@ -94,6 +94,7 @@ function DownloadAppCard() {
   return (
     <a
       href="/api/apk/download"
+      download
       className="flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl px-4 py-3.5 shadow-md hover:opacity-95 transition-opacity"
     >
       <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">

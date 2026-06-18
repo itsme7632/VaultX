@@ -9,4 +9,6 @@ export const appReleasesTable = pgTable("app_releases", {
   releaseNotes: text("release_notes"),
   isActive: boolean("is_active").notNull().default(false),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+  uploadedBy: text("uploaded_by"),
+  downloadCount: integer("download_count").notNull().default(0),
 });

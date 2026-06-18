@@ -1137,6 +1137,16 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
     }
   };
 
+  const handleDeactivate = async (id: number) => {
+    try {
+      await adminApi(`/admin/apk/${id}/deactivate`, "POST");
+      onRefresh();
+      toast({ title: "Release deactivated" });
+    } catch {
+      toast({ title: "Error", description: "Failed to deactivate release", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Upload new APK */}
@@ -1224,13 +1234,21 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
                   {!r.isActive && (
                     <Button size="sm" variant="outline" className="h-7 text-[10px] px-2" onClick={() => handleActivate(r.id)}>Activate</Button>
                   )}
+                  {r.isActive && (
+                    <Button size="sm" variant="outline" className="h-7 text-[10px] px-2 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleDeactivate(r.id)}>Deactivate</Button>
+                  )}
                   <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-red-500 border-red-200 hover:bg-red-50" onClick={() => handleDelete(r.id)}>
                     <Trash2 size={12} />
                   </Button>
                 </div>
               </div>
               {r.releaseNotes && <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-2.5 py-1.5 mt-1">{r.releaseNotes}</p>}
-              <p className="text-[10px] text-muted-foreground/70 mt-1.5 truncate font-mono">{r.fileName}</p>
+              <div className="flex items-center justify-between mt-1.5">
+                <p className="text-[10px] text-muted-foreground/70 truncate font-mono flex-1 mr-2">{r.fileName}</p>
+                <p className="text-[10px] text-muted-foreground shrink-0 flex items-center gap-0.5">
+                  <Download size={9} className="inline" /> {r.downloadCount ?? 0} downloads
+                </p>
+              </div>
             </div>
           ))
         )}

@@ -322,6 +322,8 @@ const COLUMN_MIGRATIONS_SQL = [
   `ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "tx_id" text`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "transactions_tx_id_unique" ON "transactions"("tx_id") WHERE "tx_id" IS NOT NULL`,
   `ALTER TABLE "wallets" ADD COLUMN IF NOT EXISTS "referral_pending_earnings" numeric(18, 8) DEFAULT '0' NOT NULL`,
+  `ALTER TABLE "app_releases" ADD COLUMN IF NOT EXISTS "uploaded_by" text`,
+  `ALTER TABLE "app_releases" ADD COLUMN IF NOT EXISTS "download_count" integer DEFAULT 0 NOT NULL`,
 ];
 
 const sslConfig =

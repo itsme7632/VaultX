@@ -102,7 +102,7 @@ export default function SettingsPage() {
             <SettingsItem icon={MessageCircle} label="Help & Support" description="Support tickets and FAQ" onClick={() => setLocation("/support")} />
             <SettingsItem icon={Globe} label="About Us" description="Platform info, mission & FAQ" onClick={() => setLocation("/about")} />
             {apkInfo && (
-              <a href="/api/apk/download" className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 active:bg-muted/50 transition-colors">
+              <a href="/api/apk/download" download className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 active:bg-muted/50 transition-colors">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50">
                   <Download size={16} className="text-emerald-600" />
                 </div>
