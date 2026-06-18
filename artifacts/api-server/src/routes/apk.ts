@@ -7,9 +7,11 @@ import { randomUUID } from "crypto";
 import {
   saveApkFile,
   apkFileExists,
-  getApkReadStream,
+  openApkReadStream,
   deleteApkFile,
-  ensureApkStorageDir,
+  getApkFilePath,
+  getApkStorageDir,
+  getApkFileStat,
 } from "../lib/localFileStorage";
 
 const router: IRouter = Router();
@@ -21,100 +23,6 @@ const upload = multer({
 
 function extractFileId(objectPath: string): string {
   return objectPath.split("/").pop() ?? objectPath;
-}
-
-async function tryGcsUpload(
-  buffer: Buffer,
-  fileId: string,
-  mimeType: string
-): Promise<boolean> {
-  const privateDir = process.env.PRIVATE_OBJECT_DIR;
-  if (!privateDir) return false;
-
-  try {
-    const { Storage } = await import("@google-cloud/storage");
-    const { Readable } = await import("stream");
-
-    const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-    const gcsClient = new Storage({
-      credentials: {
-        audience: "replit",
-        subject_token_type: "access_token",
-        token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-        type: "external_account",
-        credential_source: {
-          url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-          format: { type: "json", subject_token_field_name: "access_token" },
-        },
-        universe_domain: "googleapis.com",
-      },
-      projectId: "",
-    });
-
-    const dir = privateDir.replace(/\/$/, "").replace(/^\//, "");
-    const parts = dir.split("/");
-    const bucketName = parts[0];
-    const prefix = parts.slice(1).join("/");
-    const objectName = prefix ? `${prefix}/apk/${fileId}` : `apk/${fileId}`;
-
-    const bucket = gcsClient.bucket(bucketName);
-    const gcsFile = bucket.file(objectName);
-
-    await new Promise<void>((resolve, reject) => {
-      const writeStream = gcsFile.createWriteStream({
-        metadata: { contentType: mimeType },
-        resumable: false,
-      });
-      writeStream.on("error", reject);
-      writeStream.on("finish", resolve);
-      Readable.from(buffer).pipe(writeStream);
-    });
-
-    return true;
-  } catch (err) {
-    console.warn("[APK] GCS upload failed, using local filesystem:", (err as Error).message);
-    return false;
-  }
-}
-
-async function tryGcsDownload(objectPath: string): Promise<NodeJS.ReadableStream | null> {
-  const privateDir = process.env.PRIVATE_OBJECT_DIR;
-  if (!privateDir) return null;
-
-  try {
-    const { Storage } = await import("@google-cloud/storage");
-    const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
-    const gcsClient = new Storage({
-      credentials: {
-        audience: "replit",
-        subject_token_type: "access_token",
-        token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-        type: "external_account",
-        credential_source: {
-          url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-          format: { type: "json", subject_token_field_name: "access_token" },
-        },
-        universe_domain: "googleapis.com",
-      },
-      projectId: "",
-    });
-
-    const dir = privateDir.replace(/\/$/, "").replace(/^\//, "");
-    const parts = dir.split("/");
-    const bucketName = parts[0];
-    const prefix = parts.slice(1).join("/");
-    const fileId = extractFileId(objectPath);
-    const objectName = prefix ? `${prefix}/apk/${fileId}` : `apk/${fileId}`;
-
-    const bucket = gcsClient.bucket(bucketName);
-    const gcsFile = bucket.file(objectName);
-    const [exists] = await gcsFile.exists();
-    if (!exists) return null;
-
-    return gcsFile.createReadStream();
-  } catch {
-    return null;
-  }
 }
 
 // ─── Admin: upload APK ─────────────────────────────────────────────────────
@@ -135,25 +43,12 @@ router.post(
       return;
     }
 
-    try {
-      await ensureApkStorageDir();
-    } catch (err) {
-      console.warn("[APK] Could not ensure storage dir:", (err as Error).message);
-    }
-
     const fileId = randomUUID();
     const objectPath = `/objects/apk/${fileId}`;
 
     try {
-      const gcsOk = await tryGcsUpload(
-        file.buffer,
-        fileId,
-        "application/vnd.android.package-archive"
-      );
-
-      if (!gcsOk) {
-        await saveApkFile(file.buffer, fileId);
-      }
+      const savedPath = await saveApkFile(file.buffer, fileId);
+      console.log(`[APK] Saved ${file.originalname} (${file.size} bytes) to ${savedPath}`);
 
       await db.update(appReleasesTable).set({ isActive: false });
 
@@ -166,11 +61,12 @@ router.post(
           objectPath,
           releaseNotes: releaseNotes?.trim() || null,
           isActive: true,
-          uploadedBy: (req.session as any)?.username ?? null,
+          uploadedBy: (req.session as any)?.username ?? "admin",
           downloadCount: 0,
         })
         .returning();
 
+      console.log(`[APK] Release created id=${release.id} version=${release.version}`);
       res.json(release);
     } catch (err: any) {
       console.error("[APK] Upload error:", err);
@@ -186,6 +82,39 @@ router.get("/admin/apk", requireAdmin, async (_req, res): Promise<void> => {
     .from(appReleasesTable)
     .orderBy(desc(appReleasesTable.uploadedAt));
   res.json(releases);
+});
+
+// ─── Admin: diagnostics ────────────────────────────────────────────────────
+router.get("/admin/apk/diagnostic", requireAdmin, async (_req, res): Promise<void> => {
+  const releases = await db
+    .select()
+    .from(appReleasesTable)
+    .orderBy(desc(appReleasesTable.uploadedAt));
+
+  const storageDir = getApkStorageDir();
+
+  const items = await Promise.all(
+    releases.map(async (r) => {
+      const fileId = extractFileId(r.objectPath);
+      const filePath = getApkFilePath(fileId);
+      const stat = await getApkFileStat(fileId);
+      return {
+        id: r.id,
+        version: r.version,
+        fileName: r.fileName,
+        fileSize: r.fileSize,
+        objectPath: r.objectPath,
+        filePath,
+        existsOnDisk: stat !== null,
+        diskSize: stat?.size ?? null,
+        isActive: r.isActive,
+        uploadedAt: r.uploadedAt,
+        downloadCount: r.downloadCount,
+      };
+    })
+  );
+
+  res.json({ storageDir, releases: items });
 });
 
 // ─── Admin: activate a release ─────────────────────────────────────────────
@@ -230,14 +159,13 @@ router.delete("/admin/apk/:id", requireAdmin, async (req, res): Promise<void> =>
     res.status(404).json({ error: "Release not found" });
     return;
   }
-
   const fileId = extractFileId(deleted.objectPath);
   try {
     await deleteApkFile(fileId);
+    console.log(`[APK] Deleted file ${fileId} from storage`);
   } catch (err) {
-    console.warn("[APK] Could not delete file from storage:", (err as Error).message);
+    console.warn("[APK] Could not delete file:", (err as Error).message);
   }
-
   res.json({ success: true });
 });
 
@@ -265,7 +193,7 @@ router.get("/apk/latest", async (_req, res): Promise<void> => {
   });
 });
 
-// ─── Auth-required: download APK ──────────────────────────────────────────
+// ─── Auth-required: download active APK ──────────────────────────────────
 router.get("/apk/download", requireAuth, async (req, res): Promise<void> => {
   const [release] = await db
     .select()
@@ -278,35 +206,43 @@ router.get("/apk/download", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  const safeFileName = release.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-  res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
+  const fileId = extractFileId(release.objectPath);
+  const exists = await apkFileExists(fileId);
+
+  if (!exists) {
+    console.error(`[APK] File missing on disk: fileId=${fileId} objectPath=${release.objectPath} storagePath=${getApkFilePath(fileId)}`);
+    res.status(404).json({
+      error: "APK file is not available on this server. Please ask the admin to re-upload the APK.",
+    });
+    return;
+  }
+
+  const safeFileName = release.fileName.replace(/[^a-zA-Z0-9._\-()]/g, "_");
+
   res.setHeader("Content-Type", "application/vnd.android.package-archive");
-  if (release.fileSize) res.setHeader("Content-Length", String(release.fileSize));
+  res.setHeader("Content-Disposition", `attachment; filename="${safeFileName}"`);
+  res.setHeader("Content-Length", String(release.fileSize));
   res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "no-store");
 
   db.update(appReleasesTable)
     .set({ downloadCount: sql`${appReleasesTable.downloadCount} + 1` })
     .where(eq(appReleasesTable.id, release.id))
     .execute()
-    .catch((e: Error) => console.warn("[APK] download count update failed:", e.message));
+    .catch((e: Error) => console.warn("[APK] download count increment failed:", e.message));
 
-  const fileId = extractFileId(release.objectPath);
+  const stream = openApkReadStream(fileId);
 
-  const gcsStream = await tryGcsDownload(release.objectPath);
-  if (gcsStream) {
-    gcsStream.pipe(res);
-    return;
-  }
-
-  try {
-    const localStream = await getApkReadStream(fileId);
-    localStream.pipe(res);
-  } catch (err) {
-    console.error("[APK] Download error:", err);
+  stream.on("error", (err) => {
+    console.error("[APK] Read stream error:", err);
     if (!res.headersSent) {
-      res.status(404).json({ error: "APK file not found in storage" });
+      res.status(500).json({ error: "Failed to stream APK file" });
+    } else {
+      res.destroy();
     }
-  }
+  });
+
+  stream.pipe(res);
 });
 
 export default router;

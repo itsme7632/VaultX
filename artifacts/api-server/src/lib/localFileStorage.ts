@@ -1,94 +1,59 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { createReadStream } from "fs";
-import type { ReadStream } from "fs";
+import { createReadStream, type ReadStream } from "fs";
 
-function resolveStorageDir(): string {
-  const envDir = process.env.PRIVATE_OBJECT_DIR;
-  if (envDir) {
-    const clean = envDir.replace(/\/$/, "");
-    return path.isAbsolute(clean) ? clean : path.resolve(clean);
-  }
+const APK_STORAGE_DIR = path.resolve("./storage/apk");
 
-  if (process.env.REPL_ID || process.env.REPLIT_DB_URL) {
-    return "/uploads/apk";
-  }
-
-  return path.resolve("./storage/private/apk");
+export async function ensureApkDir(): Promise<string> {
+  await fs.mkdir(APK_STORAGE_DIR, { recursive: true });
+  return APK_STORAGE_DIR;
 }
 
-export async function ensureApkStorageDir(): Promise<string> {
-  const dir = resolveStorageDir();
-  await fs.mkdir(dir, { recursive: true });
-  return dir;
+export function getApkFilePath(fileId: string): string {
+  return path.join(APK_STORAGE_DIR, fileId);
 }
 
 export async function saveApkFile(buffer: Buffer, fileId: string): Promise<string> {
-  let dir: string;
-  try {
-    dir = await ensureApkStorageDir();
-  } catch {
-    dir = path.resolve("./storage/private/apk");
-    await fs.mkdir(dir, { recursive: true });
-  }
-
-  const filePath = path.join(dir, fileId);
+  await ensureApkDir();
+  const filePath = getApkFilePath(fileId);
   await fs.writeFile(filePath, buffer);
+  const stat = await fs.stat(filePath);
+  if (stat.size !== buffer.length) {
+    throw new Error(`Write verification failed: expected ${buffer.length} bytes, got ${stat.size}`);
+  }
   return filePath;
 }
 
 export async function apkFileExists(fileId: string): Promise<boolean> {
   try {
-    const dir = await ensureApkStorageDir();
-    await fs.access(path.join(dir, fileId));
+    await fs.access(getApkFilePath(fileId));
     return true;
   } catch {
-    const fallback = path.resolve("./storage/private/apk");
-    try {
-      await fs.access(path.join(fallback, fileId));
-      return true;
-    } catch {
-      return false;
-    }
+    return false;
   }
 }
 
-export async function getApkReadStream(fileId: string): Promise<ReadStream> {
-  const dir = await ensureApkStorageDir();
-  const primary = path.join(dir, fileId);
-  try {
-    await fs.access(primary);
-    return createReadStream(primary);
-  } catch {
-    const fallback = path.join(path.resolve("./storage/private/apk"), fileId);
-    await fs.access(fallback);
-    return createReadStream(fallback);
-  }
+export function openApkReadStream(fileId: string): ReadStream {
+  return createReadStream(getApkFilePath(fileId));
 }
 
 export async function deleteApkFile(fileId: string): Promise<void> {
-  const candidates: string[] = [];
-
   try {
-    const dir = await ensureApkStorageDir();
-    candidates.push(path.join(dir, fileId));
-  } catch {}
-
-  const fallback = path.join(path.resolve("./storage/private/apk"), fileId);
-  if (!candidates.includes(fallback)) candidates.push(fallback);
-
-  for (const p of candidates) {
-    try { await fs.unlink(p); } catch {}
+    await fs.unlink(getApkFilePath(fileId));
+  } catch (err: any) {
+    if (err.code !== "ENOENT") throw err;
   }
 }
 
-export function getApkStorageInfo(): { mode: string; dir: string } {
-  const envDir = process.env.PRIVATE_OBJECT_DIR;
-  if (envDir) {
-    return { mode: "env", dir: envDir };
+export function getApkStorageDir(): string {
+  return APK_STORAGE_DIR;
+}
+
+export async function getApkFileStat(fileId: string): Promise<{ size: number; mtime: Date } | null> {
+  try {
+    const s = await fs.stat(getApkFilePath(fileId));
+    return { size: s.size, mtime: s.mtime };
+  } catch {
+    return null;
   }
-  if (process.env.REPL_ID || process.env.REPLIT_DB_URL) {
-    return { mode: "replit", dir: "/uploads/apk" };
-  }
-  return { mode: "local", dir: "./storage/private/apk" };
 }

@@ -1063,8 +1063,12 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [diagnostic, setDiagnostic] = useState<any>(null);
+  const [loadingDiag, setLoadingDiag] = useState(false);
 
   const formatBytes = (bytes: number) => {
+    if (!bytes) return "0 B";
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
@@ -1076,6 +1080,7 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
     }
     setUploading(true);
     setProgress(0);
+    setUploadSuccess(false);
     try {
       const formData = new FormData();
       formData.append("apk", file);
@@ -1085,10 +1090,11 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 95));
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 90));
         });
         xhr.addEventListener("load", () => {
           if (xhr.status >= 200 && xhr.status < 300) {
+            setProgress(100);
             resolve();
           } else {
             try {
@@ -1105,11 +1111,14 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
         xhr.send(formData);
       });
 
-      setProgress(100);
-      toast({ title: "APK Uploaded", description: `v${version} is now the active release.` });
-      setVersion(""); setReleaseNotes(""); setFile(null); setProgress(0);
+      setUploadSuccess(true);
+      toast({ title: "✓ APK Uploaded Successfully", description: `v${version} is now the active release and ready to download.` });
+      setTimeout(() => {
+        setVersion(""); setReleaseNotes(""); setFile(null); setProgress(0); setUploadSuccess(false);
+      }, 3000);
       onRefresh();
     } catch (err: any) {
+      setProgress(0);
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
       setUploading(false);
@@ -1117,7 +1126,7 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Delete this release?")) return;
+    if (!confirm("Delete this release? The APK file will also be removed from storage.")) return;
     try {
       await adminApi(`/admin/apk/${id}`, "DELETE");
       onRefresh();
@@ -1147,6 +1156,18 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
     }
   };
 
+  const loadDiagnostic = async () => {
+    setLoadingDiag(true);
+    try {
+      const data = await adminApi("/admin/apk/diagnostic");
+      setDiagnostic(data);
+    } catch {
+      toast({ title: "Error", description: "Failed to load diagnostics", variant: "destructive" });
+    } finally {
+      setLoadingDiag(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Upload new APK */}
@@ -1157,7 +1178,7 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
           </div>
           <div>
             <p className="text-sm font-bold text-foreground">Upload New APK</p>
-            <p className="text-[11px] text-muted-foreground">The uploaded version will become the active release</p>
+            <p className="text-[11px] text-muted-foreground">Max 200 MB · Becomes the active release on upload</p>
           </div>
         </div>
 
@@ -1173,11 +1194,11 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
 
         <div>
           <Label className="text-xs text-muted-foreground">APK File *</Label>
-          <div className="mt-1 border-2 border-dashed border-border rounded-xl p-4 text-center relative cursor-pointer hover:border-primary/50 transition-colors">
+          <div className={cn("mt-1 border-2 border-dashed rounded-xl p-4 text-center relative cursor-pointer transition-colors", uploading ? "border-border opacity-60" : "border-border hover:border-primary/50")}>
             <input
               type="file"
               accept=".apk,application/vnd.android.package-archive"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => { setFile(e.target.files?.[0] ?? null); setUploadSuccess(false); }}
               className="absolute inset-0 opacity-0 cursor-pointer"
               disabled={uploading}
             />
@@ -1195,19 +1216,35 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
           </div>
         </div>
 
-        {uploading && progress > 0 && (
+        {(uploading || uploadSuccess) && (
           <div>
-            <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
-              <span>Uploading…</span><span>{progress}%</span>
+            <div className="flex justify-between text-[10px] mb-1">
+              <span className={uploadSuccess ? "text-emerald-600 font-medium" : "text-muted-foreground"}>
+                {uploadSuccess ? "✓ Upload complete — file saved to server" : progress < 90 ? "Uploading to server…" : "Saving file…"}
+              </span>
+              <span className={uploadSuccess ? "text-emerald-600" : "text-muted-foreground"}>{progress}%</span>
             </div>
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-primary transition-all duration-200 rounded-full" style={{ width: `${progress}%` }} />
+              <div
+                className={cn("h-full transition-all duration-300 rounded-full", uploadSuccess ? "bg-emerald-500" : "bg-primary")}
+                style={{ width: `${progress}%` }}
+              />
             </div>
           </div>
         )}
 
-        <Button className="w-full h-10 font-semibold gap-2" onClick={handleUpload} disabled={uploading || !file || !version.trim()}>
-          {uploading ? "Uploading…" : <><Upload size={15} /> Upload & Activate</>}
+        <Button
+          className={cn("w-full h-10 font-semibold gap-2", uploadSuccess && "bg-emerald-600 hover:bg-emerald-700")}
+          onClick={handleUpload}
+          disabled={uploading || !file || !version.trim()}
+        >
+          {uploading ? (
+            <><span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> Uploading…</>
+          ) : uploadSuccess ? (
+            <>✓ Upload Successful</>
+          ) : (
+            <><Upload size={15} /> Upload & Activate</>
+          )}
         </Button>
       </div>
 
@@ -1254,20 +1291,88 @@ function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefre
         )}
       </div>
 
-      {/* Download link for testing */}
+      {/* Test Download */}
       {releases.some((r: any) => r.isActive) && (
         <div className="bg-slate-50 border border-border rounded-2xl p-4 shadow-sm">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Test Download</p>
           <a
             href="/api/apk/download"
+            download
             className="flex items-center gap-2 text-primary text-sm font-medium hover:underline"
           >
             <Download size={14} />
-            Download active APK
+            Download active APK directly
           </a>
-          <p className="text-[10px] text-muted-foreground mt-1">Auth-protected. Users download from their dashboard/settings.</p>
+          <p className="text-[10px] text-muted-foreground mt-1">Auth-protected. Same endpoint used by users on dashboard & settings.</p>
         </div>
       )}
+
+      {/* Storage Diagnostics */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Storage Diagnostics</p>
+          <Button size="sm" variant="outline" className="h-7 text-[10px] px-2 gap-1" onClick={loadDiagnostic} disabled={loadingDiag}>
+            {loadingDiag ? "Loading…" : "Run Check"}
+          </Button>
+        </div>
+
+        {!diagnostic && !loadingDiag && (
+          <p className="text-xs text-muted-foreground text-center py-3">Click "Run Check" to verify APK files exist on disk.</p>
+        )}
+
+        {diagnostic && (
+          <div className="space-y-3">
+            <div className="bg-muted/30 rounded-lg px-3 py-2">
+              <p className="text-[10px] text-muted-foreground mb-0.5">Storage Directory</p>
+              <p className="text-[10px] font-mono text-foreground break-all">{diagnostic.storageDir}</p>
+            </div>
+
+            {diagnostic.releases.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-2">No releases in database.</p>
+            )}
+
+            {diagnostic.releases.map((r: any) => (
+              <div key={r.id} className={cn("rounded-xl border p-3", r.existsOnDisk ? "border-emerald-200 bg-emerald-50/30" : "border-red-200 bg-red-50/30")}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-foreground">v{r.version}</span>
+                  <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", r.existsOnDisk ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                    {r.existsOnDisk ? "✓ File exists on disk" : "✗ File missing on disk"}
+                  </span>
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex gap-2">
+                    <span className="text-[10px] text-muted-foreground w-16 shrink-0">Filename</span>
+                    <span className="text-[10px] font-mono text-foreground truncate">{r.fileName}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-[10px] text-muted-foreground w-16 shrink-0">DB size</span>
+                    <span className="text-[10px] font-mono text-foreground">{r.fileSize ? `${(r.fileSize / (1024 * 1024)).toFixed(2)} MB` : "unknown"}</span>
+                  </div>
+                  {r.existsOnDisk && (
+                    <div className="flex gap-2">
+                      <span className="text-[10px] text-muted-foreground w-16 shrink-0">Disk size</span>
+                      <span className="text-[10px] font-mono text-foreground">{r.diskSize ? `${(r.diskSize / (1024 * 1024)).toFixed(2)} MB` : "unknown"}</span>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <span className="text-[10px] text-muted-foreground w-16 shrink-0">File path</span>
+                    <span className="text-[10px] font-mono text-muted-foreground break-all">{r.filePath}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="text-[10px] text-muted-foreground w-16 shrink-0">Downloads</span>
+                    <span className="text-[10px] font-mono text-foreground">{r.downloadCount}</span>
+                  </div>
+                  {!r.existsOnDisk && (
+                    <p className="text-[10px] text-red-600 font-medium mt-1.5 bg-red-100 rounded px-2 py-1">
+                      ⚠ Re-upload this version — the APK file was lost (server restart or storage reset).
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
