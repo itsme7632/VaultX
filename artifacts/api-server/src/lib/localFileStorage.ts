@@ -2,7 +2,9 @@ import { promises as fs } from "fs";
 import path from "path";
 import { createReadStream, type ReadStream } from "fs";
 
-const APK_STORAGE_DIR = path.resolve("./storage/apk");
+// Store APK files at workspace root level: /home/runner/workspace/storage/apk
+// This survives server rebuilds and is outside the artifact build directory
+const APK_STORAGE_DIR = path.resolve(process.cwd(), "../../storage/apk");
 
 export async function ensureApkDir(): Promise<string> {
   await fs.mkdir(APK_STORAGE_DIR, { recursive: true });

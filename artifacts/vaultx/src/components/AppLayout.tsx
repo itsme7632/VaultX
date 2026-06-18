@@ -1,9 +1,10 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
 import { X, Megaphone } from "lucide-react";
 import { useState } from "react";
+import { useAppMode } from "@/lib/useAppMode";
 
 function AnnouncementBanner() {
   const [dismissed, setDismissed] = useState(false);
@@ -28,6 +29,16 @@ function AnnouncementBanner() {
 }
 
 export function AppLayout({ children, title }: { children: ReactNode; title?: string }) {
+  const { isApp } = useAppMode();
+
+  useEffect(() => {
+    if (isApp) {
+      document.documentElement.classList.add("app-mode");
+    } else {
+      document.documentElement.classList.remove("app-mode");
+    }
+  }, [isApp]);
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <TopBar title={title} />

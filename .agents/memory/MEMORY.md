@@ -1,0 +1,2 @@
+- [APK Storage](apk-storage.md) — APK files stored at workspace root `/home/runner/workspace/storage/apk` via `path.resolve(cwd, "../../storage/apk")`; frontend uses JS fetch+blob download (not `<a download>`) for graceful error handling
+- [Dark Mode Strategy](dark-mode.md) — Class-based dark mode: `.dark` on `<html>`, ThemeProvider in `lib/theme.tsx`, localStorage key `vaultx-theme`, anti-flash script in index.html; CSS overrides handle hardcoded `bg-white`/`bg-slate-*` across 24 pages without per-page edits

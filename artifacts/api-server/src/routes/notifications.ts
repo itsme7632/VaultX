@@ -67,4 +67,25 @@ router.post("/notifications/read-all", requireAuth, async (req, res): Promise<vo
   res.json({ success: true });
 });
 
+router.delete("/notifications/:id", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid notification id" });
+    return;
+  }
+
+  await db
+    .delete(notificationsTable)
+    .where(
+      and(
+        eq(notificationsTable.id, id),
+        eq(notificationsTable.userId, req.session.userId!)
+      )
+    );
+
+  res.json({ success: true });
+});
+
 export default router;

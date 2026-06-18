@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, ArrowRight, Users, Copy, Check, Smartphone, Download } from "lucide-react";
+import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, ArrowRight, Users, Copy, Check } from "lucide-react";
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetMarketPrices, getGetMarketPricesQueryKey,
@@ -41,7 +41,7 @@ function MarketTicker({ data }: { data: any[] }) {
     <div className="overflow-x-auto -mx-4 px-4">
       <div className="flex gap-3 pb-1" style={{ width: "max-content" }}>
         {data.map((coin) => (
-          <div key={coin.symbol} className="flex items-center gap-2 bg-white border border-border rounded-xl px-3 py-2 min-w-[130px]">
+          <div key={coin.symbol} className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 min-w-[130px]">
             <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
               <img src={coin.iconUrl} alt={coin.symbol} className="w-5 h-5" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             </div>
@@ -72,45 +72,14 @@ const activityTypeColor: Record<string, string> = {
 };
 
 const activityTypeBg: Record<string, string> = {
-  deposit: "bg-emerald-50",
-  withdrawal: "bg-red-50",
-  earning: "bg-amber-50",
+  deposit: "bg-emerald-500/10",
+  withdrawal: "bg-destructive/10",
+  earning: "bg-amber-500/10",
   reinvest: "bg-primary/10",
   investment: "bg-primary/10",
-  transfer: "bg-blue-50",
-  referral: "bg-purple-50",
+  transfer: "bg-blue-500/10",
+  referral: "bg-purple-500/10",
 };
-
-function DownloadAppCard() {
-  const { data: apkInfo } = useQuery({
-    queryKey: ["apk-latest"],
-    queryFn: () => fetch("/api/apk/latest", { credentials: "include" }).then((r) => r.ok ? r.json() : null),
-    staleTime: 60000,
-    retry: false,
-  });
-
-  if (!apkInfo) return null;
-
-  return (
-    <a
-      href="/api/apk/download"
-      download
-      className="flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl px-4 py-3.5 shadow-md hover:opacity-95 transition-opacity"
-    >
-      <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-        <Smartphone size={20} className="text-white" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-white font-semibold text-sm leading-tight">Get the Mobile App</p>
-        <p className="text-slate-400 text-[11px] mt-0.5">v{apkInfo.version} · {apkInfo.fileSize ? `${(apkInfo.fileSize / (1024 * 1024)).toFixed(1)} MB` : "Android APK"}</p>
-      </div>
-      <div className="flex items-center gap-1.5 bg-primary text-white text-xs font-semibold px-3 py-2 rounded-xl shrink-0">
-        <Download size={13} />
-        Download
-      </div>
-    </a>
-  );
-}
 
 function ReferralWidget() {
   const [copied, setCopied] = useState(false);
@@ -206,17 +175,17 @@ export default function DashboardPage() {
 
   const stats = [
     { label: "Total Balance", value: summary ? formatUSDT(summary.totalBalance) : null, icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },
-    { label: "Active Investments", value: summary ? `${summary.activeInvestmentsCount} plans` : null, sub: summary ? formatUSDT(summary.activeInvestmentsValue) : null, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-50" },
-    { label: "Daily Earnings", value: summary ? formatUSDT(summary.dailyEarnings) : null, icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-50" },
-    { label: "Total Earned", value: summary ? formatUSDT(summary.totalEarnings) : null, icon: Zap, color: "text-purple-500", bg: "bg-purple-50" },
+    { label: "Active Investments", value: summary ? `${summary.activeInvestmentsCount} plans` : null, sub: summary ? formatUSDT(summary.activeInvestmentsValue) : null, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Daily Earnings", value: summary ? formatUSDT(summary.dailyEarnings) : null, icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Total Earned", value: summary ? formatUSDT(summary.totalEarnings) : null, icon: Zap, color: "text-purple-500", bg: "bg-purple-500/10" },
   ];
 
   const categoryLabel: Record<string, string> = {
     announcement: "Announcement", investment: "Investment", security: "Security", market: "Market",
   };
   const categoryColor: Record<string, string> = {
-    announcement: "bg-primary/10 text-primary", investment: "bg-emerald-50 text-emerald-600",
-    security: "bg-amber-50 text-amber-600", market: "bg-purple-50 text-purple-600",
+    announcement: "bg-primary/10 text-primary", investment: "bg-emerald-500/10 text-emerald-600",
+    security: "bg-amber-500/10 text-amber-600", market: "bg-purple-500/10 text-purple-600",
   };
 
   return (
@@ -284,7 +253,7 @@ export default function DashboardPage() {
         {/* Stats grid */}
         <div className="grid grid-cols-2 gap-3">
           {stats.map(({ label, value, sub, icon: Icon, color, bg }) => (
-            <div key={label} className="bg-white border border-border rounded-xl p-3.5 shadow-sm">
+            <div key={label} className="bg-card border border-border rounded-xl p-3.5 shadow-sm">
               <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-2.5", bg)}>
                 <Icon size={16} className={color} />
               </div>
@@ -294,9 +263,6 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
-
-        {/* Download App */}
-        <DownloadAppCard />
 
         {/* Referral Widget */}
         <ReferralWidget />
@@ -327,7 +293,7 @@ export default function DashboardPage() {
             <div className="space-y-2.5">
               {newsData.map((post: any) => (
                 <Link key={post.id} href={`/news/${post.id}`}>
-                  <div className="bg-white border border-border rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+                  <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
                     <div className="flex items-start justify-between gap-2 mb-1.5">
                       <p className="font-semibold text-sm text-foreground leading-tight line-clamp-1">{post.title}</p>
                       <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0", categoryColor[post.category] ?? "bg-muted text-muted-foreground")}>
@@ -347,7 +313,7 @@ export default function DashboardPage() {
         {activity && activity.length > 0 && (
           <div>
             <h3 className="font-semibold text-sm text-foreground mb-2.5">Recent Activity</h3>
-            <div className="bg-white border border-border rounded-xl divide-y divide-border shadow-sm overflow-hidden">
+            <div className="bg-card border border-border rounded-xl divide-y divide-border shadow-sm overflow-hidden">
               {activity.slice(0, 6).map((item: any) => (
                 <div key={item.id} className="flex items-center gap-3 px-4 py-3">
                   <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", activityTypeBg[item.type] ?? "bg-muted")}>

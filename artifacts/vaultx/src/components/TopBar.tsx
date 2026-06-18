@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, User, Shield, FileCheck, Settings, LifeBuoy, LogOut, ChevronRight, LayoutDashboard, Info } from "lucide-react";
+import { Bell, User, Shield, FileCheck, Settings, LifeBuoy, LogOut, ChevronRight, LayoutDashboard, Info, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { useLogout, useGetNotifications, getGetNotificationsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 export function TopBar({ title }: { title?: string }) {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const logout = useLogout();
@@ -54,7 +56,7 @@ export function TopBar({ title }: { title?: string }) {
   ];
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-border">
+    <header className="topbar-header sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
       <div className="flex items-center justify-between px-4 py-3 max-w-screen-sm mx-auto">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center">
@@ -65,7 +67,15 @@ export function TopBar({ title }: { title?: string }) {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleTheme}
+            className="p-1.5 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label="Toggle theme"
+          >
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
           <Link href="/notifications" data-testid="link-notifications">
             <button className="relative p-1.5 rounded-xl hover:bg-muted transition-colors">
               <Bell size={20} className="text-foreground" />
@@ -87,7 +97,7 @@ export function TopBar({ title }: { title?: string }) {
                 </Avatar>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 shadow-lg border-border">
+            <DropdownMenuContent align="end" className="w-56 shadow-lg border-border bg-card">
               <div className="px-3 py-2.5">
                 <p className="font-semibold text-sm text-foreground">{user?.fullName}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">@{user?.username}</p>
@@ -111,6 +121,14 @@ export function TopBar({ title }: { title?: string }) {
                   )}
                 </DropdownMenuItem>
               ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={toggleTheme}
+              >
+                {theme === "dark" ? <Sun size={15} className="mr-2 text-muted-foreground" /> : <Moon size={15} className="mr-2 text-muted-foreground" />}
+                <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="cursor-pointer text-destructive focus:text-destructive"

@@ -14,7 +14,7 @@ export function BottomNav() {
   const [location] = useLocation();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-border safe-area-inset-bottom">
+    <nav className="bottom-nav fixed bottom-0 left-0 right-0 z-50 bg-background/97 backdrop-blur-md border-t border-border safe-area-inset-bottom">
       <div className="flex items-center justify-around px-2 py-2 max-w-screen-sm mx-auto">
         {tabs.map(({ href, icon: Icon, label }) => {
           const isActive = href === "/" ? location === "/" : location.startsWith(href);

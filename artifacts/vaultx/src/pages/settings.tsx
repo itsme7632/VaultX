@@ -1,10 +1,12 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
-import { Shield, FileCheck, User, Bell, ChevronRight, HelpCircle, LogOut, Newspaper, MessageCircle, Info, Download, Globe } from "lucide-react";
+import { Shield, FileCheck, User, Bell, ChevronRight, LogOut, Newspaper, MessageCircle, Info, Download, Globe, Moon, Sun, Loader2 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 function SettingsItem({
@@ -15,14 +17,16 @@ function SettingsItem({
   danger,
   badge,
   testId,
+  rightContent,
 }: {
   icon: React.ElementType;
   label: string;
   description?: string;
-  onClick: () => void;
+  onClick?: () => void;
   danger?: boolean;
   badge?: string;
   testId?: string;
+  rightContent?: React.ReactNode;
 }) {
   return (
     <button
@@ -30,7 +34,7 @@ function SettingsItem({
       className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 active:bg-muted/50 transition-colors"
       data-testid={testId}
     >
-      <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center", danger ? "bg-destructive/10" : "bg-primary/10")}>
+      <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0", danger ? "bg-destructive/10" : "bg-primary/10")}>
         <Icon size={16} className={danger ? "text-destructive" : "text-primary"} />
       </div>
       <div className="flex-1 min-w-0">
@@ -39,7 +43,7 @@ function SettingsItem({
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {badge && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary text-white">{badge}</span>}
-        <ChevronRight size={15} className="text-muted-foreground" />
+        {rightContent ?? <ChevronRight size={15} className="text-muted-foreground" />}
       </div>
     </button>
   );
@@ -50,7 +54,9 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const logout = useLogout();
+  const [downloading, setDownloading] = useState(false);
 
   const { data: apkInfo } = useQuery({
     queryKey: ["apk-latest"],
@@ -64,6 +70,37 @@ export default function SettingsPage() {
       onSuccess: () => { queryClient.clear(); setLocation("/login"); },
       onError: () => toast({ title: "Error", description: "Failed to logout", variant: "destructive" }),
     });
+  };
+
+  const handleDownloadApk = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/apk/download", { credentials: "include" });
+      if (!res.ok) {
+        let errMsg = "APK not available. Please try again later.";
+        try {
+          const err = await res.json();
+          errMsg = err.error ?? errMsg;
+        } catch {}
+        toast({ title: "Download Unavailable", description: errMsg, variant: "destructive" });
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = apkInfo?.filename ?? "VaultX.apk";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Download Started", description: "VaultX APK is downloading." });
+    } catch {
+      toast({ title: "Error", description: "Download failed. Please check your connection.", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -84,7 +121,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Account */}
-        <div className="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-2.5 border-b border-border bg-muted/30">Account</p>
           <div className="divide-y divide-border">
             <SettingsItem icon={User} label="Profile" description="Update personal info & photo" onClick={() => setLocation("/profile")} testId="settings-profile" />
@@ -94,30 +131,64 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Preferences */}
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-2.5 border-b border-border bg-muted/30">Preferences</p>
+          <div className="divide-y divide-border">
+            <SettingsItem
+              icon={theme === "dark" ? Sun : Moon}
+              label={theme === "dark" ? "Light Mode" : "Dark Mode"}
+              description={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+              onClick={toggleTheme}
+              rightContent={
+                <div className={cn(
+                  "w-10 h-5.5 rounded-full relative transition-colors",
+                  theme === "dark" ? "bg-primary" : "bg-muted"
+                )}>
+                  <div className={cn(
+                    "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform",
+                    theme === "dark" ? "translate-x-5" : "translate-x-0.5"
+                  )} />
+                </div>
+              }
+            />
+          </div>
+        </div>
+
         {/* Platform */}
-        <div className="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-4 py-2.5 border-b border-border bg-muted/30">Platform</p>
           <div className="divide-y divide-border">
             <SettingsItem icon={Newspaper} label="News & Updates" description="Platform announcements" onClick={() => setLocation("/news")} />
             <SettingsItem icon={MessageCircle} label="Help & Support" description="Support tickets and FAQ" onClick={() => setLocation("/support")} />
             <SettingsItem icon={Globe} label="About Us" description="Platform info, mission & FAQ" onClick={() => setLocation("/about")} />
             {apkInfo && (
-              <a href="/api/apk/download" download className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 active:bg-muted/50 transition-colors">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-50">
-                  <Download size={16} className="text-emerald-600" />
+              <button
+                onClick={handleDownloadApk}
+                disabled={downloading}
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 active:bg-muted/50 transition-colors disabled:opacity-60"
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-500/10 flex-shrink-0">
+                  {downloading
+                    ? <Loader2 size={16} className="text-emerald-600 animate-spin" />
+                    : <Download size={16} className="text-emerald-600" />
+                  }
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground">Download Mobile App</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">v{apkInfo.version} · Android APK</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">v{apkInfo.version} · Android APK{apkInfo.fileSize ? ` · ${(apkInfo.fileSize / (1024 * 1024)).toFixed(1)} MB` : ""}</p>
                 </div>
-                <ChevronRight size={15} className="text-muted-foreground shrink-0" />
-              </a>
+                {downloading
+                  ? <span className="text-xs text-muted-foreground">Downloading…</span>
+                  : <ChevronRight size={15} className="text-muted-foreground shrink-0" />
+                }
+              </button>
             )}
           </div>
         </div>
 
         {/* Sign out */}
-        <div className="bg-white border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
           <div className="divide-y divide-border">
             <SettingsItem icon={LogOut} label="Sign Out" description="Sign out of your account" onClick={handleLogout} danger testId="button-logout" />
           </div>
