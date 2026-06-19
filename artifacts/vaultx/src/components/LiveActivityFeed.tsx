@@ -12,7 +12,6 @@ interface FeedItem {
   id: string;
   type: ActivityType;
   username: string;
-  flag: string;
   action: string;
   rightLabel: string;
   rightSub: string;
@@ -54,6 +53,7 @@ const cache = {
   totalTx:     0,
   initialized: false,
   config:      null as FeedConfig | null,
+  lastNewId:   null as string | null,
 };
 
 const USERNAMES_PARTIAL = [
@@ -77,41 +77,45 @@ const USERNAMES_ANON = [
   "User****6", "User****7", "User****8", "User****9", "User****0",
 ];
 
-const FLAGS_COMMON = ["🇺🇸","🇺🇸","🇬🇧","🇬🇧","🇦🇪","🇮🇳","🇳🇬","🇨🇦","🇦🇺","🇩🇪"];
-const FLAGS_OTHER  = ["🇫🇷","🇸🇦","🇰🇪","🇵🇰","🇸🇬","🇲🇾","🇿🇦","🇧🇷","🇪🇸","🇯🇵","🇹🇷","🇵🇭","🇪🇬"];
-
 const PLANS = ["Starter Plan", "Growth Plan", "Elite Plan", "Premium Plan"];
 const VIP_TIERS = ["Silver VIP", "Gold VIP", "Platinum VIP"];
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
 
-function pickFlag(): string {
-  return Math.random() < 0.70 ? pick(FLAGS_COMMON) : pick(FLAGS_OTHER);
+function safeNum(n: number, fallback: number): number {
+  return (typeof n === "number" && isFinite(n)) ? n : fallback;
 }
 
 function randAmt(min: number, max: number): number {
-  const raw = min + Math.pow(Math.random(), 1.8) * (max - min);
-  if (raw >= 5_000) return Math.round(raw / 500) * 500;
-  if (raw >= 1_000) return Math.round(raw / 50)  * 50;
-  if (raw >= 200)   return Math.round(raw / 10)  * 10;
-  if (raw >= 50)    return Math.round(raw / 5)   * 5;
-  return Math.round(raw);
+  const safeMin = safeNum(min, 50);
+  const safeMax = safeNum(max, 5000);
+  const lo = Math.min(safeMin, safeMax);
+  const hi = Math.max(safeMin, safeMax);
+  const raw = lo + Math.pow(Math.random(), 1.8) * (hi - lo);
+  const clamped = isFinite(raw) ? raw : lo;
+  if (clamped >= 5_000) return Math.round(clamped / 500) * 500;
+  if (clamped >= 1_000) return Math.round(clamped / 50)  * 50;
+  if (clamped >= 200)   return Math.round(clamped / 10)  * 10;
+  if (clamped >= 50)    return Math.round(clamped / 5)   * 5;
+  return Math.round(clamped);
 }
 
 function fmtAmt(n: number): string {
-  if (n >= 1_000) return n.toLocaleString();
-  if (n < 10)     return n.toFixed(2);
-  return String(n);
+  const v = safeNum(n, 0);
+  if (v >= 1_000) return v.toLocaleString();
+  if (v < 10)     return v.toFixed(2);
+  return String(v);
 }
 
 function fmtVolume(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
+  const v = safeNum(n, 0);
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(2)}M`;
+  if (v >= 1_000)     return `$${(v / 1_000).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
 }
 
 function fmtOnline(n: number): string {
-  return n.toLocaleString();
+  return safeNum(n, 0).toLocaleString();
 }
 
 function timeAgo(ts: number): string {
@@ -158,7 +162,6 @@ const WEIGHTED_TYPES_DEFAULT: Array<{ type: ActivityType; w: number }> = [
   { type: "referral",       w: 1 },
   { type: "vip_upgrade",    w: 0.3 },
 ];
-const W_TOTAL = WEIGHTED_TYPES_DEFAULT.reduce((s, t) => s + t.w, 0);
 
 function weightedType(enabledTypes: ActivityType[]): ActivityType {
   const filtered = WEIGHTED_TYPES_DEFAULT.filter(t => enabledTypes.includes(t.type));
@@ -181,12 +184,11 @@ function getUsernames(style: FeedConfig["usernameStyle"]) {
 function buildItem(
   type: ActivityType, ts: number, id: string,
   cfg: FeedConfig,
-  username?: string, flagOvr?: string,
+  username?: string,
 ): FeedItem {
   const u = username ?? pick(getUsernames(cfg.usernameStyle));
-  const f = flagOvr  ?? pickFlag();
-  const amtMin = cfg.minAmount;
-  const amtMax = cfg.maxAmount;
+  const amtMin = safeNum(cfg.minAmount, 50);
+  const amtMax = safeNum(cfg.maxAmount, 5000);
 
   let action = "", rightLabel = "", rightSub = "", amount = 0;
 
@@ -244,7 +246,10 @@ function buildItem(
     }
   }
 
-  return { id, type, username: u, flag: f, action, rightLabel, rightSub, amount, ts };
+  if (!isFinite(amount) || isNaN(amount)) amount = randAmt(amtMin, amtMax);
+  if (!isFinite(amount) || isNaN(amount)) amount = 100;
+
+  return { id, type, username: u, action, rightLabel, rightSub, amount, ts };
 }
 
 function genItem(cfg: FeedConfig, tsOverride?: number, idOverride?: string): FeedItem {
@@ -269,8 +274,61 @@ function genUnique(cfg: FeedConfig, recentNames: string[], recentAmts: number[])
 
 function buildRealItem(d: any, cfg: FeedConfig): FeedItem {
   const type = (d.type ?? "earning") as ActivityType;
-  return buildItem(type, new Date(d.createdAt).getTime(), d.id, cfg, d.username, pickFlag());
+  return buildItem(type, new Date(d.createdAt).getTime(), d.id, cfg, d.username);
 }
+
+// ─── Global background generator (runs regardless of which page is shown) ───
+
+type Listener = () => void;
+const globalListeners = new Set<Listener>();
+let globalGeneratorHandle: ReturnType<typeof setTimeout> | null = null;
+const globalRecentNames: string[] = [];
+const globalRecentAmts: number[] = [];
+
+function notifyListeners() {
+  globalListeners.forEach(fn => fn());
+}
+
+function globalSchedule(cfg: FeedConfig) {
+  if (globalGeneratorHandle !== null) return;
+
+  const run = () => {
+    const freqMs = (safeNum(cfg.frequencySeconds, 14)) * 1000;
+    const base   = freqMs * 0.6 + Math.random() * freqMs * 0.8;
+    const pause  = Math.random() < 0.15 ? freqMs * 0.5 + Math.random() * freqMs * 0.5 : 0;
+    const delay  = base + pause;
+
+    globalGeneratorHandle = setTimeout(() => {
+      globalGeneratorHandle = null;
+
+      const item = genUnique(cfg, globalRecentNames, globalRecentAmts);
+      globalRecentNames.unshift(item.username);
+      if (globalRecentNames.length > 5) globalRecentNames.length = 5;
+      globalRecentAmts.unshift(item.amount);
+      if (globalRecentAmts.length > 4) globalRecentAmts.length = 4;
+
+      cache.items    = [item, ...cache.items].slice(0, MAX_ITEMS);
+      cache.volume  += isFinite(item.amount) ? item.amount : 0;
+      cache.totalTx += 1;
+      cache.lastNewId = item.id;
+      setTimeout(() => { if (cache.lastNewId === item.id) cache.lastNewId = null; }, 800);
+
+      notifyListeners();
+      run();
+    }, delay);
+  };
+
+  run();
+}
+
+function stopGlobalGenerator() {
+  if (globalGeneratorHandle !== null) {
+    clearTimeout(globalGeneratorHandle);
+    globalGeneratorHandle = null;
+  }
+}
+
+// ─── Type config for icons / colours ─────────────────────────────────────────
 
 type CfgEntry = {
   icon: React.ElementType;
@@ -288,6 +346,8 @@ const TYPE_CFG: Record<ActivityType, CfgEntry> = {
   referral:       { icon: Users,         iconBg: "bg-purple-500/10",      iconColor: "text-purple-500", amountColor: "text-purple-500" },
   vip_upgrade:    { icon: Star,          iconBg: "bg-yellow-500/10",      iconColor: "text-yellow-500", amountColor: "text-yellow-500" },
 };
+
+// ─── UI Components ────────────────────────────────────────────────────────────
 
 function ShimmerRow() {
   return (
@@ -333,7 +393,7 @@ const ActivityRow = memo(function ActivityRow({
           <span className="text-muted-foreground">{item.action}</span>
         </p>
         <p className="text-[10px] text-muted-foreground mt-[2px] tabular-nums">
-          {item.flag} · {timeAgo(item.ts)}
+          {timeAgo(item.ts)}
           {item.isReal && (
             <span className="ml-1.5 text-[9px] text-green-500 font-medium">· verified</span>
           )}
@@ -363,16 +423,15 @@ export function LiveActivityFeed() {
   const [tick,    setTick]    = useState(0);
   const [config,  setConfig]  = useState<FeedConfig>(() => cache.config ?? DEFAULT_CONFIG);
 
-  const recentNames = useRef<string[]>([]);
-  const recentAmts  = useRef<number[]>([]);
-  const scheduleRef = useRef<ReturnType<typeof setTimeout>>();
-
   useEffect(() => {
     const fetchConfig = async () => {
       try {
         const res = await fetch("/api/settings/public", { credentials: "include" });
         if (!res.ok) return;
         const s: Record<string, string> = await res.json();
+        const minAmt = parseFloat(s.feed_min_amount ?? "50");
+        const maxAmt = parseFloat(s.feed_max_amount ?? "5000");
+        const freq   = parseFloat(s.feed_frequency_seconds ?? "14");
         const cfg: FeedConfig = {
           mode: (s.activity_feed_mode as "demo" | "real") || "demo",
           enableDeposits:    s.feed_enable_deposits    !== "false",
@@ -380,9 +439,9 @@ export function LiveActivityFeed() {
           enableWithdrawals: s.feed_enable_withdrawals !== "false",
           enableEarnings:    s.feed_enable_earnings    !== "false",
           enableReferrals:   s.feed_enable_referrals   !== "false",
-          minAmount:         parseFloat(s.feed_min_amount ?? "50"),
-          maxAmount:         parseFloat(s.feed_max_amount ?? "5000"),
-          frequencySeconds:  parseFloat(s.feed_frequency_seconds ?? "14"),
+          minAmount:         isFinite(minAmt) ? minAmt : 50,
+          maxAmount:         isFinite(maxAmt) ? maxAmt : 5000,
+          frequencySeconds:  isFinite(freq)   ? freq   : 14,
           usernameStyle:     (s.feed_username_style as FeedConfig["usernameStyle"]) || "partial",
         };
         cache.config = cfg;
@@ -448,38 +507,25 @@ export function LiveActivityFeed() {
     return () => clearInterval(id);
   }, [config.mode]);
 
-  const addItem = useCallback((item: FeedItem) => {
-    cache.items    = [item, ...cache.items].slice(0, MAX_ITEMS);
-    cache.volume  += item.amount;
-    cache.totalTx += 1;
-    setItems([...cache.items]);
-    setVolume(cache.volume);
-    setTotalTx(cache.totalTx);
-    setNewId(item.id);
-    setTimeout(() => setNewId(null), 800);
-  }, []);
-
   useEffect(() => {
     if (config.mode === "real") return;
 
-    const freqMs = (config.frequencySeconds || 14) * 1000;
+    globalSchedule(config);
 
-    const schedule = () => {
-      const base  = freqMs * 0.6 + Math.random() * freqMs * 0.8;
-      const pause = Math.random() < 0.15 ? freqMs * 0.5 + Math.random() * freqMs * 0.5 : 0;
-      const delay = base + pause;
-
-      scheduleRef.current = setTimeout(() => {
-        const item = genUnique(config, recentNames.current, recentAmts.current);
-        recentNames.current = [item.username, ...recentNames.current].slice(0, 5);
-        recentAmts.current  = [item.amount,   ...recentAmts.current ].slice(0, 4);
-        addItem(item);
-        schedule();
-      }, delay);
+    const sync = () => {
+      setItems([...cache.items]);
+      setVolume(cache.volume);
+      setTotalTx(cache.totalTx);
+      const nid = cache.lastNewId;
+      if (nid) {
+        setNewId(nid);
+        setTimeout(() => setNewId(n => n === nid ? null : n), 800);
+      }
     };
-    schedule();
-    return () => clearTimeout(scheduleRef.current);
-  }, [addItem, config]);
+
+    globalListeners.add(sync);
+    return () => { globalListeners.delete(sync); };
+  }, [config]);
 
   useEffect(() => {
     const drift = () => {
@@ -529,7 +575,7 @@ export function LiveActivityFeed() {
             <p className="text-[13px] font-semibold text-foreground">Platform Activity</p>
           </div>
           <span className="text-[10px] text-muted-foreground tabular-nums">
-            {totalTx.toLocaleString()} transactions
+            {safeNum(totalTx, 847).toLocaleString()} transactions
           </span>
         </div>
 

@@ -1,17 +1,25 @@
-export function formatUSDT(v: number, decimals = 2): string {
-  if (v === 0) return "0.00 USDT";
-  if (Math.abs(v) < 0.01) return v.toFixed(6) + " USDT";
-  return v.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " USDT";
+function safeV(v: unknown, fallback = 0): number {
+  const n = typeof v === "number" ? v : Number(v);
+  return isFinite(n) ? n : fallback;
 }
 
-export function formatUSDTCompact(v: number): string {
-  if (v >= 1_000_000) return (v / 1_000_000).toFixed(2) + "M USDT";
-  if (v >= 1_000) return (v / 1_000).toFixed(2) + "K USDT";
-  return formatUSDT(v);
+export function formatUSDT(v: unknown, decimals = 2): string {
+  const n = safeV(v);
+  if (n === 0) return "0.00 USDT";
+  if (Math.abs(n) < 0.01) return n.toFixed(6) + " USDT";
+  return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + " USDT";
 }
 
-export function formatPct(v: number, decimals = 2): string {
-  return (v * 100).toFixed(decimals) + "%";
+export function formatUSDTCompact(v: unknown): string {
+  const n = safeV(v);
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M USDT";
+  if (n >= 1_000) return (n / 1_000).toFixed(2) + "K USDT";
+  return formatUSDT(n);
+}
+
+export function formatPct(v: unknown, decimals = 2): string {
+  const n = safeV(v);
+  return (n * 100).toFixed(decimals) + "%";
 }
 
 export function formatDate(d: string | Date): string {

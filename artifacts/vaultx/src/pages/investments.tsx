@@ -1,4 +1,4 @@
-import { TrendingUp, Shield, Zap, CheckCircle, ArrowRight, Clock, Wallet, Star } from "lucide-react";
+import { TrendingUp, CheckCircle, ArrowRight, Clock, Wallet, Star } from "lucide-react";
 import {
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
   useGetUserInvestments, getGetUserInvestmentsQueryKey,
@@ -13,18 +13,6 @@ import { LiveCounter } from "@/components/LiveCounter";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
 import { useState } from "react";
-
-const RISK_COLORS: Record<string, string> = {
-  low: "bg-emerald-50 text-emerald-600 border-emerald-200",
-  medium: "bg-amber-50 text-amber-600 border-amber-200",
-  high: "bg-red-50 text-red-600 border-red-200",
-};
-
-const RISK_ICONS: Record<string, React.ElementType> = {
-  low: Shield,
-  medium: TrendingUp,
-  high: Zap,
-};
 
 const PLAN_GRADIENTS: Record<number, string> = {
   1: "from-slate-600 to-slate-800",
@@ -80,7 +68,6 @@ export default function InvestmentsPage() {
             {plansLoading ? (
               [1, 2, 3].map((i) => <Skeleton key={i} className="h-56 rounded-2xl" />)
             ) : [...(plans ?? [])].sort((a: any, b: any) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)).map((plan: any) => {
-              const RiskIcon = RISK_ICONS[plan.riskLevel] ?? Shield;
               const minRoi = plan.minRoiRate ?? 0.025;
               const maxRoi = plan.maxRoiRate ?? 0.030;
               const gradient = PLAN_GRADIENTS[plan.id] ?? "from-slate-600 to-slate-800";
@@ -94,15 +81,9 @@ export default function InvestmentsPage() {
                     </div>
                   )}
                   <div className={cn("bg-gradient-to-r p-5 text-white", gradient)}>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-bold text-xl">{plan.name}</h3>
-                        <p className="text-white/70 text-xs mt-1">{plan.description}</p>
-                      </div>
-                      <Badge className={cn("text-xs font-medium capitalize border", RISK_COLORS[plan.riskLevel])}>
-                        <RiskIcon size={11} className="mr-1" />
-                        {plan.riskLevel} risk
-                      </Badge>
+                    <div className="mb-4">
+                      <h3 className="font-bold text-xl">{plan.name}</h3>
+                      <p className="text-white/70 text-xs mt-1">{plan.description}</p>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mt-4">
                       <div className="bg-white/15 rounded-xl py-2.5 text-center">
