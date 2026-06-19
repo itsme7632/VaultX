@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { db, platformSettingsTable } from "@workspace/db";
 
 const router: IRouter = Router();
@@ -15,6 +15,8 @@ const PUBLIC_KEYS = [
   "support_email",
   "support_telegram",
   "support_whatsapp",
+  "support_whatsapp_community",
+  "support_telegram_group",
   "deposit_instructions",
   "withdrawal_instructions",
   "app_download_url",
@@ -50,6 +52,8 @@ router.get("/settings/public", async (_req, res): Promise<void> => {
     support_email: "",
     support_telegram: "",
     support_whatsapp: "",
+    support_whatsapp_community: "",
+    support_telegram_group: "",
     deposit_instructions: "",
     withdrawal_instructions: "",
     app_download_url: "",

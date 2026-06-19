@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MessageCircle, Plus, ChevronRight, Send, Clock, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { MessageCircle, Plus, ChevronRight, Send, Clock, CheckCircle, XCircle, RefreshCw, Users } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -92,7 +92,6 @@ export function SupportTicketPage() {
   return (
     <AppLayout title={ticket?.subject ?? "Support"}>
       <div className="flex flex-col h-[calc(100vh-140px)]">
-        {/* Ticket header */}
         <div className="px-4 pt-4 pb-3 border-b border-border">
           <Link href="/support" className="text-xs text-muted-foreground hover:text-foreground mb-2 inline-block">← Back to tickets</Link>
           <div className="flex items-center justify-between">
@@ -106,7 +105,6 @@ export function SupportTicketPage() {
           </p>
         </div>
 
-        {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
           {ticket?.messages?.map((msg: any) => (
             <div key={msg.id} className={cn("flex", msg.isAdmin ? "justify-start" : "justify-end")}>
@@ -129,7 +127,6 @@ export function SupportTicketPage() {
           )}
         </div>
 
-        {/* Reply / status area */}
         {ticket?.status !== "closed" ? (
           <div className="px-4 py-3 border-t border-border bg-card">
             <div className="flex gap-2">
@@ -185,6 +182,12 @@ export default function SupportPage() {
     staleTime: 30000,
   });
 
+  const { data: settings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
+    staleTime: 60000,
+  });
+
   const createTicket = useMutation({
     mutationFn: (data: { subject: string; message: string }) =>
       apiCall("/api/support/tickets", "POST", data),
@@ -200,6 +203,15 @@ export default function SupportPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const telegramLink    = settings?.support_telegram?.trim() || null;
+  const whatsappNumber  = settings?.support_whatsapp?.trim() || null;
+  const waCommunity     = settings?.support_whatsapp_community?.trim() || null;
+  const tgGroup         = settings?.support_telegram_group?.trim() || null;
+
+  const whatsappHref = whatsappNumber
+    ? `https://wa.me/${whatsappNumber.replace(/[^0-9]/g, "")}`
+    : "https://wa.me/";
+
   const FAQ = [
     { q: "How long do withdrawals take?", a: "Withdrawals are processed within 24 hours after admin approval." },
     { q: "What is the minimum deposit?", a: "Minimum deposit varies by network. TRC20 minimum is 10 USDT." },
@@ -211,10 +223,10 @@ export default function SupportPage() {
     <AppLayout title="Support">
       <div className="px-4 pt-5 pb-24 space-y-5">
 
-        {/* Quick actions */}
+        {/* Direct support contacts */}
         <div className="grid grid-cols-2 gap-3">
           <a
-            href="https://t.me/"
+            href={telegramLink ?? "https://t.me/"}
             target="_blank"
             rel="noopener noreferrer"
             className="bg-[#0088cc]/5 border border-[#0088cc]/20 rounded-xl p-3.5 flex items-center gap-3 hover:bg-[#0088cc]/10 transition-colors"
@@ -228,7 +240,7 @@ export default function SupportPage() {
             </div>
           </a>
           <a
-            href="https://wa.me/"
+            href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
             className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3.5 flex items-center gap-3 hover:bg-emerald-500/10 transition-colors"
@@ -242,6 +254,49 @@ export default function SupportPage() {
             </div>
           </a>
         </div>
+
+        {/* Community links — shown only when configured by admin */}
+        {(waCommunity || tgGroup) && (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Communities</p>
+            <div className="space-y-2.5">
+              {waCommunity && (
+                <a
+                  href={waCommunity}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3.5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-4 py-3.5 hover:bg-emerald-500/10 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <Users size={18} className="text-emerald-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Join WhatsApp Community</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{waCommunity}</p>
+                  </div>
+                  <ChevronRight size={15} className="text-muted-foreground shrink-0" />
+                </a>
+              )}
+              {tgGroup && (
+                <a
+                  href={tgGroup}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3.5 bg-[#0088cc]/5 border border-[#0088cc]/20 rounded-xl px-4 py-3.5 hover:bg-[#0088cc]/10 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-[#0088cc]/10 flex items-center justify-center shrink-0">
+                    <Users size={18} className="text-[#0088cc]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">Join Telegram Community</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{tgGroup}</p>
+                  </div>
+                  <ChevronRight size={15} className="text-muted-foreground shrink-0" />
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* New ticket */}
         {showNew ? (

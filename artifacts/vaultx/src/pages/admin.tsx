@@ -1287,8 +1287,10 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
   const TEXT_FIELDS = [
     { key: "platform_name", label: "Platform Name", placeholder: "VaultX" },
     { key: "support_email", label: "Support Email", placeholder: "support@vaultx.com" },
-    { key: "support_telegram", label: "Telegram Link", placeholder: "https://t.me/vaultx" },
+    { key: "support_telegram", label: "Telegram Support Link", placeholder: "https://t.me/vaultxsupport" },
+    { key: "support_telegram_group", label: "Telegram Community Group Link", placeholder: "https://t.me/vaultxcommunity" },
     { key: "support_whatsapp", label: "WhatsApp Support Number", placeholder: "+1234567890" },
+    { key: "support_whatsapp_community", label: "WhatsApp Community Link", placeholder: "https://chat.whatsapp.com/xxxx" },
     { key: "min_deposit", label: "Min. Deposit (USDT)", placeholder: "10" },
     { key: "min_withdrawal", label: "Min. Withdrawal (USDT)", placeholder: "10" },
     { key: "withdrawal_fee_percent", label: "Withdrawal Fee (%)", placeholder: "1.5" },

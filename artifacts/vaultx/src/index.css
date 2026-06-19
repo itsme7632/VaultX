@@ -303,6 +303,9 @@
 .app-mode .topbar-header {
   padding-top: max(12px, var(--safe-top));
 }
+.app-mode .subpage-header {
+  padding-top: max(12px, var(--safe-top));
+}
 .app-mode .bottom-nav {
   padding-bottom: max(8px, var(--safe-bottom));
 }

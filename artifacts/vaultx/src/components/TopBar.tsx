@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, User, Shield, FileCheck, Settings, LifeBuoy, LogOut, ChevronRight, LayoutDashboard, Info, Sun, Moon } from "lucide-react";
+import { Bell, User, Shield, FileCheck, Settings, LifeBuoy, LogOut, ChevronRight, LayoutDashboard, Info, Sun, Moon, BellOff } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { useLogout, useGetNotifications, getGetNotificationsQueryKey } from "@workspace/api-client-react";
@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { playNotificationSound, isNotificationMuted, setNotificationMuted } from "@/lib/notificationSound";
 
 export function TopBar({ title }: { title?: string }) {
   const { user } = useAuth();
@@ -22,12 +23,35 @@ export function TopBar({ title }: { title?: string }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const logout = useLogout();
+  const [muted, setMuted] = useState(() => isNotificationMuted());
+  const prevUnreadRef = useRef<number | null>(null);
 
   const { data: notifications } = useGetNotifications({
-    query: { queryKey: getGetNotificationsQueryKey(), staleTime: 30000 },
+    query: {
+      queryKey: getGetNotificationsQueryKey(),
+      staleTime: 20000,
+      refetchInterval: 30000,
+    },
   });
 
   const unreadCount = notifications?.unreadCount ?? 0;
+
+  useEffect(() => {
+    if (prevUnreadRef.current === null) {
+      prevUnreadRef.current = unreadCount;
+      return;
+    }
+    if (unreadCount > prevUnreadRef.current) {
+      playNotificationSound();
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount]);
+
+  const handleToggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    setNotificationMuted(next);
+  };
 
   const handleLogout = () => {
     logout.mutate(undefined, {
@@ -76,6 +100,15 @@ export function TopBar({ title }: { title?: string }) {
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
+          <button
+            onClick={handleToggleMute}
+            className="p-1.5 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label={muted ? "Unmute notifications" : "Mute notifications"}
+            title={muted ? "Notification sound off" : "Notification sound on"}
+          >
+            {muted ? <BellOff size={16} /> : null}
+          </button>
+
           <Link href="/notifications" data-testid="link-notifications">
             <button className="relative p-1.5 rounded-xl hover:bg-muted transition-colors">
               <Bell size={20} className="text-foreground" />
@@ -122,11 +155,16 @@ export function TopBar({ title }: { title?: string }) {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="cursor-pointer"
-                onClick={toggleTheme}
-              >
-                {theme === "dark" ? <Sun size={15} className="mr-2 text-muted-foreground" /> : <Moon size={15} className="mr-2 text-muted-foreground" />}
+              <DropdownMenuItem className="cursor-pointer" onClick={handleToggleMute}>
+                {muted
+                  ? <Bell size={15} className="mr-2 text-muted-foreground" />
+                  : <BellOff size={15} className="mr-2 text-muted-foreground" />}
+                <span>{muted ? "Unmute Notifications" : "Mute Notifications"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer" onClick={toggleTheme}>
+                {theme === "dark"
+                  ? <Sun size={15} className="mr-2 text-muted-foreground" />
+                  : <Moon size={15} className="mr-2 text-muted-foreground" />}
                 <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
