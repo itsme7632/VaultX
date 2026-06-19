@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { Bell, User, Shield, FileCheck, Settings, LifeBuoy, LogOut, ChevronRight, LayoutDashboard, Info, Sun, Moon, BellOff } from "lucide-react";
+import {
+  Bell, User, Shield, Settings, LayoutDashboard, LogOut,
+  ChevronRight, Download, HeadphonesIcon, Sun, Moon,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { useLogout, useGetNotifications, getGetNotificationsQueryKey } from "@workspace/api-client-react";
@@ -13,9 +16,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { playNotificationSound, isNotificationMuted, setNotificationMuted } from "@/lib/notificationSound";
+import { playNotificationSound } from "@/lib/notificationSound";
 
 export function TopBar({ title }: { title?: string }) {
   const { user } = useAuth();
@@ -23,7 +24,6 @@ export function TopBar({ title }: { title?: string }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const logout = useLogout();
-  const [muted, setMuted] = useState(() => isNotificationMuted());
   const prevUnreadRef = useRef<number | null>(null);
 
   const { data: notifications } = useGetNotifications({
@@ -47,12 +47,6 @@ export function TopBar({ title }: { title?: string }) {
     prevUnreadRef.current = unreadCount;
   }, [unreadCount]);
 
-  const handleToggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    setNotificationMuted(next);
-  };
-
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => {
@@ -70,12 +64,11 @@ export function TopBar({ title }: { title?: string }) {
     .toUpperCase() ?? "V";
 
   const menuItems = [
-    { icon: User, label: "Profile", href: "/profile" },
-    { icon: Shield, label: "Security", href: "/security" },
-    { icon: FileCheck, label: "KYC Verification", href: "/kyc" },
-    { icon: Settings, label: "Settings", href: "/settings" },
-    { icon: Bell, label: "Notifications", href: "/notifications", badge: unreadCount },
-    { icon: Info, label: "About Us", href: "/about" },
+    { icon: User,            label: "Profile",           href: "/profile" },
+    { icon: Shield,          label: "Security",          href: "/security" },
+    { icon: HeadphonesIcon,  label: "Customer Support",  href: "/support" },
+    { icon: Download,        label: "Download App",      href: "/download-app" },
+    { icon: Settings,        label: "Settings",          href: "/settings" },
     ...(user?.isAdmin ? [{ icon: LayoutDashboard, label: "Admin Panel", href: "/admin" }] : []),
   ];
 
@@ -91,7 +84,7 @@ export function TopBar({ title }: { title?: string }) {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={toggleTheme}
             className="p-1.5 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
@@ -100,16 +93,7 @@ export function TopBar({ title }: { title?: string }) {
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          <button
-            onClick={handleToggleMute}
-            className="p-1.5 rounded-xl hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-            aria-label={muted ? "Unmute notifications" : "Mute notifications"}
-            title={muted ? "Notification sound off" : "Notification sound on"}
-          >
-            {muted ? <BellOff size={16} /> : null}
-          </button>
-
-          <Link href="/notifications" data-testid="link-notifications">
+          <Link href="/notifications">
             <button className="relative p-1.5 rounded-xl hover:bg-muted transition-colors">
               <Bell size={20} className="text-foreground" />
               {unreadCount > 0 && (
@@ -122,7 +106,7 @@ export function TopBar({ title }: { title?: string }) {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="focus:outline-none" data-testid="button-profile-menu">
+              <button className="focus:outline-none ml-0.5">
                 <Avatar className="w-8 h-8 ring-2 ring-primary/20">
                   <AvatarFallback className="bg-gradient-to-br from-primary to-blue-600 text-white text-xs font-semibold">
                     {initials}
@@ -130,48 +114,28 @@ export function TopBar({ title }: { title?: string }) {
                 </Avatar>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 shadow-lg border-border bg-card">
+
+            <DropdownMenuContent align="end" className="w-52 shadow-lg border-border bg-card">
               <div className="px-3 py-2.5">
-                <p className="font-semibold text-sm text-foreground">{user?.fullName}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">@{user?.username}</p>
+                <p className="font-semibold text-sm text-foreground truncate">{user?.fullName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">@{user?.username}</p>
               </div>
               <DropdownMenuSeparator />
-              {menuItems.map(({ icon: Icon, label, href, badge }) => (
+              {menuItems.map(({ icon: Icon, label, href }) => (
                 <DropdownMenuItem
                   key={href}
                   className="cursor-pointer"
                   onClick={() => setLocation(href)}
-                  data-testid={`menu-${label.toLowerCase().replace(/\s/g, "-")}`}
                 >
-                  <Icon size={15} className="text-muted-foreground mr-2" />
+                  <Icon size={15} className="text-muted-foreground mr-2 shrink-0" />
                   <span className="flex-1">{label}</span>
-                  {badge && badge > 0 ? (
-                    <Badge variant="destructive" className="text-xs px-1.5 py-0 h-4">
-                      {badge}
-                    </Badge>
-                  ) : (
-                    <ChevronRight size={14} className="text-muted-foreground" />
-                  )}
+                  <ChevronRight size={14} className="text-muted-foreground" />
                 </DropdownMenuItem>
               ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="cursor-pointer" onClick={handleToggleMute}>
-                {muted
-                  ? <Bell size={15} className="mr-2 text-muted-foreground" />
-                  : <BellOff size={15} className="mr-2 text-muted-foreground" />}
-                <span>{muted ? "Unmute Notifications" : "Mute Notifications"}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer" onClick={toggleTheme}>
-                {theme === "dark"
-                  ? <Sun size={15} className="mr-2 text-muted-foreground" />
-                  : <Moon size={15} className="mr-2 text-muted-foreground" />}
-                <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="cursor-pointer text-destructive focus:text-destructive"
                 onClick={handleLogout}
-                data-testid="button-logout"
               >
                 <LogOut size={15} className="mr-2" />
                 <span>Logout</span>

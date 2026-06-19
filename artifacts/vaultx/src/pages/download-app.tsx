@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Download, Server, CheckCircle2, XCircle, Smartphone, RefreshCw, Calendar, HardDrive, Tag } from "lucide-react";
+import {
+  Download, Smartphone, RefreshCw, Calendar, HardDrive, Tag,
+  CheckCircle2, XCircle,
+} from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -14,63 +16,103 @@ interface AppInfo {
   lastUpdated: string;
   releaseNotes: string;
   changelog: string;
+  githubUrl: string;
+  mediafireUrl: string;
+  gdriveUrl: string;
+  telegramUrl: string;
   primaryUrl: string;
   mirrorUrl: string;
   backupUrl: string;
+  githubCount: number;
+  mediafireCount: number;
+  gdriveCount: number;
+  telegramCount: number;
   primaryCount: number;
   mirrorCount: number;
   backupCount: number;
 }
 
-type ServerKey = "primary" | "mirror" | "backup";
+type MirrorKey = "github" | "mediafire" | "gdrive" | "telegram" | "primary" | "mirror" | "backup";
 
-const SERVER_CONFIG: { key: ServerKey; label: string; urlKey: keyof AppInfo; countKey: keyof AppInfo }[] = [
-  { key: "primary", label: "Primary Server", urlKey: "primaryUrl", countKey: "primaryCount" },
-  { key: "mirror", label: "Mirror Server", urlKey: "mirrorUrl", countKey: "mirrorCount" },
-  { key: "backup", label: "Backup Server", urlKey: "backupUrl", countKey: "backupCount" },
+interface MirrorConfig {
+  key: MirrorKey;
+  label: string;
+  sub: string;
+  urlKey: keyof AppInfo;
+  countKey: keyof AppInfo;
+  gradient: string;
+  icon: string;
+}
+
+const MIRRORS: MirrorConfig[] = [
+  {
+    key: "github", label: "GitHub Releases", sub: "github.com",
+    urlKey: "githubUrl", countKey: "githubCount",
+    gradient: "from-gray-700 to-gray-900", icon: "G",
+  },
+  {
+    key: "mediafire", label: "MediaFire", sub: "mediafire.com",
+    urlKey: "mediafireUrl", countKey: "mediafireCount",
+    gradient: "from-rose-500 to-red-600", icon: "M",
+  },
+  {
+    key: "gdrive", label: "Google Drive", sub: "drive.google.com",
+    urlKey: "gdriveUrl", countKey: "gdriveCount",
+    gradient: "from-blue-500 to-indigo-600", icon: "D",
+  },
+  {
+    key: "telegram", label: "Telegram Channel", sub: "t.me",
+    urlKey: "telegramUrl", countKey: "telegramCount",
+    gradient: "from-[#0088cc] to-[#006ba3]", icon: "T",
+  },
+  {
+    key: "primary", label: "Primary Server", sub: "Direct download",
+    urlKey: "primaryUrl", countKey: "primaryCount",
+    gradient: "from-primary to-blue-600", icon: "P",
+  },
+  {
+    key: "mirror", label: "Mirror Server", sub: "Alternative link",
+    urlKey: "mirrorUrl", countKey: "mirrorCount",
+    gradient: "from-violet-500 to-purple-700", icon: "M",
+  },
+  {
+    key: "backup", label: "Backup Server", sub: "Fallback link",
+    urlKey: "backupUrl", countKey: "backupCount",
+    gradient: "from-emerald-500 to-teal-600", icon: "B",
+  },
 ];
 
 export default function DownloadAppPage() {
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [downloading, setDownloading] = useState<ServerKey | null>(null);
+  const [downloading, setDownloading] = useState<MirrorKey | null>(null);
 
-  const { data: appInfo, isLoading, error } = useQuery<AppInfo>({
+  const { data: appInfo, isLoading } = useQuery<AppInfo>({
     queryKey: ["app-info"],
     queryFn: () => fetch("/api/app-info", { credentials: "include" }).then((r) => r.json()),
     staleTime: 30000,
     retry: 1,
   });
 
-  const handleDownload = async (server: ServerKey, url: string) => {
+  const handleDownload = async (key: MirrorKey, url: string) => {
     if (downloading || !url) return;
-    setDownloading(server);
+    setDownloading(key);
     try {
-      await fetch(`/api/app-info/download/${server}`, {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch(`/api/app-info/download/${key}`, { method: "POST", credentials: "include" });
       queryClient.invalidateQueries({ queryKey: ["app-info"] });
-    } catch {
-    }
+    } catch {}
     window.open(url, "_blank", "noopener,noreferrer");
-    toast({
-      title: "Download Started",
-      description: "Your download has been opened. If nothing happened, check your browser's pop-up settings.",
-    });
+    toast({ title: "Download Started", description: "Your download has been opened. If nothing happened, check your browser's pop-up settings." });
     setTimeout(() => setDownloading(null), 2000);
   };
 
-  const hasAnyUrl = appInfo && (appInfo.primaryUrl || appInfo.mirrorUrl || appInfo.backupUrl);
+  const activeMirrors = MIRRORS.filter((m) => appInfo?.[m.urlKey]);
 
   if (isLoading) {
     return (
       <AppLayout title="Download App">
         <div className="px-4 pt-5 pb-24 space-y-4">
-          <div className="h-40 rounded-2xl bg-muted animate-pulse" />
-          <div className="h-24 rounded-2xl bg-muted animate-pulse" />
-          <div className="h-32 rounded-2xl bg-muted animate-pulse" />
+          {[1, 2, 3].map((i) => <div key={i} className="h-36 rounded-2xl bg-muted animate-pulse" />)}
         </div>
       </AppLayout>
     );
@@ -79,15 +121,13 @@ export default function DownloadAppPage() {
   return (
     <AppLayout title="Download App">
       <div className="pb-24">
-        {/* Hero header */}
+
+        {/* Hero */}
         <div className="relative bg-gradient-to-br from-primary via-blue-600 to-blue-800 px-4 pt-5 pb-8 overflow-hidden">
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white translate-x-12 -translate-y-12" />
             <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white -translate-x-8 translate-y-8" />
           </div>
-          <button onClick={() => setLocation("/settings")} className="flex items-center gap-1.5 text-white/80 text-sm mb-5 hover:text-white transition-colors">
-            <ArrowLeft size={16} /> Back
-          </button>
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/20">
               <span className="text-2xl font-black text-white">V</span>
@@ -97,8 +137,6 @@ export default function DownloadAppPage() {
               <p className="text-blue-200 text-sm mt-0.5">Crypto Investment Platform</p>
             </div>
           </div>
-
-          {/* Meta chips */}
           <div className="flex flex-wrap gap-2 mt-4">
             {appInfo?.version && (
               <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-full px-3 py-1">
@@ -124,29 +162,26 @@ export default function DownloadAppPage() {
         </div>
 
         <div className="px-4 pt-5 space-y-4">
-          {/* Server status overview */}
+
+          {/* Mirror status grid */}
           <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Server size={14} className="text-primary" />
-              </div>
-              <p className="text-sm font-bold text-foreground">Server Status</p>
-            </div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Mirror Status</p>
             <div className="grid grid-cols-3 gap-2">
-              {SERVER_CONFIG.map(({ key, label, urlKey }) => {
-                const url = appInfo?.[urlKey] as string | undefined;
-                const online = !!url;
+              {MIRRORS.map(({ key, label, urlKey }) => {
+                const online = !!(appInfo?.[urlKey]);
                 return (
                   <div key={key} className={cn(
-                    "rounded-xl border px-2.5 py-2.5 text-center",
-                    online ? "border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800" : "border-border bg-muted/30"
+                    "rounded-xl border px-2 py-2.5 text-center",
+                    online
+                      ? "border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800"
+                      : "border-border bg-muted/30"
                   )}>
                     {online
-                      ? <CheckCircle2 size={16} className="mx-auto text-emerald-500 mb-1" />
-                      : <XCircle size={16} className="mx-auto text-muted-foreground/50 mb-1" />
+                      ? <CheckCircle2 size={15} className="mx-auto text-emerald-500 mb-1" />
+                      : <XCircle size={15} className="mx-auto text-muted-foreground/40 mb-1" />
                     }
-                    <p className="text-[10px] font-bold text-foreground">{label.split(" ")[0]}</p>
-                    <p className={cn("text-[10px] font-semibold mt-0.5", online ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                    <p className="text-[9px] font-bold text-foreground leading-tight">{label.split(" ")[0]}</p>
+                    <p className={cn("text-[9px] font-semibold mt-0.5", online ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
                       {online ? "Online" : "Offline"}
                     </p>
                   </div>
@@ -156,58 +191,46 @@ export default function DownloadAppPage() {
           </div>
 
           {/* Download buttons */}
-          {hasAnyUrl ? (
+          {activeMirrors.length > 0 ? (
             <div className="space-y-3">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-0.5">Download Options</p>
-              {SERVER_CONFIG.map(({ key, label, urlKey, countKey }) => {
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Download Options</p>
+              {activeMirrors.map(({ key, label, sub, urlKey, countKey, gradient, icon }) => {
                 const url = appInfo?.[urlKey] as string;
                 const count = appInfo?.[countKey] as number;
-                if (!url) return null;
                 const isActive = downloading === key;
                 return (
-                  <div
-                    key={key}
-                    className="bg-card border border-border rounded-2xl p-4 shadow-sm"
-                  >
+                  <div key={key} className="bg-card border border-border rounded-2xl p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                          <Smartphone size={16} className="text-primary" />
+                      <div className="flex items-center gap-3">
+                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-sm", gradient)}>
+                          <span className="text-white font-black text-base">{icon}</span>
                         </div>
                         <div>
                           <p className="text-sm font-bold text-foreground">{label}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
+                          <div className="flex items-center gap-2 mt-0.5">
                             <span className="flex items-center gap-1">
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">Online</span>
                             </span>
-                            <span className="text-muted-foreground text-[10px]">·</span>
-                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                              <Download size={9} className="inline" />
-                              {count?.toLocaleString() ?? 0} downloads
-                            </span>
+                            <span className="text-[10px] text-muted-foreground">·</span>
+                            <span className="text-[10px] text-muted-foreground">{sub}</span>
                           </div>
                         </div>
                       </div>
+                      <span className="text-[10px] text-muted-foreground font-medium">
+                        <Download size={9} className="inline mr-0.5" />
+                        {(count ?? 0).toLocaleString()}
+                      </span>
                     </div>
                     <Button
-                      className={cn(
-                        "w-full h-11 font-semibold gap-2 text-sm",
-                        isActive && "opacity-80"
-                      )}
+                      className={cn("w-full h-11 font-semibold gap-2 text-sm bg-gradient-to-r", gradient, "hover:opacity-90 border-0")}
                       onClick={() => handleDownload(key, url)}
                       disabled={!!downloading}
                     >
                       {isActive ? (
-                        <>
-                          <RefreshCw size={15} className="animate-spin" />
-                          Opening…
-                        </>
+                        <><RefreshCw size={15} className="animate-spin" /> Opening…</>
                       ) : (
-                        <>
-                          <Download size={15} />
-                          Download from {label.split(" ")[0]}
-                        </>
+                        <><Download size={15} /> Download from {label.split(" ")[0]}</>
                       )}
                     </Button>
                   </div>
@@ -234,7 +257,7 @@ export default function DownloadAppPage() {
           {appInfo?.changelog && (
             <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2.5">Changelog</p>
-              <p className="text-sm text-foreground whitespace-pre-line leading-relaxed text-muted-foreground">{appInfo.changelog}</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">{appInfo.changelog}</p>
             </div>
           )}
 
@@ -242,7 +265,7 @@ export default function DownloadAppPage() {
           <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
             <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-1">Installation Note</p>
             <p className="text-xs text-amber-700 dark:text-amber-500 leading-relaxed">
-              This is an Android APK file. Before installing, enable <strong>Install from Unknown Sources</strong> in your Android Settings → Security. iOS installation is not supported.
+              This is an Android APK file. Before installing, enable <strong>Install from Unknown Sources</strong> in your Android Settings → Security. iOS is not supported.
             </p>
           </div>
         </div>

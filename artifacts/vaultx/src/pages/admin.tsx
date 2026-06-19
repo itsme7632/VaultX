@@ -1077,6 +1077,10 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
     app_last_updated: "",
     release_notes: "",
     changelog: "",
+    github_download_url: "",
+    mediafire_download_url: "",
+    gdrive_download_url: "",
+    telegram_download_url: "",
     primary_download_url: "",
     mirror_download_url: "",
     backup_download_url: "",
@@ -1120,9 +1124,13 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
   };
 
   const SERVERS = [
-    { key: "primary", label: "Primary", urlKey: "primary_download_url", countKey: "primary_download_count" },
-    { key: "mirror", label: "Mirror", urlKey: "mirror_download_url", countKey: "mirror_download_count" },
-    { key: "backup", label: "Backup", urlKey: "backup_download_url", countKey: "backup_download_count" },
+    { key: "github",    label: "GitHub",     urlKey: "github_download_url",    countKey: "github_download_count" },
+    { key: "mediafire", label: "MediaFire",  urlKey: "mediafire_download_url", countKey: "mediafire_download_count" },
+    { key: "gdrive",    label: "Google Drive", urlKey: "gdrive_download_url",  countKey: "gdrive_download_count" },
+    { key: "telegram",  label: "Telegram",   urlKey: "telegram_download_url",  countKey: "telegram_download_count" },
+    { key: "primary",   label: "Primary",    urlKey: "primary_download_url",   countKey: "primary_download_count" },
+    { key: "mirror",    label: "Mirror",     urlKey: "mirror_download_url",    countKey: "mirror_download_count" },
+    { key: "backup",    label: "Backup",     urlKey: "backup_download_url",    countKey: "backup_download_count" },
   ];
 
   return (
