@@ -175,4 +175,26 @@ router.post("/support/tickets/:id/close", requireAuth, async (req, res): Promise
   res.json({ success: true });
 });
 
+router.post("/support/tickets/:id/reopen", requireAuth, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [ticket] = await db.select().from(supportTicketsTable).where(eq(supportTicketsTable.id, id)).limit(1);
+  if (!ticket) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+  if (!req.session.isAdmin && ticket.userId !== req.session.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  await db
+    .update(supportTicketsTable)
+    .set({ status: "open", updatedAt: new Date() })
+    .where(eq(supportTicketsTable.id, id));
+
+  res.json({ success: true });
+});
+
 export default router;

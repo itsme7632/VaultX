@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -78,6 +78,8 @@ export default function AdminPage() {
   const { data: resetLogs } = useQuery({ queryKey: ["admin-reset-logs"], queryFn: () => adminApi("/admin/password-reset-logs"), staleTime: 30000, enabled: tab === "logs" });
   const { data: appSettings, refetch: refetchAppSettings } = useQuery({ queryKey: ["admin-app-settings"], queryFn: () => adminApi("/admin/app-settings"), staleTime: 30000, enabled: tab === "app-settings" });
   const { data: aboutData, refetch: refetchAbout } = useQuery({ queryKey: ["admin-about"], queryFn: () => adminApi("/admin/about"), staleTime: 30000, enabled: tab === "about" });
+  const { data: statisticsData, refetch: refetchStatistics } = useQuery({ queryKey: ["admin-statistics"], queryFn: () => adminApi("/admin/statistics"), staleTime: 30000, enabled: tab === "statistics" });
+  const { data: ticketsData, refetch: refetchTickets } = useQuery({ queryKey: ["admin-tickets"], queryFn: () => adminApi("/support/tickets"), staleTime: 15000, enabled: tab === "tickets" });
 
   const approveKyc = useAdminApproveKyc();
   const rejectKyc = useAdminRejectKyc();
@@ -200,6 +202,8 @@ export default function AdminPage() {
     { id: "networks", label: "Networks", icon: Network },
     { id: "news", label: "News", icon: Newspaper },
     { id: "broadcast", label: "Broadcast", icon: Bell },
+    { id: "statistics", label: "Statistics", icon: BarChart3 },
+    { id: "tickets", label: "Tickets", icon: MessageSquare },
     { id: "app-settings", label: "App Settings", icon: Smartphone },
     { id: "about", label: "About Us", icon: Info },
     { id: "settings", label: "Settings", icon: Settings },
@@ -221,7 +225,7 @@ export default function AdminPage() {
     <AppLayout title="Admin Panel">
       <div className="pb-24">
         {/* Tabs (horizontal scroll) */}
-        <div className="flex gap-1 overflow-x-auto px-4 py-3 border-b border-border bg-white sticky top-0 z-10">
+        <div className="flex gap-1 overflow-x-auto px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setTab(id)}
               className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all", tab === id ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted")}>
@@ -600,6 +604,14 @@ export default function AdminPage() {
 
           {tab === "about" && (
             <AboutTab data={aboutData} onRefresh={refetchAbout} toast={toast} />
+          )}
+
+          {tab === "statistics" && (
+            <StatisticsTab data={statisticsData} onRefresh={refetchStatistics} toast={toast} />
+          )}
+
+          {tab === "tickets" && (
+            <TicketsTab data={ticketsData} onRefresh={refetchTickets} toast={toast} />
           )}
 
           {tab === "settings" && (
@@ -1419,7 +1431,438 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
           {saving ? "Saving…" : "Save Instructions"}
         </Button>
       </div>
+
+      {/* Activity Feed Settings */}
+      <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Activity size={14} className="text-green-500" />
+          <p className="text-sm font-bold text-foreground">Activity Feed Settings</p>
+        </div>
+        <p className="text-xs text-muted-foreground -mt-1">Control how the Live Activity Feed works on the dashboard and about page.</p>
+
+        <div className="flex items-center justify-between py-2 border-b border-border">
+          <div>
+            <p className="text-sm font-medium text-foreground">Real Activity Mode</p>
+            <p className="text-xs text-muted-foreground">Show real platform actions instead of simulated activity</p>
+          </div>
+          <Switch
+            checked={form["activity_feed_mode"] === "real"}
+            onCheckedChange={(checked) => setForm((f) => ({ ...f, activity_feed_mode: checked ? "real" : "demo" }))}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { key: "feed_enable_deposits", label: "Show Deposits" },
+            { key: "feed_enable_investments", label: "Show Investments" },
+            { key: "feed_enable_withdrawals", label: "Show Withdrawals" },
+            { key: "feed_enable_earnings", label: "Show Earnings" },
+            { key: "feed_enable_referrals", label: "Show Referrals" },
+          ].map(({ key, label }) => (
+            <div key={key} className="flex items-center justify-between py-1.5">
+              <p className="text-xs text-foreground">{label}</p>
+              <Switch
+                checked={form[key] !== "false"}
+                onCheckedChange={(checked) => setForm((f) => ({ ...f, [key]: checked ? "true" : "false" }))}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">Min Amount (USDT)</Label>
+            <Input type="number" value={form["feed_min_amount"] ?? "50"} onChange={(e) => setForm((f) => ({ ...f, feed_min_amount: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="50" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Max Amount (USDT)</Label>
+            <Input type="number" value={form["feed_max_amount"] ?? "5000"} onChange={(e) => setForm((f) => ({ ...f, feed_max_amount: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="5000" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Update Frequency (seconds)</Label>
+            <Input type="number" value={form["feed_frequency_seconds"] ?? "14"} onChange={(e) => setForm((f) => ({ ...f, feed_frequency_seconds: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="14" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Username Style</Label>
+            <select
+              value={form["feed_username_style"] ?? "partial"}
+              onChange={(e) => setForm((f) => ({ ...f, feed_username_style: e.target.value }))}
+              className="mt-1 h-9 text-sm w-full rounded-md border border-input bg-background px-3 text-foreground"
+            >
+              <option value="partial">Partial (john***)</option>
+              <option value="full">Full names</option>
+              <option value="anonymous">Anonymous</option>
+            </select>
+          </div>
+        </div>
+
+        <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : "Save Feed Settings"}
+        </Button>
+      </div>
     </div>
   );
+}
+
+// ─── Statistics Tab ───────────────────────────────────────────────────────────
+function StatisticsTab({ data, onRefresh, toast }: { data: any; onRefresh: () => void; toast: any }) {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (data && typeof data === "object") setForm(data as Record<string, string>);
+  }, [data]);
+
+  const mode = form["stats_mode"] ?? "real";
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/statistics", {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      queryClient.invalidateQueries({ queryKey: ["admin-statistics"] });
+      queryClient.invalidateQueries({ queryKey: ["about"] });
+      toast({ title: "Statistics settings saved!" });
+      onRefresh();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const STAT_FIELDS = [
+    { key: "members", label: "Registered Members", placeholder: "5000" },
+    { key: "active_investments", label: "Active Investments", placeholder: "387" },
+    { key: "total_deposits", label: "Total Deposits (USDT)", placeholder: "2850000" },
+    { key: "total_withdrawals", label: "Total Withdrawals (USDT)", placeholder: "1920000" },
+    { key: "countries", label: "Countries Served", placeholder: "42" },
+    { key: "completed", label: "Completed Opportunities", placeholder: "1056" },
+  ];
+
+  const ANIM_FIELDS = [
+    { key: "members", label: "Members" },
+    { key: "investments", label: "Active Investments" },
+    { key: "deposits", label: "Total Deposits" },
+    { key: "withdrawals", label: "Total Withdrawals" },
+    { key: "countries", label: "Countries" },
+    { key: "completed", label: "Completed" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-4">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={14} className="text-primary" />
+          <p className="text-sm font-bold text-foreground">Platform Statistics Display</p>
+        </div>
+        <p className="text-xs text-muted-foreground">Choose how platform statistics appear on the About page.</p>
+
+        {/* Mode selector */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { id: "real", label: "Real Data", desc: "Live database values", icon: Activity },
+            { id: "custom", label: "Custom", desc: "Manually set values", icon: Tag },
+            { id: "animated", label: "Animated", desc: "Randomised ranges", icon: Zap },
+          ].map(({ id, label, desc, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setForm((f) => ({ ...f, stats_mode: id }))}
+              className={cn(
+                "rounded-xl p-3 text-left border transition-all",
+                mode === id
+                  ? "bg-primary/10 border-primary text-primary"
+                  : "bg-muted/30 border-border text-muted-foreground hover:border-primary/50"
+              )}
+            >
+              <Icon size={14} className="mb-1.5" />
+              <p className="text-xs font-semibold">{label}</p>
+              <p className="text-[10px] opacity-70">{desc}</p>
+            </button>
+          ))}
+        </div>
+
+        {/* Real mode info */}
+        {mode === "real" && (
+          <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3">
+            <p className="text-xs text-emerald-600 font-medium">Live database values will be shown.</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Users, investments, deposits, and withdrawals are fetched in real-time from the database.</p>
+          </div>
+        )}
+
+        {/* Custom mode */}
+        {mode === "custom" && (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-foreground">Custom Values</p>
+            <div className="grid grid-cols-2 gap-3">
+              {STAT_FIELDS.map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <Label className="text-xs text-muted-foreground">{label}</Label>
+                  <Input
+                    type="number"
+                    value={form[`stats_${key}`] ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, [`stats_${key}`]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="mt-1 h-9 text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Animated mode */}
+        {mode === "animated" && (
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-foreground">Animated Ranges</p>
+            <p className="text-[10px] text-muted-foreground">Values will smoothly randomise within these ranges every few seconds.</p>
+            {ANIM_FIELDS.map(({ key, label }) => (
+              <div key={key}>
+                <p className="text-xs font-medium text-foreground mb-1.5">{label}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Min</Label>
+                    <Input
+                      type="number"
+                      value={form[`stats_anim_${key}_min`] ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, [`stats_anim_${key}_min`]: e.target.value }))}
+                      className="mt-0.5 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Max</Label>
+                    <Input
+                      type="number"
+                      value={form[`stats_anim_${key}_max`] ?? ""}
+                      onChange={(e) => setForm((f) => ({ ...f, [`stats_anim_${key}_max`]: e.target.value }))}
+                      className="mt-0.5 h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : "Save Statistics Settings"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tickets Tab ──────────────────────────────────────────────────────────────
+function TicketsTab({ data, onRefresh, toast }: { data: any; onRefresh: () => void; toast: any }) {
+  const queryClient = useQueryClient();
+  const [filter, setFilter] = useState<"all" | "open" | "answered" | "closed">("all");
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [reply, setReply] = useState("");
+
+  const { data: ticketDetail, isLoading: detailLoading } = useQuery({
+    queryKey: ["admin-ticket-detail", selectedId],
+    queryFn: () => adminApiTicket(`/api/support/tickets/${selectedId}`),
+    enabled: selectedId !== null,
+    refetchInterval: 15000,
+  });
+
+  const sendReply = useMutation({
+    mutationFn: (message: string) => adminApiTicket(`/api/support/tickets/${selectedId}/reply`, "POST", { message }),
+    onSuccess: () => {
+      setReply("");
+      queryClient.invalidateQueries({ queryKey: ["admin-ticket-detail", selectedId] });
+      queryClient.invalidateQueries({ queryKey: ["admin-tickets"] });
+      onRefresh();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const closeTicket = useMutation({
+    mutationFn: (id: number) => adminApiTicket(`/api/support/tickets/${id}/close`, "POST"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-ticket-detail", selectedId] });
+      queryClient.invalidateQueries({ queryKey: ["admin-tickets"] });
+      onRefresh();
+      toast({ title: "Ticket closed" });
+    },
+  });
+
+  const reopenTicket = useMutation({
+    mutationFn: (id: number) => adminApiTicket(`/api/support/tickets/${id}/reopen`, "POST"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-ticket-detail", selectedId] });
+      queryClient.invalidateQueries({ queryKey: ["admin-tickets"] });
+      onRefresh();
+      toast({ title: "Ticket reopened" });
+    },
+  });
+
+  const tickets: any[] = data ?? [];
+  const filtered = filter === "all" ? tickets : tickets.filter((t) => t.status === filter);
+
+  const STATUS_COLOR: Record<string, string> = {
+    open:     "bg-primary/10 text-primary border-primary/20",
+    answered: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+    closed:   "bg-muted text-muted-foreground border-border",
+  };
+
+  const counts = {
+    all:      tickets.length,
+    open:     tickets.filter((t) => t.status === "open").length,
+    answered: tickets.filter((t) => t.status === "answered").length,
+    closed:   tickets.filter((t) => t.status === "closed").length,
+  };
+
+  if (selectedId !== null) {
+    return (
+      <div className="space-y-3">
+        <button onClick={() => setSelectedId(null)} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+          ← Back to tickets
+        </button>
+        {detailLoading ? (
+          <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)}</div>
+        ) : (
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+            {/* Header */}
+            <div className="px-4 py-3 border-b border-border">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{ticketDetail?.subject}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    #{ticketDetail?.id} · @{tickets.find(t => t.id === selectedId)?.username ?? "user"} · {ticketDetail?.status}
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  {ticketDetail?.status !== "closed" ? (
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => closeTicket.mutate(selectedId)}>
+                      Close
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => reopenTicket.mutate(selectedId)}>
+                      <RefreshCw size={10} className="mr-1" /> Reopen
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="max-h-[50vh] overflow-y-auto px-4 py-3 space-y-3">
+              {ticketDetail?.messages?.map((msg: any) => (
+                <div key={msg.id} className={cn("flex", msg.isAdmin ? "justify-start" : "justify-end")}>
+                  <div className={cn(
+                    "max-w-[80%] rounded-2xl px-3 py-2 text-xs",
+                    msg.isAdmin ? "bg-primary text-white rounded-tl-sm" : "bg-muted text-foreground rounded-tr-sm border border-border"
+                  )}>
+                    <p className={cn("text-[9px] font-semibold mb-0.5", msg.isAdmin ? "text-white/70" : "text-muted-foreground")}>
+                      {msg.isAdmin ? "Support Team" : "User"}
+                    </p>
+                    <p className="leading-relaxed">{msg.message}</p>
+                  </div>
+                </div>
+              ))}
+              {!ticketDetail?.messages?.length && (
+                <p className="text-center text-xs text-muted-foreground py-4">No messages yet</p>
+              )}
+            </div>
+
+            {/* Reply */}
+            {ticketDetail?.status !== "closed" && (
+              <div className="px-4 py-3 border-t border-border">
+                <div className="flex gap-2">
+                  <Input
+                    value={reply}
+                    onChange={(e) => setReply(e.target.value)}
+                    placeholder="Type admin reply..."
+                    className="flex-1 h-9 text-sm"
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && reply.trim()) sendReply.mutate(reply.trim()); }}
+                  />
+                  <Button
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={() => reply.trim() && sendReply.mutate(reply.trim())}
+                    disabled={sendReply.isPending || !reply.trim()}
+                  >
+                    <Send size={13} />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Header + refresh */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-bold text-foreground">Support Tickets</p>
+        <button onClick={onRefresh} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+          <RefreshCw size={11} /> Refresh
+        </button>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="flex gap-1.5 flex-wrap">
+        {(["all", "open", "answered", "closed"] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={cn(
+              "px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all border",
+              filter === f ? "bg-primary text-white border-primary" : "bg-muted/30 text-muted-foreground border-border hover:border-primary/50"
+            )}
+          >
+            {f} {counts[f] > 0 && <span className="ml-0.5 opacity-70">({counts[f]})</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Ticket list */}
+      {!filtered.length ? (
+        <div className="py-10 text-center text-sm text-muted-foreground bg-card border border-border rounded-2xl">
+          No {filter === "all" ? "" : filter} tickets
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-2xl divide-y divide-border shadow-sm overflow-hidden">
+          {filtered.map((ticket: any) => (
+            <button
+              key={ticket.id}
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors text-left"
+              onClick={() => setSelectedId(ticket.id)}
+            >
+              <div className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize shrink-0", STATUS_COLOR[ticket.status] ?? "bg-muted")}>
+                {ticket.status}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">{ticket.subject}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  @{ticket.username ?? ticket.fullName ?? "user"} · #{ticket.id}
+                </p>
+              </div>
+              <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+async function adminApiTicket(url: string, method = "GET", body?: any) {
+  const res = await fetch(url, {
+    method, credentials: "include",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error((await res.json()).message ?? "Request failed");
+  return res.json();
 }
 

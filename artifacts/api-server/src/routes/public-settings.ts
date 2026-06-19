@@ -18,6 +18,16 @@ const PUBLIC_KEYS = [
   "deposit_instructions",
   "withdrawal_instructions",
   "app_download_url",
+  "activity_feed_mode",
+  "feed_enable_deposits",
+  "feed_enable_investments",
+  "feed_enable_withdrawals",
+  "feed_enable_earnings",
+  "feed_enable_referrals",
+  "feed_min_amount",
+  "feed_max_amount",
+  "feed_frequency_seconds",
+  "feed_username_style",
 ];
 
 router.get("/settings/public", async (_req, res): Promise<void> => {

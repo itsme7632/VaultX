@@ -15,14 +15,17 @@ import { formatUSDT } from "@/lib/format";
 
 function useCountUp(target: number, duration = 1800, start = false) {
   const [value, setValue] = useState(0);
+  const prevTarget = useRef(0);
   useEffect(() => {
     if (!start || target === 0) return;
+    const from = prevTarget.current;
+    prevTarget.current = target;
     let startTime: number | null = null;
     const step = (timestamp: number) => {
       if (!startTime) startTime = timestamp;
       const progress = Math.min((timestamp - startTime) / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(Math.floor(eased * target));
+      setValue(Math.floor(from + eased * (target - from)));
       if (progress < 1) requestAnimationFrame(step);
       else setValue(target);
     };
@@ -46,12 +49,40 @@ function StatCard({ label, value, prefix = "", suffix = "", isCurrency = false, 
   );
 }
 
+function AnimatedStatCard({ label, min, max, prefix = "", suffix = "", isCurrency = false, start }: {
+  label: string; min: number; max: number; prefix?: string; suffix?: string; isCurrency?: boolean; start: boolean;
+}) {
+  const [target, setTarget] = useState(() => Math.round(min + Math.random() * (max - min)));
+  useEffect(() => {
+    if (!start) return;
+    const schedule = () => {
+      const delay = 4_000 + Math.random() * 6_000;
+      return setTimeout(() => {
+        setTarget(Math.round(min + Math.random() * (max - min)));
+        tRef.current = schedule();
+      }, delay);
+    };
+    const tRef = { current: schedule() };
+    return () => clearTimeout(tRef.current);
+  }, [min, max, start]);
+  const animated = useCountUp(target, 2000, start);
+  const display = isCurrency
+    ? formatUSDT(animated)
+    : `${prefix}${animated.toLocaleString()}${suffix}`;
+  return (
+    <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 text-center">
+      <p className="text-2xl font-black text-white">{display}</p>
+      <p className="text-xs text-white/70 mt-1 font-medium">{label}</p>
+    </div>
+  );
+}
+
 function FAQItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="border border-border rounded-xl overflow-hidden">
       <button
-        className="w-full flex items-center justify-between px-4 py-3.5 text-left bg-white hover:bg-muted/20 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3.5 text-left bg-card hover:bg-muted/30 transition-colors"
         onClick={() => setOpen(!open)}
       >
         <span className="text-sm font-medium text-foreground pr-2">{q}</span>
@@ -79,6 +110,9 @@ export default function AboutPage() {
 
   const content = data?.content ?? {};
   const stats = data?.stats ?? {};
+  const statsMode: "real" | "custom" | "animated" = data?.statsMode ?? "real";
+  const statsCustom = data?.statsCustom ?? {};
+  const statsAnim = data?.statsAnim ?? {};
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -90,19 +124,19 @@ export default function AboutPage() {
   }, []);
 
   const features = [
-    { icon: Shield, label: "Secure Platform", desc: "Advanced security measures and account protection systems.", color: "text-emerald-600", bg: "bg-emerald-50" },
-    { icon: Zap, label: "Fast Transactions", desc: "Efficient deposit and withdrawal processing.", color: "text-amber-600", bg: "bg-amber-50" },
-    { icon: BarChart2, label: "Real-Time Tracking", desc: "Monitor investments and portfolio performance in real time.", color: "text-blue-600", bg: "bg-blue-50" },
-    { icon: Eye, label: "Transparent Operations", desc: "Clear investment information and progress tracking.", color: "text-purple-600", bg: "bg-purple-50" },
+    { icon: Shield, label: "Secure Platform", desc: "Advanced security measures and account protection systems.", color: "text-emerald-600", bg: "bg-emerald-500/10" },
+    { icon: Zap, label: "Fast Transactions", desc: "Efficient deposit and withdrawal processing.", color: "text-amber-600", bg: "bg-amber-500/10" },
+    { icon: BarChart2, label: "Real-Time Tracking", desc: "Monitor investments and portfolio performance in real time.", color: "text-blue-600", bg: "bg-blue-500/10" },
+    { icon: Eye, label: "Transparent Operations", desc: "Clear investment information and progress tracking.", color: "text-purple-600", bg: "bg-purple-500/10" },
     { icon: LayoutDashboard, label: "User-Friendly Dashboard", desc: "Simple and intuitive interface for all users.", color: "text-primary", bg: "bg-primary/10" },
-    { icon: HeadphonesIcon, label: "Dedicated Support", desc: "Responsive support team available to assist members.", color: "text-rose-600", bg: "bg-rose-50" },
+    { icon: HeadphonesIcon, label: "Dedicated Support", desc: "Responsive support team available to assist members.", color: "text-rose-600", bg: "bg-rose-500/10" },
   ];
 
   const values = [
-    { icon: Eye, label: "Transparency", desc: "Clear information and honest communication.", color: "text-blue-600", bg: "bg-blue-50" },
-    { icon: Lock, label: "Security", desc: "Protecting user accounts and platform integrity.", color: "text-emerald-600", bg: "bg-emerald-50" },
-    { icon: Lightbulb, label: "Innovation", desc: "Continuous improvement and feature development.", color: "text-amber-600", bg: "bg-amber-50" },
-    { icon: Award, label: "Reliability", desc: "Consistent platform performance and user experience.", color: "text-purple-600", bg: "bg-purple-50" },
+    { icon: Eye, label: "Transparency", desc: "Clear information and honest communication.", color: "text-blue-600", bg: "bg-blue-500/10" },
+    { icon: Lock, label: "Security", desc: "Protecting user accounts and platform integrity.", color: "text-emerald-600", bg: "bg-emerald-500/10" },
+    { icon: Lightbulb, label: "Innovation", desc: "Continuous improvement and feature development.", color: "text-amber-600", bg: "bg-amber-500/10" },
+    { icon: Award, label: "Reliability", desc: "Consistent platform performance and user experience.", color: "text-purple-600", bg: "bg-purple-500/10" },
   ];
 
   const steps = [
@@ -121,6 +155,88 @@ export default function AboutPage() {
   ];
 
   const platformName = content.platform_name || "VaultX";
+
+  function renderStatCards() {
+    const statDefs = [
+      {
+        label: "Registered Members",
+        realVal: stats.totalUsers || 1240,
+        customVal: Number(statsCustom.members ?? 1240),
+        animMin: Number(statsAnim.members?.min ?? 5000),
+        animMax: Number(statsAnim.members?.max ?? 10000),
+      },
+      {
+        label: "Active Investments",
+        realVal: stats.activeInvestments || 387,
+        customVal: Number(statsCustom.activeInvestments ?? 387),
+        animMin: Number(statsAnim.activeInvestments?.min ?? 300),
+        animMax: Number(statsAnim.activeInvestments?.max ?? 800),
+      },
+      {
+        label: "Total Deposits",
+        realVal: Math.round(stats.totalDeposits || 2850000),
+        customVal: Number(statsCustom.totalDeposits ?? 2850000),
+        animMin: Number(statsAnim.totalDeposits?.min ?? 250000),
+        animMax: Number(statsAnim.totalDeposits?.max ?? 500000),
+        prefix: "$",
+      },
+      {
+        label: "Total Withdrawals",
+        realVal: Math.round(stats.totalWithdrawals || 1920000),
+        customVal: Number(statsCustom.totalWithdrawals ?? 1920000),
+        animMin: Number(statsAnim.totalWithdrawals?.min ?? 150000),
+        animMax: Number(statsAnim.totalWithdrawals?.max ?? 400000),
+        prefix: "$",
+      },
+      {
+        label: "Completed Opportunities",
+        realVal: stats.completedInvestments || 1056,
+        customVal: Number(statsCustom.completedInvestments ?? 1056),
+        animMin: Number(statsAnim.completedInvestments?.min ?? 800),
+        animMax: Number(statsAnim.completedInvestments?.max ?? 2000),
+      },
+      {
+        label: "Countries Served",
+        realVal: stats.countriesServed || 42,
+        customVal: Number(statsCustom.countriesServed ?? 42),
+        animMin: Number(statsAnim.countriesServed?.min ?? 35),
+        animMax: Number(statsAnim.countriesServed?.max ?? 60),
+        suffix: "+",
+      },
+    ];
+
+    return statDefs.map((s) => {
+      if (statsMode === "animated") {
+        return (
+          <AnimatedStatCard
+            key={s.label}
+            label={s.label}
+            min={s.animMin}
+            max={s.animMax}
+            prefix={s.prefix ?? ""}
+            suffix={s.suffix ?? ""}
+            start={statsVisible}
+          />
+        );
+      }
+      const value = statsMode === "custom" ? s.customVal : s.realVal;
+      return (
+        <StatCard
+          key={s.label}
+          label={s.label}
+          value={value}
+          prefix={s.prefix ?? ""}
+          suffix={s.suffix ?? ""}
+          start={statsVisible}
+        />
+      );
+    });
+  }
+
+  const statsSubtitle =
+    statsMode === "real" ? "Live data from our platform" :
+    statsMode === "custom" ? "Platform growth milestones" :
+    "Growing platform statistics";
 
   return (
     <AppLayout title={`About ${platformName}`}>
@@ -148,7 +264,7 @@ export default function AboutPage() {
         <div className="px-4 space-y-6 mt-6 max-w-screen-sm mx-auto">
 
           {/* ── Our Mission ── */}
-          <div className="bg-white border border-border rounded-2xl p-5 shadow-sm">
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Star size={16} className="text-primary" />
@@ -165,7 +281,7 @@ export default function AboutPage() {
             <h2 className="text-base font-bold text-foreground mb-3">Why Choose {platformName}</h2>
             <div className="grid grid-cols-2 gap-3">
               {features.map(({ icon: Icon, label, desc, color, bg }) => (
-                <div key={label} className="bg-white border border-border rounded-2xl p-3.5 shadow-sm">
+                <div key={label} className="bg-card border border-border rounded-2xl p-3.5 shadow-sm">
                   <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center mb-2", bg)}>
                     <Icon size={16} className={color} />
                   </div>
@@ -182,14 +298,9 @@ export default function AboutPage() {
             className="bg-gradient-to-br from-slate-900 to-primary rounded-2xl p-5"
           >
             <h2 className="text-sm font-bold text-white mb-1">Platform Statistics</h2>
-            <p className="text-xs text-white/50 mb-4">Live data from our platform</p>
+            <p className="text-xs text-white/50 mb-4">{statsSubtitle}</p>
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Registered Members" value={stats.totalUsers || 1240} start={statsVisible} />
-              <StatCard label="Active Investments" value={stats.activeInvestments || 387} start={statsVisible} />
-              <StatCard label="Total Deposits" value={Math.round(stats.totalDeposits || 2850000)} prefix="$" start={statsVisible} />
-              <StatCard label="Total Withdrawals" value={Math.round(stats.totalWithdrawals || 1920000)} prefix="$" start={statsVisible} />
-              <StatCard label="Completed Opportunities" value={stats.completedInvestments || 1056} start={statsVisible} />
-              <StatCard label="Countries Served" value={stats.countriesServed || 42} suffix="+" start={statsVisible} />
+              {renderStatCards()}
             </div>
           </div>
 
@@ -198,7 +309,7 @@ export default function AboutPage() {
             <h2 className="text-base font-bold text-foreground mb-3">Our Core Values</h2>
             <div className="grid grid-cols-2 gap-3">
               {values.map(({ icon: Icon, label, desc, color, bg }) => (
-                <div key={label} className="bg-white border border-border rounded-2xl p-3.5 shadow-sm">
+                <div key={label} className="bg-card border border-border rounded-2xl p-3.5 shadow-sm">
                   <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center mb-2", bg)}>
                     <Icon size={16} className={color} />
                   </div>
@@ -210,7 +321,7 @@ export default function AboutPage() {
           </div>
 
           {/* ── How VaultX Works ── */}
-          <div className="bg-white border border-border rounded-2xl p-5 shadow-sm">
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
             <h2 className="text-base font-bold text-foreground mb-4">How {platformName} Works</h2>
             <div className="space-y-0">
               {steps.map(({ icon: Icon, step, title, desc }, i) => (
@@ -236,19 +347,19 @@ export default function AboutPage() {
           </div>
 
           {/* ── Security & Compliance ── */}
-          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl p-5">
+          <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5">
             <div className="flex items-start gap-3">
               <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0">
                 <Shield size={18} className="text-white" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-emerald-900 mb-1.5">Security &amp; Compliance</h2>
-                <p className="text-xs text-emerald-800/80 leading-relaxed">
+                <h2 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mb-1.5">Security &amp; Compliance</h2>
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   {content.security_text || "VaultX prioritizes platform security through account protection measures, encrypted connections, and continuous monitoring."}
                 </p>
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {["Encrypted Connections", "Account Protection", "Continuous Monitoring"].map((badge) => (
-                    <span key={badge} className="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <span key={badge} className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full flex items-center gap-1">
                       <CheckCircle2 size={9} /> {badge}
                     </span>
                   ))}
@@ -278,7 +389,7 @@ export default function AboutPage() {
           <div>
             <h2 className="text-base font-bold text-foreground mb-3">Contact &amp; Support</h2>
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white border border-border rounded-2xl p-3.5 shadow-sm">
+              <div className="bg-card border border-border rounded-2xl p-3.5 shadow-sm">
                 <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center mb-2">
                   <LayoutDashboard size={16} className="text-primary" />
                 </div>
@@ -295,10 +406,10 @@ export default function AboutPage() {
               {content.support_email && (
                 <a
                   href={`mailto:${content.support_email}`}
-                  className="bg-white border border-border rounded-2xl p-3.5 shadow-sm block"
+                  className="bg-card border border-border rounded-2xl p-3.5 shadow-sm block"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center mb-2">
-                    <Mail size={16} className="text-blue-600" />
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center mb-2">
+                    <Mail size={16} className="text-blue-500" />
                   </div>
                   <p className="text-xs font-bold text-foreground mb-0.5">Email Support</p>
                   <p className="text-[10px] text-muted-foreground truncate">{content.support_email}</p>
@@ -310,9 +421,9 @@ export default function AboutPage() {
                   href={content.support_telegram}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-white border border-border rounded-2xl p-3.5 shadow-sm block"
+                  className="bg-card border border-border rounded-2xl p-3.5 shadow-sm block"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center mb-2">
+                  <div className="w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center mb-2">
                     <MessageCircle size={16} className="text-sky-500" />
                   </div>
                   <p className="text-xs font-bold text-foreground mb-0.5">Telegram</p>
@@ -325,10 +436,10 @@ export default function AboutPage() {
                   href={`https://wa.me/${content.support_whatsapp.replace(/\D/g, "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-white border border-border rounded-2xl p-3.5 shadow-sm block"
+                  className="bg-card border border-border rounded-2xl p-3.5 shadow-sm block"
                 >
-                  <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center mb-2">
-                    <Phone size={16} className="text-emerald-600" />
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-2">
+                    <Phone size={16} className="text-emerald-500" />
                   </div>
                   <p className="text-xs font-bold text-foreground mb-0.5">WhatsApp</p>
                   <p className="text-[10px] text-muted-foreground">{content.support_whatsapp}</p>

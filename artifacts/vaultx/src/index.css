@@ -227,6 +227,18 @@
 .dark .text-slate-400 {
   color: hsl(215 20% 52%);
 }
+.dark .text-gray-900,
+.dark .text-gray-800 {
+  color: hsl(var(--foreground));
+}
+.dark .text-gray-700,
+.dark .text-gray-600 {
+  color: hsl(var(--muted-foreground));
+}
+.dark .text-gray-500,
+.dark .text-gray-400 {
+  color: hsl(215 20% 52%);
+}
 .dark .border-slate-200 {
   border-color: hsl(var(--border));
 }
