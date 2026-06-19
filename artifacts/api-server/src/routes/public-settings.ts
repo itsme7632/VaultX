@@ -12,6 +12,8 @@ const PUBLIC_KEYS = [
   "maintenance_mode",
   "announcement_text",
   "platform_name",
+  "platform_logo_url",
+  "platform_url",
   "support_email",
   "support_telegram",
   "support_whatsapp",

@@ -1285,12 +1285,14 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
   }, [settingsData]);
 
   const TEXT_FIELDS = [
-    { key: "platform_name", label: "Platform Name", placeholder: "VaultX" },
-    { key: "support_email", label: "Support Email", placeholder: "support@vaultx.com" },
-    { key: "support_telegram", label: "Telegram Support Link", placeholder: "https://t.me/vaultxsupport" },
-    { key: "support_telegram_group", label: "Telegram Community Group Link", placeholder: "https://t.me/vaultxcommunity" },
-    { key: "support_whatsapp", label: "WhatsApp Support Number", placeholder: "+1234567890" },
-    { key: "support_whatsapp_community", label: "WhatsApp Community Link", placeholder: "https://chat.whatsapp.com/xxxx" },
+    { key: "platform_name",      label: "Platform Name",              placeholder: "VaultX",                          section: "Branding" },
+    { key: "platform_logo_url",  label: "Platform Logo URL",          placeholder: "https://example.com/logo.png",    section: "Branding" },
+    { key: "platform_url",       label: "Platform Website URL",       placeholder: "https://vaultx.app",              section: "Branding" },
+    { key: "support_email",      label: "Support Email",              placeholder: "support@vaultx.com",              section: "Support" },
+    { key: "support_telegram",   label: "Telegram Support Link",      placeholder: "https://t.me/vaultxsupport",      section: "Support" },
+    { key: "support_telegram_group",   label: "Telegram Community Group Link",  placeholder: "https://t.me/vaultxcommunity",    section: "Support" },
+    { key: "support_whatsapp",         label: "WhatsApp Support Number",        placeholder: "+1234567890",                     section: "Support" },
+    { key: "support_whatsapp_community", label: "WhatsApp Community Link",      placeholder: "https://chat.whatsapp.com/xxxx",  section: "Support" },
     { key: "min_deposit", label: "Min. Deposit (USDT)", placeholder: "10" },
     { key: "min_withdrawal", label: "Min. Withdrawal (USDT)", placeholder: "10" },
     { key: "withdrawal_fee_percent", label: "Withdrawal Fee (%)", placeholder: "1.5" },
