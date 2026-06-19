@@ -34,6 +34,7 @@ import SupportPage, { SupportTicketPage } from "@/pages/support";
 import TransactionPage from "@/pages/transaction";
 import NotFound from "@/pages/not-found";
 import AboutPage from "@/pages/about";
+import DownloadAppPage from "@/pages/download-app";
 
 setBaseUrl(null);
 
@@ -154,6 +155,9 @@ function Router() {
       </Route>
       <Route path="/about">
         <ProtectedRoute><AboutPage /></ProtectedRoute>
+      </Route>
+      <Route path="/download-app">
+        <ProtectedRoute><DownloadAppPage /></ProtectedRoute>
       </Route>
 
       <Route component={NotFound} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Upload, Download, Info } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "mobile-app" | "about";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -76,7 +76,7 @@ export default function AdminPage() {
   const { data: depData, isLoading: depLoading } = useQuery({ queryKey: ["admin-deposits", depFilter], queryFn: () => adminApi(`/admin/deposits?status=${depFilter}`), staleTime: 20000, enabled: tab === "deposits" });
   const { data: settingsData } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" });
   const { data: resetLogs } = useQuery({ queryKey: ["admin-reset-logs"], queryFn: () => adminApi("/admin/password-reset-logs"), staleTime: 30000, enabled: tab === "logs" });
-  const { data: apkReleases, refetch: refetchApk } = useQuery({ queryKey: ["admin-apk"], queryFn: () => adminApi("/admin/apk"), staleTime: 30000, enabled: tab === "mobile-app" });
+  const { data: appSettings, refetch: refetchAppSettings } = useQuery({ queryKey: ["admin-app-settings"], queryFn: () => adminApi("/admin/app-settings"), staleTime: 30000, enabled: tab === "app-settings" });
   const { data: aboutData, refetch: refetchAbout } = useQuery({ queryKey: ["admin-about"], queryFn: () => adminApi("/admin/about"), staleTime: 30000, enabled: tab === "about" });
 
   const approveKyc = useAdminApproveKyc();
@@ -200,7 +200,7 @@ export default function AdminPage() {
     { id: "networks", label: "Networks", icon: Network },
     { id: "news", label: "News", icon: Newspaper },
     { id: "broadcast", label: "Broadcast", icon: Bell },
-    { id: "mobile-app", label: "Mobile App", icon: Smartphone },
+    { id: "app-settings", label: "App Settings", icon: Smartphone },
     { id: "about", label: "About Us", icon: Info },
     { id: "settings", label: "Settings", icon: Settings },
     { id: "logs", label: "Logs", icon: FileText },
@@ -594,8 +594,8 @@ export default function AdminPage() {
           )}
 
           {/* SETTINGS */}
-          {tab === "mobile-app" && (
-            <MobileAppTab releases={apkReleases ?? []} onRefresh={refetchApk} toast={toast} />
+          {tab === "app-settings" && (
+            <AppSettingsTab settings={appSettings} onRefresh={refetchAppSettings} toast={toast} />
           )}
 
           {tab === "about" && (
@@ -1057,321 +1057,201 @@ function AboutTab({ data, onRefresh, toast }: { data: any; onRefresh: () => void
   );
 }
 
-function MobileAppTab({ releases, onRefresh, toast }: { releases: any[]; onRefresh: () => void; toast: any }) {
-  const [version, setVersion] = useState("");
-  const [releaseNotes, setReleaseNotes] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [diagnostic, setDiagnostic] = useState<any>(null);
-  const [loadingDiag, setLoadingDiag] = useState(false);
+function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefresh: () => void; toast: any }) {
+  const [form, setForm] = useState<Record<string, string>>({
+    app_name: "",
+    app_version: "",
+    apk_size: "",
+    app_last_updated: "",
+    release_notes: "",
+    changelog: "",
+    primary_download_url: "",
+    mirror_download_url: "",
+    backup_download_url: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState<string | null>(null);
 
-  const formatBytes = (bytes: number) => {
-    if (!bytes) return "0 B";
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const handleUpload = async () => {
-    if (!file || !version.trim()) {
-      toast({ title: "Missing fields", description: "Version and APK file are required.", variant: "destructive" });
-      return;
+  useEffect(() => {
+    if (settings && typeof settings === "object") {
+      setForm((prev) => ({ ...prev, ...settings }));
     }
-    setUploading(true);
-    setProgress(0);
-    setUploadSuccess(false);
+  }, [settings]);
+
+  const set = (key: string) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleSave = async () => {
+    setSaving(true);
     try {
-      const formData = new FormData();
-      formData.append("apk", file);
-      formData.append("version", version.trim());
-      if (releaseNotes.trim()) formData.append("releaseNotes", releaseNotes.trim());
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.upload.addEventListener("progress", (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 90));
-        });
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            setProgress(100);
-            resolve();
-          } else {
-            try {
-              const body = JSON.parse(xhr.responseText);
-              reject(new Error(body.error || `Upload failed (${xhr.status})`));
-            } catch {
-              reject(new Error(`Upload failed (${xhr.status})`));
-            }
-          }
-        });
-        xhr.addEventListener("error", () => reject(new Error("Network error during upload")));
-        xhr.open("POST", "/api/admin/apk/upload");
-        xhr.withCredentials = true;
-        xhr.send(formData);
-      });
-
-      setUploadSuccess(true);
-      toast({ title: "✓ APK Uploaded Successfully", description: `v${version} is now the active release and ready to download.` });
-      setTimeout(() => {
-        setVersion(""); setReleaseNotes(""); setFile(null); setProgress(0); setUploadSuccess(false);
-      }, 3000);
+      await adminApi("/admin/app-settings", "PUT", form);
       onRefresh();
-    } catch (err: any) {
-      setProgress(0);
-      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+      toast({ title: "✓ App settings saved", description: "Download URLs and app info updated successfully." });
+    } catch {
+      toast({ title: "Save failed", description: "Could not save settings. Please try again.", variant: "destructive" });
     } finally {
-      setUploading(false);
+      setSaving(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this release? The APK file will also be removed from storage.")) return;
+  const handleResetCounter = async (server: string) => {
+    setResetting(server);
     try {
-      await adminApi(`/admin/apk/${id}`, "DELETE");
+      await adminApi(`/admin/app-settings/reset-counter/${server}`, "POST");
       onRefresh();
-      toast({ title: "Release deleted" });
+      toast({ title: "Counter reset", description: `${server} download counter reset to 0.` });
     } catch {
-      toast({ title: "Error", description: "Failed to delete release", variant: "destructive" });
-    }
-  };
-
-  const handleActivate = async (id: number) => {
-    try {
-      await adminApi(`/admin/apk/${id}/activate`, "POST");
-      onRefresh();
-      toast({ title: "Release activated" });
-    } catch {
-      toast({ title: "Error", description: "Failed to activate release", variant: "destructive" });
-    }
-  };
-
-  const handleDeactivate = async (id: number) => {
-    try {
-      await adminApi(`/admin/apk/${id}/deactivate`, "POST");
-      onRefresh();
-      toast({ title: "Release deactivated" });
-    } catch {
-      toast({ title: "Error", description: "Failed to deactivate release", variant: "destructive" });
-    }
-  };
-
-  const loadDiagnostic = async () => {
-    setLoadingDiag(true);
-    try {
-      const data = await adminApi("/admin/apk/diagnostic");
-      setDiagnostic(data);
-    } catch {
-      toast({ title: "Error", description: "Failed to load diagnostics", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to reset counter.", variant: "destructive" });
     } finally {
-      setLoadingDiag(false);
+      setResetting(null);
     }
   };
+
+  const SERVERS = [
+    { key: "primary", label: "Primary", urlKey: "primary_download_url", countKey: "primary_download_count" },
+    { key: "mirror", label: "Mirror", urlKey: "mirror_download_url", countKey: "mirror_download_count" },
+    { key: "backup", label: "Backup", urlKey: "backup_download_url", countKey: "backup_download_count" },
+  ];
 
   return (
     <div className="space-y-4">
-      {/* Upload new APK */}
+      {/* App Information */}
       <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
         <div className="flex items-center gap-2 mb-1">
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Upload size={15} className="text-primary" />
+            <Smartphone size={15} className="text-primary" />
           </div>
           <div>
-            <p className="text-sm font-bold text-foreground">Upload New APK</p>
-            <p className="text-[11px] text-muted-foreground">Max 200 MB · Becomes the active release on upload</p>
+            <p className="text-sm font-bold text-foreground">App Information</p>
+            <p className="text-[11px] text-muted-foreground">Metadata shown on the Download App page</p>
           </div>
         </div>
 
-        <div>
-          <Label className="text-xs text-muted-foreground">Version *</Label>
-          <Input value={version} onChange={(e) => setVersion(e.target.value)} placeholder="e.g. 1.2.0" className="mt-1 h-9 text-sm" disabled={uploading} />
-        </div>
-
-        <div>
-          <Label className="text-xs text-muted-foreground">Release Notes</Label>
-          <Textarea value={releaseNotes} onChange={(e) => setReleaseNotes(e.target.value)} placeholder="What's new in this version…" className="mt-1 text-sm min-h-[70px] resize-none" disabled={uploading} />
-        </div>
-
-        <div>
-          <Label className="text-xs text-muted-foreground">APK File *</Label>
-          <div className={cn("mt-1 border-2 border-dashed rounded-xl p-4 text-center relative cursor-pointer transition-colors", uploading ? "border-border opacity-60" : "border-border hover:border-primary/50")}>
-            <input
-              type="file"
-              accept=".apk,application/vnd.android.package-archive"
-              onChange={(e) => { setFile(e.target.files?.[0] ?? null); setUploadSuccess(false); }}
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              disabled={uploading}
-            />
-            {file ? (
-              <div>
-                <p className="text-sm font-medium text-foreground truncate">{file.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{formatBytes(file.size)}</p>
-              </div>
-            ) : (
-              <div>
-                <Smartphone size={20} className="mx-auto text-muted-foreground mb-1" />
-                <p className="text-xs text-muted-foreground">Tap to choose APK file</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {(uploading || uploadSuccess) && (
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <div className="flex justify-between text-[10px] mb-1">
-              <span className={uploadSuccess ? "text-emerald-600 font-medium" : "text-muted-foreground"}>
-                {uploadSuccess ? "✓ Upload complete — file saved to server" : progress < 90 ? "Uploading to server…" : "Saving file…"}
-              </span>
-              <span className={uploadSuccess ? "text-emerald-600" : "text-muted-foreground"}>{progress}%</span>
-            </div>
-            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className={cn("h-full transition-all duration-300 rounded-full", uploadSuccess ? "bg-emerald-500" : "bg-primary")}
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+            <Label className="text-xs text-muted-foreground">App Name</Label>
+            <Input value={form.app_name} onChange={set("app_name")} placeholder="VaultX" className="mt-1 h-9 text-sm" />
           </div>
-        )}
-
-        <Button
-          className={cn("w-full h-10 font-semibold gap-2", uploadSuccess && "bg-emerald-600 hover:bg-emerald-700")}
-          onClick={handleUpload}
-          disabled={uploading || !file || !version.trim()}
-        >
-          {uploading ? (
-            <><span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> Uploading…</>
-          ) : uploadSuccess ? (
-            <>✓ Upload Successful</>
-          ) : (
-            <><Upload size={15} /> Upload & Activate</>
-          )}
-        </Button>
-      </div>
-
-      {/* Release history */}
-      <div className="space-y-3">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Release History</p>
-        {releases.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground bg-white border border-border rounded-2xl">No APK releases yet</div>
-        ) : (
-          releases.map((r: any) => (
-            <div key={r.id} className={cn("bg-white border rounded-2xl p-4 shadow-sm", r.isActive ? "border-primary/40" : "border-border")}>
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center", r.isActive ? "bg-emerald-50" : "bg-muted/50")}>
-                    <Smartphone size={14} className={r.isActive ? "text-emerald-600" : "text-muted-foreground"} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-foreground">v{r.version}</p>
-                    <p className="text-[10px] text-muted-foreground">{formatBytes(r.fileSize)} · {new Date(r.uploadedAt).toLocaleDateString()}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {r.isActive && <Badge className="text-[10px] bg-emerald-100 text-emerald-700 border-0 px-2 py-0.5">Active</Badge>}
-                  {!r.isActive && (
-                    <Button size="sm" variant="outline" className="h-7 text-[10px] px-2" onClick={() => handleActivate(r.id)}>Activate</Button>
-                  )}
-                  {r.isActive && (
-                    <Button size="sm" variant="outline" className="h-7 text-[10px] px-2 text-amber-600 border-amber-200 hover:bg-amber-50" onClick={() => handleDeactivate(r.id)}>Deactivate</Button>
-                  )}
-                  <Button size="sm" variant="outline" className="h-7 w-7 p-0 text-red-500 border-red-200 hover:bg-red-50" onClick={() => handleDelete(r.id)}>
-                    <Trash2 size={12} />
-                  </Button>
-                </div>
-              </div>
-              {r.releaseNotes && <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-2.5 py-1.5 mt-1">{r.releaseNotes}</p>}
-              <div className="flex items-center justify-between mt-1.5">
-                <p className="text-[10px] text-muted-foreground/70 truncate font-mono flex-1 mr-2">{r.fileName}</p>
-                <p className="text-[10px] text-muted-foreground shrink-0 flex items-center gap-0.5">
-                  <Download size={9} className="inline" /> {r.downloadCount ?? 0} downloads
-                </p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-
-      {/* Test Download */}
-      {releases.some((r: any) => r.isActive) && (
-        <div className="bg-slate-50 border border-border rounded-2xl p-4 shadow-sm">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Test Download</p>
-          <a
-            href="/api/apk/download"
-            download
-            className="flex items-center gap-2 text-primary text-sm font-medium hover:underline"
-          >
-            <Download size={14} />
-            Download active APK directly
-          </a>
-          <p className="text-[10px] text-muted-foreground mt-1">Auth-protected. Same endpoint used by users on dashboard & settings.</p>
-        </div>
-      )}
-
-      {/* Storage Diagnostics */}
-      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Storage Diagnostics</p>
-          <Button size="sm" variant="outline" className="h-7 text-[10px] px-2 gap-1" onClick={loadDiagnostic} disabled={loadingDiag}>
-            {loadingDiag ? "Loading…" : "Run Check"}
-          </Button>
+          <div>
+            <Label className="text-xs text-muted-foreground">Version</Label>
+            <Input value={form.app_version} onChange={set("app_version")} placeholder="e.g. 2.1.0" className="mt-1 h-9 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">APK Size</Label>
+            <Input value={form.apk_size} onChange={set("apk_size")} placeholder="e.g. 45.2 MB" className="mt-1 h-9 text-sm" />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Last Updated</Label>
+            <Input value={form.app_last_updated} onChange={set("app_last_updated")} type="date" className="mt-1 h-9 text-sm" />
+          </div>
         </div>
 
-        {!diagnostic && !loadingDiag && (
-          <p className="text-xs text-muted-foreground text-center py-3">Click "Run Check" to verify APK files exist on disk.</p>
-        )}
+        <div>
+          <Label className="text-xs text-muted-foreground">Release Notes (What's New)</Label>
+          <Textarea value={form.release_notes} onChange={set("release_notes")} placeholder="Describe what's new in this version…" className="mt-1 text-sm min-h-[80px] resize-none" />
+        </div>
 
-        {diagnostic && (
-          <div className="space-y-3">
-            <div className="bg-muted/30 rounded-lg px-3 py-2">
-              <p className="text-[10px] text-muted-foreground mb-0.5">Storage Directory</p>
-              <p className="text-[10px] font-mono text-foreground break-all">{diagnostic.storageDir}</p>
-            </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Changelog</Label>
+          <Textarea value={form.changelog} onChange={set("changelog")} placeholder="Detailed changelog for this release…" className="mt-1 text-sm min-h-[70px] resize-none" />
+        </div>
+      </div>
 
-            {diagnostic.releases.length === 0 && (
-              <p className="text-xs text-muted-foreground text-center py-2">No releases in database.</p>
-            )}
+      {/* Download URLs */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+            <Link2 size={15} className="text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Download URLs</p>
+            <p className="text-[11px] text-muted-foreground">Leave a URL empty to hide that server's button on the Download page</p>
+          </div>
+        </div>
 
-            {diagnostic.releases.map((r: any) => (
-              <div key={r.id} className={cn("rounded-xl border p-3", r.existsOnDisk ? "border-emerald-200 bg-emerald-50/30" : "border-red-200 bg-red-50/30")}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-bold text-foreground">v{r.version}</span>
-                  <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", r.existsOnDisk ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
-                    {r.existsOnDisk ? "✓ File exists on disk" : "✗ File missing on disk"}
+        {SERVERS.map(({ key, label, urlKey }) => {
+          const url = form[urlKey] ?? "";
+          return (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-xs text-muted-foreground">{label} Server URL</Label>
+                <div className="flex items-center gap-1">
+                  <span className={cn("inline-block w-1.5 h-1.5 rounded-full", url ? "bg-emerald-500" : "bg-muted-foreground/40")} />
+                  <span className={cn("text-[10px] font-semibold", url ? "text-emerald-600" : "text-muted-foreground")}>
+                    {url ? "Online" : "Offline"}
                   </span>
                 </div>
-                <div className="space-y-0.5">
-                  <div className="flex gap-2">
-                    <span className="text-[10px] text-muted-foreground w-16 shrink-0">Filename</span>
-                    <span className="text-[10px] font-mono text-foreground truncate">{r.fileName}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className="text-[10px] text-muted-foreground w-16 shrink-0">DB size</span>
-                    <span className="text-[10px] font-mono text-foreground">{r.fileSize ? `${(r.fileSize / (1024 * 1024)).toFixed(2)} MB` : "unknown"}</span>
-                  </div>
-                  {r.existsOnDisk && (
-                    <div className="flex gap-2">
-                      <span className="text-[10px] text-muted-foreground w-16 shrink-0">Disk size</span>
-                      <span className="text-[10px] font-mono text-foreground">{r.diskSize ? `${(r.diskSize / (1024 * 1024)).toFixed(2)} MB` : "unknown"}</span>
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <span className="text-[10px] text-muted-foreground w-16 shrink-0">File path</span>
-                    <span className="text-[10px] font-mono text-muted-foreground break-all">{r.filePath}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <span className="text-[10px] text-muted-foreground w-16 shrink-0">Downloads</span>
-                    <span className="text-[10px] font-mono text-foreground">{r.downloadCount}</span>
-                  </div>
-                  {!r.existsOnDisk && (
-                    <p className="text-[10px] text-red-600 font-medium mt-1.5 bg-red-100 rounded px-2 py-1">
-                      ⚠ Re-upload this version — the APK file was lost (server restart or storage reset).
-                    </p>
-                  )}
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  value={url}
+                  onChange={set(urlKey)}
+                  placeholder={`https://example.com/vaultx-${key}.apk`}
+                  className="h-9 text-sm font-mono flex-1"
+                />
+                {url && (
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="h-9 w-9 rounded-lg border border-border flex items-center justify-center shrink-0 hover:bg-muted transition-colors">
+                    <ExternalLink size={13} className="text-muted-foreground" />
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Download Statistics */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+            <Download size={15} className="text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Download Statistics</p>
+            <p className="text-[11px] text-muted-foreground">Counts increment when users click a download button</p>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {SERVERS.map(({ key, label, countKey }) => {
+            const count = parseInt(settings?.[countKey] ?? "0", 10);
+            return (
+              <div key={key} className="flex items-center justify-between bg-muted/30 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <Server size={13} className="text-muted-foreground" />
+                  <span className="text-sm font-medium text-foreground">{label} Server</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-primary">{count.toLocaleString()}</span>
+                  <span className="text-[10px] text-muted-foreground">downloads</span>
+                  <button
+                    onClick={() => handleResetCounter(key)}
+                    disabled={resetting === key || count === 0}
+                    className="h-7 px-2 rounded-lg border border-border text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-40 flex items-center gap-1"
+                  >
+                    <RotateCcw size={10} className={resetting === key ? "animate-spin" : ""} />
+                    Reset
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Save */}
+      <Button className="w-full h-11 font-semibold gap-2" onClick={handleSave} disabled={saving}>
+        {saving
+          ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> Saving…</>
+          : <>✓ Save App Settings</>
+        }
+      </Button>
+
+      {/* Preview link */}
+      <div className="bg-muted/30 border border-border rounded-xl px-3 py-2.5 flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Preview the Download App page</p>
+        <a href="/download-app" target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+          Open page <ExternalLink size={11} />
+        </a>
       </div>
     </div>
   );

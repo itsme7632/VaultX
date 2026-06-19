@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { useLocation } from "wouter";
-import { Shield, FileCheck, User, Bell, ChevronRight, LogOut, Newspaper, MessageCircle, Info, Download, Globe, Moon, Sun, Loader2 } from "lucide-react";
+import { Shield, FileCheck, User, Bell, ChevronRight, LogOut, Newspaper, MessageCircle, Info, Download, Globe, Moon, Sun } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -56,51 +55,11 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const logout = useLogout();
-  const [downloading, setDownloading] = useState(false);
-
-  const { data: apkInfo } = useQuery({
-    queryKey: ["apk-latest"],
-    queryFn: () => fetch("/api/apk/latest", { credentials: "include" }).then((r) => r.ok ? r.json() : null),
-    staleTime: 60000,
-    retry: false,
-  });
-
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => { queryClient.clear(); setLocation("/login"); },
       onError: () => toast({ title: "Error", description: "Failed to logout", variant: "destructive" }),
     });
-  };
-
-  const handleDownloadApk = async () => {
-    if (downloading) return;
-    setDownloading(true);
-    try {
-      const res = await fetch("/api/apk/download", { credentials: "include" });
-      if (!res.ok) {
-        let errMsg = "APK not available. Please try again later.";
-        try {
-          const err = await res.json();
-          errMsg = err.error ?? errMsg;
-        } catch {}
-        toast({ title: "Download Unavailable", description: errMsg, variant: "destructive" });
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = apkInfo?.filename ?? "VaultX.apk";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast({ title: "Download Started", description: "VaultX APK is downloading." });
-    } catch {
-      toast({ title: "Error", description: "Download failed. Please check your connection.", variant: "destructive" });
-    } finally {
-      setDownloading(false);
-    }
   };
 
   return (
@@ -162,28 +121,7 @@ export default function SettingsPage() {
             <SettingsItem icon={Newspaper} label="News & Updates" description="Platform announcements" onClick={() => setLocation("/news")} />
             <SettingsItem icon={MessageCircle} label="Help & Support" description="Support tickets and FAQ" onClick={() => setLocation("/support")} />
             <SettingsItem icon={Globe} label="About Us" description="Platform info, mission & FAQ" onClick={() => setLocation("/about")} />
-            {apkInfo && (
-              <button
-                onClick={handleDownloadApk}
-                disabled={downloading}
-                className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/30 active:bg-muted/50 transition-colors disabled:opacity-60"
-              >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-500/10 flex-shrink-0">
-                  {downloading
-                    ? <Loader2 size={16} className="text-emerald-600 animate-spin" />
-                    : <Download size={16} className="text-emerald-600" />
-                  }
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">Download Mobile App</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">v{apkInfo.version} · Android APK{apkInfo.fileSize ? ` · ${(apkInfo.fileSize / (1024 * 1024)).toFixed(1)} MB` : ""}</p>
-                </div>
-                {downloading
-                  ? <span className="text-xs text-muted-foreground">Downloading…</span>
-                  : <ChevronRight size={15} className="text-muted-foreground shrink-0" />
-                }
-              </button>
-            )}
+            <SettingsItem icon={Download} label="Download Mobile App" description="Get the latest Android APK" onClick={() => setLocation("/download-app")} />
           </div>
         </div>
 
