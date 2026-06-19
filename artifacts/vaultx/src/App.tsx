@@ -35,6 +35,9 @@ import TransactionPage from "@/pages/transaction";
 import NotFound from "@/pages/not-found";
 import AboutPage from "@/pages/about";
 import DownloadAppPage from "@/pages/download-app";
+import MorePage from "@/pages/more";
+import PrivacyPolicyPage from "@/pages/privacy";
+import TermsPage from "@/pages/terms";
 
 setBaseUrl(null);
 
@@ -158,6 +161,15 @@ function Router() {
       </Route>
       <Route path="/download-app">
         <ProtectedRoute><DownloadAppPage /></ProtectedRoute>
+      </Route>
+      <Route path="/more">
+        <ProtectedRoute><MorePage /></ProtectedRoute>
+      </Route>
+      <Route path="/privacy">
+        <ProtectedRoute><PrivacyPolicyPage /></ProtectedRoute>
+      </Route>
+      <Route path="/terms">
+        <ProtectedRoute><TermsPage /></ProtectedRoute>
       </Route>
 
       <Route component={NotFound} />

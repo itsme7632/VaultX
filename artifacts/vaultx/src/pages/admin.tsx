@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag, Lock } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -74,7 +74,7 @@ export default function AdminPage() {
   const { data: networks } = useQuery({ queryKey: ["admin-networks"], queryFn: () => adminApi("/admin/deposit-networks"), staleTime: 30000 });
   const { data: newsData } = useQuery({ queryKey: ["admin-news"], queryFn: () => adminApi("/admin/news"), staleTime: 30000 });
   const { data: depData, isLoading: depLoading } = useQuery({ queryKey: ["admin-deposits", depFilter], queryFn: () => adminApi(`/admin/deposits?status=${depFilter}`), staleTime: 20000, enabled: tab === "deposits" });
-  const { data: settingsData } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" });
+  const { data: settingsData, refetch: refetchSettings } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" || tab === "content" });
   const { data: resetLogs } = useQuery({ queryKey: ["admin-reset-logs"], queryFn: () => adminApi("/admin/password-reset-logs"), staleTime: 30000, enabled: tab === "logs" });
   const { data: appSettings, refetch: refetchAppSettings } = useQuery({ queryKey: ["admin-app-settings"], queryFn: () => adminApi("/admin/app-settings"), staleTime: 30000, enabled: tab === "app-settings" });
   const { data: aboutData, refetch: refetchAbout } = useQuery({ queryKey: ["admin-about"], queryFn: () => adminApi("/admin/about"), staleTime: 30000, enabled: tab === "about" });
@@ -206,6 +206,7 @@ export default function AdminPage() {
     { id: "tickets", label: "Tickets", icon: MessageSquare },
     { id: "app-settings", label: "App Settings", icon: Smartphone },
     { id: "about", label: "About Us", icon: Info },
+    { id: "content", label: "Platform Content", icon: FileText },
     { id: "settings", label: "Settings", icon: Settings },
     { id: "logs", label: "Logs", icon: FileText },
   ];
@@ -612,6 +613,10 @@ export default function AdminPage() {
 
           {tab === "tickets" && (
             <TicketsTab data={ticketsData} onRefresh={refetchTickets} toast={toast} />
+          )}
+
+          {tab === "content" && (
+            <ContentTab settingsData={settingsData} onRefresh={refetchSettings} toast={toast} />
           )}
 
           {tab === "settings" && (
@@ -1511,6 +1516,137 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
         <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : "Save Feed Settings"}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Platform Content Tab ─────────────────────────────────────────────────────
+function ContentTab({ settingsData, onRefresh, toast }: { settingsData: any; onRefresh: () => void; toast: any }) {
+  const [form, setForm] = useState<Record<string, string>>({
+    privacy_policy_content: "",
+    privacy_policy_updated: "",
+    terms_content: "",
+    terms_updated: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (settingsData && typeof settingsData === "object") {
+      setForm((prev) => ({ ...prev, ...settingsData }));
+    }
+  }, [settingsData]);
+
+  const set = (key: string) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          privacy_policy_content: form.privacy_policy_content,
+          privacy_policy_updated: form.privacy_policy_updated,
+          terms_content: form.terms_content,
+          terms_updated: form.terms_updated,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).message ?? "Failed to save");
+      onRefresh();
+      toast({ title: "✓ Platform content saved", description: "Privacy Policy and Terms updated." });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+
+      {/* Privacy Policy */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+            <Lock size={14} className="text-slate-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Privacy Policy</p>
+            <p className="text-[11px] text-muted-foreground">Leave blank to show the default policy sections</p>
+          </div>
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Last Updated Date</Label>
+          <Input type="date" value={form.privacy_policy_updated} onChange={set("privacy_policy_updated")} className="mt-1 h-9 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Custom Content (optional — replaces default sections)</Label>
+          <Textarea
+            value={form.privacy_policy_content}
+            onChange={set("privacy_policy_content")}
+            placeholder="Enter custom privacy policy text here, or leave empty to show the built-in default sections…"
+            className="mt-1 text-sm min-h-[140px] resize-none"
+          />
+        </div>
+      </div>
+
+      {/* Terms & Conditions */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+            <FileText size={14} className="text-amber-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Terms &amp; Conditions</p>
+            <p className="text-[11px] text-muted-foreground">Leave blank to show the default T&amp;C sections</p>
+          </div>
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Last Updated Date</Label>
+          <Input type="date" value={form.terms_updated} onChange={set("terms_updated")} className="mt-1 h-9 text-sm" />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Custom Content (optional — replaces default sections)</Label>
+          <Textarea
+            value={form.terms_content}
+            onChange={set("terms_content")}
+            placeholder="Enter custom terms and conditions text here, or leave empty to show the built-in default sections…"
+            className="mt-1 text-sm min-h-[140px] resize-none"
+          />
+        </div>
+      </div>
+
+      {/* App Version note */}
+      <div className="bg-muted/30 border border-border rounded-xl px-4 py-3 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-semibold text-foreground">App Version</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Manage version number in the App Settings tab</p>
+        </div>
+        <button
+          className="text-xs font-semibold text-primary hover:underline"
+          onClick={() => {}}
+        >
+          → App Settings
+        </button>
+      </div>
+
+      {/* Save */}
+      <Button className="w-full h-11 font-semibold gap-2" onClick={handleSave} disabled={saving}>
+        {saving
+          ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> Saving…</>
+          : <>✓ Save Platform Content</>}
+      </Button>
+
+      {/* Quick links */}
+      <div className="grid grid-cols-2 gap-2">
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 bg-muted/30 border border-border rounded-xl h-9 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
+          <ExternalLink size={11} /> Preview Privacy Policy
+        </a>
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 bg-muted/30 border border-border rounded-xl h-9 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors">
+          <ExternalLink size={11} /> Preview Terms &amp; Conditions
+        </a>
       </div>
     </div>
   );

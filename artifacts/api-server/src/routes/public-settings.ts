@@ -32,6 +32,10 @@ const PUBLIC_KEYS = [
   "feed_max_amount",
   "feed_frequency_seconds",
   "feed_username_style",
+  "privacy_policy_content",
+  "privacy_policy_updated",
+  "terms_content",
+  "terms_updated",
 ];
 
 router.get("/settings/public", async (_req, res): Promise<void> => {
@@ -59,6 +63,10 @@ router.get("/settings/public", async (_req, res): Promise<void> => {
     deposit_instructions: "",
     withdrawal_instructions: "",
     app_download_url: "",
+    privacy_policy_content: "",
+    privacy_policy_updated: "",
+    terms_content: "",
+    terms_updated: "",
   };
 
   for (const key of PUBLIC_KEYS) {

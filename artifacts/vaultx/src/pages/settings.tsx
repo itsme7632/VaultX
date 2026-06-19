@@ -207,6 +207,18 @@ export default function SettingsPage() {
           <Item icon={Download} label="Download App" description="Get the Android APK" onClick={() => setLocation("/download-app")} iconBg="bg-cyan-500/10" iconColor="text-cyan-500" />
         </Section>
 
+        {/* More */}
+        <Section title="More">
+          <Item
+            icon={Globe}
+            label="More"
+            description="About, legal docs, download & support"
+            onClick={() => setLocation("/more")}
+            iconBg="bg-slate-500/10"
+            iconColor="text-slate-600"
+          />
+        </Section>
+
         {/* Legal */}
         <Section title="Legal">
           <Item
@@ -215,7 +227,7 @@ export default function SettingsPage() {
             description="How we handle your data"
             iconBg="bg-slate-500/10"
             iconColor="text-slate-600"
-            onClick={() => toast({ title: "Privacy Policy", description: "VaultX respects your privacy. All data is encrypted and never sold to third parties." })}
+            onClick={() => setLocation("/privacy")}
           />
           <Item
             icon={FileText}
@@ -223,7 +235,7 @@ export default function SettingsPage() {
             description="Platform usage agreement"
             iconBg="bg-slate-500/10"
             iconColor="text-slate-600"
-            onClick={() => toast({ title: "Terms & Conditions", description: "By using VaultX you agree to our terms of service. Investment involves risk. Past performance is not indicative of future results." })}
+            onClick={() => setLocation("/terms")}
           />
           <Item
             icon={Smartphone}
