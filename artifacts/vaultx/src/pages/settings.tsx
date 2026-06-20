@@ -2,11 +2,10 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   Shield, FileCheck, User, Bell, BellOff, ChevronRight, LogOut,
-  Newspaper, MessageCircle, Info, Download, Globe, Moon, Sun,
-  Lock, FileText, Smartphone, Languages,
+  Globe, Moon, Sun, Languages,
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -99,12 +98,6 @@ export default function SettingsPage() {
   const logout = useLogout();
   const [notifMuted, setNotifMuted] = useState(() => isNotificationMuted());
 
-  const { data: appInfo } = useQuery({
-    queryKey: ["app-info"],
-    queryFn: () => fetch("/api/app-info", { credentials: "include" }).then((r) => r.json()),
-    staleTime: 60000,
-  });
-
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => { queryClient.clear(); setLocation("/login"); },
@@ -118,8 +111,6 @@ export default function SettingsPage() {
     setNotificationMuted(next);
     toast({ title: next ? "Notification sound muted" : "Notification sound enabled" });
   };
-
-  const appVersion = appInfo?.version ? `v${appInfo.version}` : "v2.0";
 
   return (
     <AppLayout title="Settings">
@@ -168,7 +159,7 @@ export default function SettingsPage() {
           <Item
             icon={notifMuted ? BellOff : Bell}
             label="Notification Sound"
-            description={notifMuted ? "Sound alerts are off" : "Sound plays on new alerts"}
+            description={notifMuted ? "Notification sound muted" : "Notification sound enabled"}
             onClick={handleToggleMute}
             iconBg={notifMuted ? "bg-muted" : "bg-primary/10"}
             iconColor={notifMuted ? "text-muted-foreground" : "text-primary"}
@@ -180,7 +171,7 @@ export default function SettingsPage() {
         <Section title="Appearance">
           <Item
             icon={theme === "dark" ? Sun : Moon}
-            label={theme === "dark" ? "Dark Mode" : "Dark Mode"}
+            label="Dark Mode"
             description={theme === "dark" ? "Currently using dark theme" : "Currently using light theme"}
             onClick={toggleTheme}
             iconBg="bg-slate-500/10"
@@ -199,16 +190,8 @@ export default function SettingsPage() {
           />
         </Section>
 
-        {/* Platform */}
-        <Section title="Platform">
-          <Item icon={Info} label="About VaultX" description="Mission, features & FAQ" onClick={() => setLocation("/about")} iconBg="bg-indigo-500/10" iconColor="text-indigo-500" />
-          <Item icon={Newspaper} label="News & Updates" description="Platform announcements" onClick={() => setLocation("/news")} iconBg="bg-orange-500/10" iconColor="text-orange-500" />
-          <Item icon={MessageCircle} label="Help & Support" description="Tickets, chat, community" onClick={() => setLocation("/support")} iconBg="bg-emerald-500/10" iconColor="text-emerald-500" />
-          <Item icon={Download} label="Download App" description="Get the Android APK" onClick={() => setLocation("/download-app")} iconBg="bg-cyan-500/10" iconColor="text-cyan-500" />
-        </Section>
-
         {/* More */}
-        <Section title="More">
+        <Section title="Platform">
           <Item
             icon={Globe}
             label="More"
@@ -216,36 +199,6 @@ export default function SettingsPage() {
             onClick={() => setLocation("/more")}
             iconBg="bg-slate-500/10"
             iconColor="text-slate-600"
-          />
-        </Section>
-
-        {/* Legal */}
-        <Section title="Legal">
-          <Item
-            icon={Lock}
-            label="Privacy Policy"
-            description="How we handle your data"
-            iconBg="bg-slate-500/10"
-            iconColor="text-slate-600"
-            onClick={() => setLocation("/privacy")}
-          />
-          <Item
-            icon={FileText}
-            label="Terms & Conditions"
-            description="Platform usage agreement"
-            iconBg="bg-slate-500/10"
-            iconColor="text-slate-600"
-            onClick={() => setLocation("/terms")}
-          />
-          <Item
-            icon={Smartphone}
-            label="App Version"
-            description="VaultX · Crypto Investment Platform"
-            iconBg="bg-muted"
-            iconColor="text-muted-foreground"
-            rightContent={
-              <span className="text-xs font-semibold text-muted-foreground bg-muted px-2 py-0.5 rounded-full font-mono">{appVersion}</span>
-            }
           />
         </Section>
 

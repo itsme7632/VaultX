@@ -67,6 +67,13 @@ router.post("/notifications/read-all", requireAuth, async (req, res): Promise<vo
   res.json({ success: true });
 });
 
+router.delete("/notifications", requireAuth, async (req, res): Promise<void> => {
+  await db
+    .delete(notificationsTable)
+    .where(eq(notificationsTable.userId, req.session.userId!));
+  res.json({ success: true });
+});
+
 router.delete("/notifications/:id", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);

@@ -149,6 +149,13 @@ async function creditReferralCommission(
     txId: generateTxId(),
     note: `L${level} referral commission (${ratePercent.toFixed(1)}%) from ${planName} earnings`,
   });
+
+  await db.insert(notificationsTable).values({
+    userId: referrerId,
+    type: "referral",
+    title: `L${level} Referral Commission`,
+    message: `+${amount.toFixed(4)} USDT commission (${ratePercent.toFixed(1)}%) from your referral's ${planName} earnings.`,
+  });
 }
 
 async function processReferralCommission(userId: number, earning: number, planName: string): Promise<void> {

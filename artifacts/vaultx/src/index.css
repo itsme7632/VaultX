@@ -283,6 +283,18 @@
 .dark textarea::placeholder {
   color: hsl(var(--muted-foreground));
 }
+/* Fix contextual color shades in dark mode */
+.dark .bg-indigo-50 { background-color: hsl(239 40% 14%); }
+.dark .bg-cyan-50 { background-color: hsl(186 40% 12%); }
+.dark .bg-orange-50 { background-color: hsl(30 40% 14%); }
+.dark .bg-teal-50 { background-color: hsl(162 40% 12%); }
+.dark .bg-pink-50 { background-color: hsl(330 40% 14%); }
+.dark .bg-yellow-50 { background-color: hsl(47 40% 14%); }
+/* Fix border-gray shades */
+.dark .border-gray-200,
+.dark .border-gray-300 { border-color: hsl(var(--border)); }
+.dark .divide-gray-100 > * + *,
+.dark .divide-gray-200 > * + * { border-color: hsl(var(--border)); }
 
 /* ─── Safe area / WebView support ─────────────────────────────────────────── */
 :root {
