@@ -14,6 +14,7 @@ const APP_SETTINGS_KEYS = [
   "app_last_updated",
   "release_notes",
   "changelog",
+  "force_update_enabled",
   "github_download_url",
   "mediafire_download_url",
   "gdrive_download_url",
@@ -42,13 +43,14 @@ router.get("/app-info", async (_req, res): Promise<void> => {
   try {
     const s = await getAppSettings();
     res.json({
-      appName:        s.app_name || "VaultX",
-      version:        s.app_version || "",
-      size:           s.apk_size || "",
-      lastUpdated:    s.app_last_updated || "",
-      releaseNotes:   s.release_notes || "",
-      changelog:      s.changelog || "",
-      githubUrl:      s.github_download_url || "",
+      appName:             s.app_name || "VaultX",
+      version:             s.app_version || "",
+      size:                s.apk_size || "",
+      lastUpdated:         s.app_last_updated || "",
+      releaseNotes:        s.release_notes || "",
+      changelog:           s.changelog || "",
+      forceUpdateEnabled:  s.force_update_enabled === "true",
+      githubUrl:           s.github_download_url || "",
       mediafireUrl:   s.mediafire_download_url || "",
       gdriveUrl:      s.gdrive_download_url || "",
       telegramUrl:    s.telegram_download_url || "",
@@ -102,6 +104,7 @@ router.get("/admin/app-settings", requireAdmin, async (_req, res): Promise<void>
 router.put("/admin/app-settings", requireAdmin, async (req, res): Promise<void> => {
   const EDITABLE_KEYS = [
     "app_name", "app_version", "apk_size", "app_last_updated", "release_notes", "changelog",
+    "force_update_enabled",
     "github_download_url", "mediafire_download_url", "gdrive_download_url", "telegram_download_url",
     "primary_download_url", "mirror_download_url", "backup_download_url",
   ];

@@ -1,9 +1,8 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowDownLeft, ArrowUpRight, Copy, Check, Clock, CheckCircle,
-  XCircle, AlertCircle, Share2, Download, ImageDown, FileText, X,
-  QrCode,
+  Copy, Check, Clock, CheckCircle,
+  XCircle, AlertCircle, Share2, ImageDown, FileText, X,
 } from "lucide-react";
 import { SubPageLayout } from "@/components/SubPageLayout";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,10 +10,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDateTime } from "@/lib/format";
-import { useState, useEffect, useRef } from "react";
-import QRCode from "qrcode";
+import { useState } from "react";
 import {
-  generateReceiptImageUrl,
   downloadReceiptImage,
   downloadReceiptPDF,
   shareReceiptImage,
@@ -37,6 +34,8 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 interface ShareSheetProps {
+  txId?: string | null;
+  txDbId: number;
   onClose: () => void;
   onShare: () => void;
   onSaveImage: () => void;
@@ -44,7 +43,8 @@ interface ShareSheetProps {
   loading: boolean;
 }
 
-function ShareSheet({ onClose, onShare, onSaveImage, onDownloadPdf, loading }: ShareSheetProps) {
+function ShareSheet({ txId, txDbId, onClose, onShare, onSaveImage, onDownloadPdf, loading }: ShareSheetProps) {
+  const displayId = txId ?? txDbId;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
@@ -69,7 +69,7 @@ function ShareSheet({ onClose, onShare, onSaveImage, onDownloadPdf, loading }: S
           </div>
           <div className="text-left">
             <p className="font-semibold text-sm text-foreground">Share Receipt</p>
-            <p className="text-[11px] text-muted-foreground">Send via WhatsApp, Telegram, Email…</p>
+            <p className="text-[11px] text-muted-foreground">Send via WhatsApp, Telegram, Gmail…</p>
           </div>
         </button>
 
@@ -83,7 +83,7 @@ function ShareSheet({ onClose, onShare, onSaveImage, onDownloadPdf, loading }: S
           </div>
           <div className="text-left">
             <p className="font-semibold text-sm text-foreground">Save as Image</p>
-            <p className="text-[11px] text-muted-foreground">Download PNG receipt to device</p>
+            <p className="text-[11px] text-muted-foreground">VaultX-Receipt-{displayId}.png</p>
           </div>
         </button>
 
@@ -97,7 +97,7 @@ function ShareSheet({ onClose, onShare, onSaveImage, onDownloadPdf, loading }: S
           </div>
           <div className="text-left">
             <p className="font-semibold text-sm text-foreground">Download PDF</p>
-            <p className="text-[11px] text-muted-foreground">{`VaultX-Receipt-${""}.pdf`}</p>
+            <p className="text-[11px] text-muted-foreground">VaultX-Receipt-{displayId}.pdf</p>
           </div>
         </button>
 
@@ -159,8 +159,6 @@ export default function TransactionPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [shareLoading, setShareLoading] = useState(false);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [showQr, setShowQr] = useState(false);
 
   const { data: tx, isLoading, error } = useQuery({
     queryKey: ["transaction", id],
@@ -177,16 +175,6 @@ export default function TransactionPage() {
     queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
     staleTime: 120000,
   });
-
-  useEffect(() => {
-    if (!tx) return;
-    const qrText = `VaultX|${tx.txId ?? tx.id}|${tx.amount}|${tx.status}`;
-    QRCode.toDataURL(qrText, {
-      width: 200,
-      margin: 2,
-      color: { dark: "#0f172a", light: "#ffffff" },
-    }).then(setQrDataUrl).catch(() => {});
-  }, [tx]);
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -222,16 +210,12 @@ export default function TransactionPage() {
     setShareLoading(true);
     try {
       const shared = await shareReceiptImage(receiptTx, receiptSettings);
-      if (!shared) {
-        const text = `VaultX Receipt\nID: ${tx.txId ?? "#" + tx.id}\nType: ${tx.type}\nAmount: ${formatUSDT(tx.amount)}\nStatus: ${tx.status}\nDate: ${formatDateTime(tx.createdAt)}`;
-        if (navigator.share) {
-          await navigator.share({ title: "VaultX Receipt", text }).catch(() => {});
-        } else {
-          await navigator.clipboard.writeText(text).catch(() => {});
-          toast({ title: "Copied to clipboard" });
-        }
-      } else {
+      if (shared) {
         toast({ title: "Receipt shared!" });
+      } else {
+        // No native share available — download image as fallback
+        await downloadReceiptImage(receiptTx, receiptSettings);
+        toast({ title: "Receipt downloaded", description: "Native sharing not available on this browser." });
       }
     } catch (e: any) {
       toast({ title: "Could not share", description: e.message, variant: "destructive" });
@@ -246,7 +230,7 @@ export default function TransactionPage() {
     setShareLoading(true);
     try {
       await downloadReceiptImage(receiptTx, receiptSettings);
-      toast({ title: "Receipt saved!", description: "Image downloaded to your device." });
+      toast({ title: "Receipt downloaded!", description: `VaultX-Receipt-${receiptTx.txId ?? receiptTx.id}.png saved.` });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
@@ -260,7 +244,7 @@ export default function TransactionPage() {
     setShareLoading(true);
     try {
       await downloadReceiptPDF(receiptTx, receiptSettings);
-      toast({ title: "PDF downloaded!" });
+      toast({ title: "PDF downloaded!", description: `VaultX-Receipt-${receiptTx.txId ?? receiptTx.id}.pdf saved.` });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
@@ -311,7 +295,7 @@ export default function TransactionPage() {
             <div className={cn("rounded-2xl border p-6 text-center", statusCfg?.bg)}>
               <div
                 className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 ring-4"
-                style={{ backgroundColor: "rgba(255,255,255,0.08)", ringColor: statusCfg?.ringColor }}
+                style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
               >
                 <StatusIcon size={28} className={statusCfg?.color} />
               </div>
@@ -383,7 +367,7 @@ export default function TransactionPage() {
               </div>
             )}
 
-            {/* ── Timeline ── */}
+            {/* ── Status Timeline ── */}
             <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
               <p className="text-xs font-bold text-foreground mb-4 uppercase tracking-wide">Status Timeline</p>
               <div>
@@ -430,50 +414,25 @@ export default function TransactionPage() {
               </div>
             </div>
 
-            {/* ── QR Code ── */}
-            {qrDataUrl && (
-              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="text-xs font-bold text-foreground uppercase tracking-wide">Verification QR</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Scan to verify transaction details</p>
-                  </div>
-                  <button
-                    onClick={() => setShowQr((v) => !v)}
-                    className="text-xs text-primary font-semibold flex items-center gap-1"
-                  >
-                    <QrCode size={13} />
-                    {showQr ? "Hide" : "Show"}
-                  </button>
-                </div>
-                {showQr && (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-white rounded-xl p-3 inline-block">
-                      <img src={qrDataUrl} alt="QR Code" className="w-36 h-36" />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground font-mono">{tx.txId ?? `#${tx.id}`}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* ── Support note ── */}
             <div className="bg-blue-500/8 border border-blue-500/20 rounded-2xl p-3.5 flex gap-2.5">
               <AlertCircle size={14} className="text-blue-500 shrink-0 mt-0.5" />
-              <p className="text-[12px] text-blue-600 dark:text-blue-400 leading-snug">
-                If you have any issues with this transaction, please contact support with your VaultX Transaction ID:{" "}
-                <button
-                  onClick={() => tx.txId && handleCopy(tx.txId, "support-txid")}
-                  className="font-bold underline underline-offset-2 inline-flex items-center gap-0.5"
-                >
-                  {tx.txId ?? `#${tx.id}`}
-                  {tx.txId && (
-                    copied === "support-txid"
-                      ? <Check size={10} className="text-emerald-500 ml-0.5" />
-                      : <Copy size={10} className="ml-0.5 opacity-70" />
-                  )}
-                </button>
-              </p>
+              <div>
+                <p className="text-[12px] text-blue-600 dark:text-blue-400 leading-snug">
+                  For assistance regarding this transaction, please contact support and provide your VaultX Transaction ID.
+                </p>
+                {tx.txId && (
+                  <button
+                    onClick={() => handleCopy(tx.txId, "support-txid")}
+                    className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold text-blue-500 dark:text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded-full"
+                  >
+                    <span className="font-mono">{tx.txId}</span>
+                    {copied === "support-txid"
+                      ? <Check size={10} className="text-emerald-500" />
+                      : <Copy size={10} className="opacity-70" />}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* ── Export actions ── */}
@@ -512,6 +471,8 @@ export default function TransactionPage() {
 
       {showShare && receiptTx && (
         <ShareSheet
+          txId={tx?.txId}
+          txDbId={tx?.id}
           onClose={() => setShowShare(false)}
           onShare={handleShare}
           onSaveImage={handleSaveImage}
