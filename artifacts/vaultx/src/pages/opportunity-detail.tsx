@@ -209,6 +209,27 @@ export default function OpportunityDetailPage() {
           </div>
         )}
 
+        {/* Social proof */}
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
+          <p className="text-sm font-bold text-foreground flex items-center gap-2">
+            <span className="text-base">📊</span> Real-Time Activity
+          </p>
+          {[
+            { label: "Participants in this opportunity", value: participants.toLocaleString(), icon: "👥" },
+            { label: "Capital allocated", value: formatUSDT(capitalRaised), icon: "💰" },
+            { label: "New participants today", value: `+${seededInt(id, 5, 3, 25)}`, icon: "🚀" },
+            { label: "New this week", value: `+${seededInt(id, 6, 15, 85)}`, icon: "📈" },
+          ].map(({ label, value, icon }) => (
+            <div key={label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{icon}</span>
+                <p className="text-xs text-muted-foreground">{label}</p>
+              </div>
+              <p className="text-sm font-bold text-foreground">{value}</p>
+            </div>
+          ))}
+        </div>
+
         {/* Risk notice */}
         <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
           <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">

@@ -1,9 +1,9 @@
-import { TrendingUp, CheckCircle, ArrowRight, Clock, Wallet, Star, Users, Target, Info } from "lucide-react";
+import { TrendingUp, CheckCircle, ArrowRight, Clock, Star, Users, Target, Info, ChevronDown, ChevronUp, Zap, BarChart3, Calendar } from "lucide-react";
 import {
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
   useGetUserInvestments, getGetUserInvestmentsQueryKey,
-  useGetWallet, getGetWalletQueryKey,
 } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LiveCounter } from "@/components/LiveCounter";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+
+/* ─── Shared constants ──────────────────────────────────────────────────── */
 
 const OPPORTUNITY_GRADIENTS: Record<number, string> = {
   1: "from-blue-600 to-indigo-700",
@@ -36,165 +38,381 @@ const CATEGORIES: Record<number, string> = {
   8: "Strategic Capital",
 };
 
+type BadgeKey = "trending" | "popular" | "fast-growing" | "top-funded" | "none";
+
+const BADGE_DISPLAY: Record<BadgeKey, { label: string; cls: string }> = {
+  trending:       { label: "🔥 Trending",     cls: "bg-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-300/50" },
+  popular:        { label: "⭐ Popular",       cls: "bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-300/50" },
+  "fast-growing": { label: "🚀 Fast Growing", cls: "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-300/50" },
+  "top-funded":   { label: "🏆 Top Funded",   cls: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-300/50" },
+  none:           { label: "",                 cls: "" },
+};
+
+/* ─── Seeded stat helpers ───────────────────────────────────────────────── */
+
 function seededInt(planId: number, salt: number, min: number, max: number) {
   const seed = (planId * 31 + salt * 17) % 97;
   return min + Math.floor((seed / 97) * (max - min));
 }
 
+function autoStats(id: number) {
+  const participants   = seededInt(id, 3, 120, 520);
+  const raisedPct      = seededInt(id, 2, 48, 82);
+  const joinedToday    = seededInt(id, 5, 3, 25);
+  const joinedWeek     = seededInt(id, 6, 15, 85);
+  const capitalTargetK = seededInt(id, 1, 80, 200);
+  return { participants, raisedPct, joinedToday, joinedWeek, capitalTargetK };
+}
+
+/* ─── Badge auto-assignment (comparative across all plans) ─────────────── */
+
+function computeAutoBadges(plans: any[]): Record<number, BadgeKey> {
+  if (!plans.length) return {};
+
+  const stats = plans.map(p => ({
+    id: p.id,
+    ...autoStats(p.id),
+  }));
+
+  const badges: Record<number, BadgeKey> = {};
+  const assigned = new Set<number>();
+
+  const assignTop = (sorted: typeof stats, badge: BadgeKey) => {
+    const winner = sorted.find(s => !assigned.has(s.id));
+    if (winner) { badges[winner.id] = badge; assigned.add(winner.id); }
+  };
+
+  // 🔥 Trending = most joined today
+  assignTop([...stats].sort((a, b) => b.joinedToday - a.joinedToday), "trending");
+  // 🚀 Fast Growing = highest joinedToday-to-participants ratio
+  assignTop([...stats].sort((a, b) => (b.joinedToday / b.participants) - (a.joinedToday / a.participants)), "fast-growing");
+  // 🏆 Top Funded = highest raised %
+  assignTop([...stats].sort((a, b) => b.raisedPct - a.raisedPct), "top-funded");
+  // ⭐ Popular = most total participants
+  assignTop([...stats].sort((a, b) => b.participants - a.participants), "popular");
+
+  return badges;
+}
+
+/* ─── Animated progress bar ─────────────────────────────────────────────── */
+
+function AnimatedBar({ pct, gradient, className }: { pct: number; gradient: string; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.width = "0%";
+    const t = setTimeout(() => { el.style.width = `${pct}%`; }, 80);
+    return () => clearTimeout(t);
+  }, [pct]);
+  return (
+    <div className={cn("rounded-full overflow-hidden bg-muted", className ?? "h-2.5")}>
+      <div
+        ref={ref}
+        className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-1000 ease-out", gradient)}
+        style={{ width: "0%" }}
+      />
+    </div>
+  );
+}
+
+/* ─── Opportunity Insights summary (top of page) ───────────────────────── */
+
+function OpportunityInsightsSummary({ plans, customStats, mode }: { plans: any[]; customStats: Record<string, any>; mode: string }) {
+  const activePlans = plans.filter(p => p.isActive);
+  if (!activePlans.length) return null;
+
+  let totalParticipants = 0;
+  let totalRaised = 0;
+  let totalTarget = 0;
+
+  activePlans.forEach(p => {
+    const custom = mode === "custom" && customStats[p.id];
+    const s = custom || autoStats(p.id);
+    const target = (custom?.capitalTargetK ?? s.capitalTargetK) * 1000;
+    const raised = Math.floor(target * (s.raisedPct / 100));
+    totalParticipants += s.participants;
+    totalRaised += raised;
+    totalTarget += target;
+  });
+
+  const overallPct = totalTarget > 0 ? Math.round((totalRaised / totalTarget) * 100) : 0;
+
+  return (
+    <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-primary/60 rounded-2xl p-4 text-white shadow-lg mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <BarChart3 size={14} className="text-blue-200" />
+        <p className="text-[11px] font-bold text-blue-100 uppercase tracking-widest">Opportunity Insights</p>
+      </div>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="bg-white/10 rounded-xl py-2.5 text-center">
+          <p className="font-bold text-base">{activePlans.length}</p>
+          <p className="text-[9px] text-white/60 mt-0.5">Active</p>
+        </div>
+        <div className="bg-white/10 rounded-xl py-2.5 text-center">
+          <p className="font-bold text-base">{totalParticipants.toLocaleString()}</p>
+          <p className="text-[9px] text-white/60 mt-0.5">Participants</p>
+        </div>
+        <div className="bg-white/10 rounded-xl py-2.5 text-center">
+          <p className="font-bold text-base">{overallPct}%</p>
+          <p className="text-[9px] text-white/60 mt-0.5">Avg Funded</p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-white/60 mb-1">
+        <span>Platform Capital Raised</span>
+        <span className="text-white font-semibold">
+          {totalRaised >= 1_000_000 ? `$${(totalRaised / 1_000_000).toFixed(1)}M` : totalRaised >= 1_000 ? `$${(totalRaised / 1_000).toFixed(0)}K` : `$${totalRaised}`}
+          {" / "}
+          {totalTarget >= 1_000_000 ? `$${(totalTarget / 1_000_000).toFixed(1)}M` : `$${(totalTarget / 1_000).toFixed(0)}K`}
+        </span>
+      </div>
+      <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-blue-400 to-emerald-400 rounded-full transition-all duration-1000" style={{ width: `${overallPct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+/* ─── Main page ─────────────────────────────────────────────────────────── */
+
 export default function InvestmentsPage() {
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<"opportunities" | "active">("opportunities");
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const { data: plans, isLoading: plansLoading } = useGetInvestmentPlans({
     query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
   });
 
   const { data: userInvestments, isLoading: uiLoading } = useGetUserInvestments({
-    query: {
-      queryKey: getGetUserInvestmentsQueryKey(),
-      staleTime: 15000,
-      refetchInterval: 30000,
-    },
+    query: { queryKey: getGetUserInvestmentsQueryKey(), staleTime: 15000, refetchInterval: 30000 },
   });
 
-  const { data: wallet } = useGetWallet({
-    query: { queryKey: getGetWalletQueryKey(), staleTime: 30000 },
+  const { data: settings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then(r => r.json()),
+    staleTime: 60000,
   });
+
+  const analyticsMode: string = settings?.opportunity_analytics_mode ?? "auto";
+  const badgeOverrides: Record<string, BadgeKey> = (() => {
+    try { return JSON.parse(settings?.opportunity_badges ?? "{}"); } catch { return {}; }
+  })();
+  const customStatsMap: Record<string, any> = (() => {
+    try { return JSON.parse(settings?.opportunity_custom_stats ?? "{}"); } catch { return {}; }
+  })();
 
   const activeCount = userInvestments?.filter((i: any) => i.status === "active").length ?? 0;
+  const activePlans = (plans ?? []).filter((p: any) => p.isActive);
+
+  // Compute auto badges then apply admin overrides
+  const autoBadges = computeAutoBadges(activePlans);
+  const badges: Record<number, BadgeKey> = { ...autoBadges };
+  Object.entries(badgeOverrides).forEach(([planId, badge]) => {
+    if (badge) badges[Number(planId)] = badge;
+  });
+
+  const getPlanStats = (plan: any) => {
+    const custom = analyticsMode === "custom" && customStatsMap[String(plan.id)];
+    const base = autoStats(plan.id);
+    const participants   = custom?.participants   ?? base.participants;
+    const raisedPct      = custom?.raisedPct      ?? base.raisedPct;
+    const joinedToday    = custom?.joinedToday    ?? base.joinedToday;
+    const joinedWeek     = custom?.joinedWeek     ?? base.joinedWeek;
+    const capitalTargetK = custom?.capitalTargetK ?? base.capitalTargetK;
+    const capitalTarget  = capitalTargetK * 1000;
+    const capitalRaised  = Math.floor(capitalTarget * (raisedPct / 100));
+    const capitalRemaining = capitalTarget - capitalRaised;
+    return { participants, raisedPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
+  };
 
   return (
     <AppLayout title="Opportunities">
       <div className="px-4 pt-5 pb-24">
-
         {/* Tab switcher */}
         <div className="flex bg-muted rounded-xl p-1 mb-5">
           <button
             onClick={() => setTab("opportunities")}
             className={cn("flex-1 py-2 rounded-lg text-sm font-semibold transition-all", tab === "opportunities" ? "bg-white dark:bg-slate-800 shadow-sm text-foreground" : "text-muted-foreground")}
           >
-            Available Opportunities
+            Available
           </button>
           <button
             onClick={() => setTab("active")}
-            className={cn("flex-1 py-2 rounded-lg text-sm font-semibold transition-all relative", tab === "active" ? "bg-white dark:bg-slate-800 shadow-sm text-foreground" : "text-muted-foreground")}
+            className={cn("flex-1 py-2 rounded-lg text-sm font-semibold transition-all", tab === "active" ? "bg-white dark:bg-slate-800 shadow-sm text-foreground" : "text-muted-foreground")}
           >
-            My Active Opportunities
-            {activeCount > 0 && <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-white text-[10px] font-bold">{activeCount}</span>}
+            My Active{activeCount > 0 && <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-white text-[10px] font-bold">{activeCount}</span>}
           </button>
         </div>
 
         {tab === "opportunities" && (
-          <div className="space-y-4">
-            {plansLoading ? (
-              [1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
-            ) : [...(plans ?? [])].sort((a: any, b: any) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)).map((plan: any) => {
-              const minRoi = plan.minRoiRate ?? 0.025;
-              const maxRoi = plan.maxRoiRate ?? 0.030;
-              const gradient = OPPORTUNITY_GRADIENTS[plan.id] ?? "from-blue-600 to-indigo-700";
-              const category = CATEGORIES[plan.id] ?? "Strategic Capital";
-              const participants = seededInt(plan.id, 3, 120, 520);
-              const raisedPct = seededInt(plan.id, 2, 48, 82);
+          <div>
+            {/* Platform-wide insights summary */}
+            {!plansLoading && (plans ?? []).length > 0 && (
+              <OpportunityInsightsSummary plans={plans ?? []} customStats={customStatsMap} mode={analyticsMode} />
+            )}
 
-              return (
-                <div
-                  key={plan.id}
-                  className={cn(
-                    "bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow",
-                    plan.isFeatured ? "border-amber-300 ring-2 ring-amber-200" : "border-border"
-                  )}
-                >
-                  {plan.isFeatured && (
-                    <div className="bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-1.5 flex items-center gap-1.5">
-                      <Star size={11} className="text-white fill-white" />
-                      <p className="text-white text-[11px] font-bold tracking-wide uppercase">Featured Opportunity</p>
-                    </div>
-                  )}
-                  <div className={cn("bg-gradient-to-r p-5 text-white", gradient)}>
-                    <div className="flex items-start justify-between mb-1">
-                      <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold mb-2">
-                        {category}
-                      </Badge>
-                      <Badge className="bg-emerald-400/30 text-emerald-100 border-emerald-300/40 text-[10px]">
-                        Funding Active
-                      </Badge>
-                    </div>
-                    <div className="mb-4">
-                      <h3 className="font-bold text-xl">{plan.name}</h3>
-                      <p className="text-white/70 text-xs mt-1">{plan.description}</p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mt-4">
-                      <div className="bg-white/15 rounded-xl py-2.5 text-center">
-                        <p className="text-lg font-bold">{(minRoi * 100).toFixed(1)}%–{(maxRoi * 100).toFixed(1)}%</p>
-                        <p className="text-[10px] text-white/70 mt-0.5">Daily Return</p>
-                      </div>
-                      <div className="bg-white/15 rounded-xl py-2.5 text-center">
-                        <p className="text-lg font-bold">{plan.durationDays}d</p>
-                        <p className="text-[10px] text-white/70 mt-0.5">Duration</p>
-                      </div>
-                      <div className="bg-white/15 rounded-xl py-2.5 text-center">
-                        <p className="text-lg font-bold">{((minRoi + maxRoi) / 2 * plan.durationDays * 100).toFixed(0)}%</p>
-                        <p className="text-[10px] text-white/70 mt-0.5">Est. Total</p>
-                      </div>
-                    </div>
-                  </div>
+            <div className="space-y-4">
+              {plansLoading ? (
+                [1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
+              ) : [...(plans ?? [])].sort((a: any, b: any) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)).map((plan: any) => {
+                const minRoi = plan.minRoiRate ?? 0.025;
+                const maxRoi = plan.maxRoiRate ?? 0.030;
+                const gradient = OPPORTUNITY_GRADIENTS[plan.id] ?? "from-blue-600 to-indigo-700";
+                const category = CATEGORIES[plan.id] ?? "Strategic Capital";
+                const badge = badges[plan.id] ?? null;
+                const s = getPlanStats(plan);
+                const isExpanded = expandedId === plan.id;
 
-                  <div className="p-5">
-                    {/* Participants & funding progress */}
-                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-                      <div className="flex items-center gap-1">
-                        <Users size={11} />
-                        <span>{participants.toLocaleString()} participants</span>
-                      </div>
-                      <span className="font-semibold text-foreground">{raisedPct}% funded</span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-4">
-                      <div
-                        className={cn("h-full rounded-full bg-gradient-to-r", OPPORTUNITY_GRADIENTS[plan.id] ?? "from-blue-600 to-indigo-700")}
-                        style={{ width: `${raisedPct}%` }}
-                      />
-                    </div>
+                const statusLabel = s.raisedPct >= 90 ? "Almost Funded" : s.raisedPct >= 70 ? "Funding Active" : "Open";
+                const statusCls   = s.raisedPct >= 90 ? "bg-amber-400/30 text-amber-100 border-amber-300/40" : "bg-emerald-400/30 text-emerald-100 border-emerald-300/40";
 
-                    <div className="flex justify-between text-xs text-muted-foreground mb-4">
-                      <div className="flex items-center gap-1">
-                        <Target size={10} />
-                        <span>Min: <span className="font-semibold text-foreground">{formatUSDT(plan.minAmount)}</span></span>
-                      </div>
-                      <span>Max: <span className="font-semibold text-foreground">{formatUSDT(plan.maxAmount)}</span></span>
-                    </div>
-
-                    {plan.features?.length > 0 && (
-                      <div className="grid grid-cols-1 gap-1 mb-4">
-                        {plan.features.slice(0, 3).map((f: string, i: number) => (
-                          <div key={i} className="flex items-center gap-1.5">
-                            <CheckCircle size={12} className="text-emerald-500 shrink-0" />
-                            <span className="text-xs text-muted-foreground">{f}</span>
-                          </div>
-                        ))}
+                return (
+                  <div
+                    key={plan.id}
+                    className={cn(
+                      "bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow",
+                      plan.isFeatured ? "border-amber-300 ring-2 ring-amber-200 dark:ring-amber-800" : "border-border"
+                    )}
+                  >
+                    {/* Featured strip */}
+                    {plan.isFeatured && (
+                      <div className="bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-1.5 flex items-center gap-1.5">
+                        <Star size={11} className="text-white fill-white" />
+                        <p className="text-white text-[11px] font-bold tracking-wide uppercase">Featured Opportunity</p>
                       </div>
                     )}
 
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1 text-xs h-9"
-                        onClick={() => navigate(`/opportunity/${plan.id}`)}
+                    {/* Gradient header */}
+                    <div className={cn("bg-gradient-to-br p-5 text-white", gradient)}>
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold">
+                          {category}
+                        </Badge>
+                        <div className="flex items-center gap-1.5">
+                          {badge && badge !== "none" && (
+                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", BADGE_DISPLAY[badge].cls, "bg-white/20 text-white border-white/30")}>
+                              {BADGE_DISPLAY[badge].label}
+                            </span>
+                          )}
+                          <Badge className={cn("text-[10px] border", statusCls)}>
+                            {statusLabel}
+                          </Badge>
+                        </div>
+                      </div>
+                      <h3 className="font-bold text-xl mb-1">{plan.name}</h3>
+                      <p className="text-white/70 text-xs">{plan.description}</p>
+
+                      {/* ROI stats */}
+                      <div className="grid grid-cols-3 gap-2 mt-4">
+                        <div className="bg-white/15 rounded-xl py-2.5 text-center">
+                          <p className="text-base font-bold">{(minRoi * 100).toFixed(1)}%–{(maxRoi * 100).toFixed(1)}%</p>
+                          <p className="text-[10px] text-white/70 mt-0.5">Daily Return</p>
+                        </div>
+                        <div className="bg-white/15 rounded-xl py-2.5 text-center">
+                          <p className="text-base font-bold">{plan.durationDays}d</p>
+                          <p className="text-[10px] text-white/70 mt-0.5">Duration</p>
+                        </div>
+                        <div className="bg-white/15 rounded-xl py-2.5 text-center">
+                          <p className="text-base font-bold">{((minRoi + maxRoi) / 2 * plan.durationDays * 100).toFixed(0)}%</p>
+                          <p className="text-[10px] text-white/70 mt-0.5">Est. Total</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 space-y-3">
+                      {/* Social proof strip */}
+                      <div className="flex items-center justify-between bg-muted/40 border border-border rounded-xl px-3 py-2">
+                        <div className="flex items-center gap-1.5 text-xs text-foreground font-semibold">
+                          <Users size={12} className="text-primary" />
+                          <span>{s.participants.toLocaleString()} participants</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                            <Zap size={9} />
+                            <span className="text-[10px] font-bold">+{s.joinedToday} today</span>
+                          </div>
+                          <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                            <Calendar size={9} />
+                            <span className="text-[10px] font-bold">+{s.joinedWeek} this week</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Funding progress */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs text-muted-foreground font-medium">{s.raisedPct}% funded</span>
+                          <span className="text-xs font-bold text-foreground">{formatUSDT(s.capitalRaised)} / {formatUSDT(s.capitalTarget)}</span>
+                        </div>
+                        <AnimatedBar pct={s.raisedPct} gradient={OPPORTUNITY_GRADIENTS[plan.id] ?? "from-blue-600 to-indigo-700"} />
+                        <p className="text-[10px] text-muted-foreground mt-1">{formatUSDT(s.capitalRemaining)} remaining to target</p>
+                      </div>
+
+                      {/* Analytics grid */}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(isExpanded ? null : plan.id)}
+                        className="w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors py-0.5"
                       >
-                        <Info size={12} />
-                        Details
-                      </Button>
-                      <Button
-                        className="flex-1 h-9 font-semibold text-sm"
-                        onClick={() => navigate(`/invest/${plan.id}`)}
-                      >
-                        Participate Now <ArrowRight size={13} className="ml-1" />
-                      </Button>
+                        <span className="font-semibold">Full Analytics</span>
+                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
+
+                      {isExpanded && (
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          {[
+                            { label: "Participants", value: s.participants.toLocaleString(), icon: Users },
+                            { label: "Capital Target", value: formatUSDT(s.capitalTarget), icon: Target },
+                            { label: "Capital Raised", value: formatUSDT(s.capitalRaised), icon: TrendingUp },
+                            { label: "Funding %", value: `${s.raisedPct}%`, icon: BarChart3 },
+                            { label: "Min. Entry", value: formatUSDT(plan.minAmount), icon: Target },
+                            { label: "Status", value: statusLabel, icon: Zap },
+                          ].map(({ label, value, icon: Icon }) => (
+                            <div key={label} className="bg-muted/40 border border-border rounded-xl p-2.5 text-center">
+                              <Icon size={12} className="text-primary mx-auto mb-1" />
+                              <p className="text-xs font-bold text-foreground leading-tight">{value}</p>
+                              <p className="text-[9px] text-muted-foreground mt-0.5">{label}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Entry range */}
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Target size={10} />
+                          <span>Min: <span className="font-semibold text-foreground">{formatUSDT(plan.minAmount)}</span></span>
+                        </div>
+                        <span>Max: <span className="font-semibold text-foreground">{formatUSDT(plan.maxAmount)}</span></span>
+                      </div>
+
+                      {/* Features */}
+                      {plan.features?.length > 0 && (
+                        <div className="grid grid-cols-1 gap-1">
+                          {plan.features.slice(0, 3).map((f: string, i: number) => (
+                            <div key={i} className="flex items-center gap-1.5">
+                              <CheckCircle size={11} className="text-emerald-500 shrink-0" />
+                              <span className="text-xs text-muted-foreground">{f}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Action buttons */}
+                      <div className="flex gap-2 pt-1">
+                        <Button variant="outline" size="sm" className="gap-1 text-xs h-9" onClick={() => navigate(`/opportunity/${plan.id}`)}>
+                          <Info size={12} /> Details
+                        </Button>
+                        <Button className="flex-1 h-9 font-semibold text-sm" onClick={() => navigate(`/invest/${plan.id}`)}>
+                          Participate Now <ArrowRight size={13} className="ml-1" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -261,12 +479,7 @@ export default function InvestmentsPage() {
                         <span>{inv.progressPercent.toFixed(1)}% complete</span>
                         <span>Day {elapsed} of {inv.daysTotal}</span>
                       </div>
-                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full transition-all duration-500"
-                          style={{ width: `${progressPct}%` }}
-                        />
-                      </div>
+                      <AnimatedBar pct={progressPct} gradient="from-primary to-blue-400" />
                     </div>
                   </div>
                 );

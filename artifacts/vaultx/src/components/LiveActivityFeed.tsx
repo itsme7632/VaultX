@@ -77,7 +77,11 @@ const USERNAMES_ANON = [
   "User****6", "User****7", "User****8", "User****9", "User****0",
 ];
 
-const PLANS = ["Starter Plan", "Growth Plan", "Elite Plan", "Premium Plan"];
+const OPPORTUNITY_FUNDS = [
+  "AI Infrastructure Fund", "Digital Assets Fund", "Technology Expansion Fund",
+  "Global Commerce Fund", "Blockchain Innovation Fund", "FinTech Growth Fund",
+  "Renewable Energy Fund", "Strategic Capital Fund",
+];
 const VIP_TIERS = ["Silver VIP", "Gold VIP", "Platinum VIP"];
 
 function pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -208,23 +212,23 @@ function buildItem(
       break;
     }
     case "investment": {
-      const plan = pick(PLANS);
+      const fund = pick(OPPORTUNITY_FUNDS);
       amount = randAmt(Math.max(amtMin, 100), amtMax);
-      action = `invested in ${plan}`;
+      action = `participated in ${fund}`;
       rightLabel = fmtAmt(amount);
       rightSub = "USDT";
       break;
     }
     case "earning": {
       amount = randAmt(5, Math.min(amtMax * 0.05, 250));
-      action = "earned profit";
+      action = "earned distribution";
       rightLabel = `+${fmtAmt(amount)}`;
       rightSub = "USDT";
       break;
     }
     case "profit_claimed": {
       amount = randAmt(10, Math.min(amtMax * 0.08, 400));
-      action = "claimed profit";
+      action = "claimed distribution";
       rightLabel = `+${fmtAmt(amount)}`;
       rightSub = "USDT";
       break;

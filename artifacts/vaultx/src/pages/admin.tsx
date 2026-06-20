@@ -65,6 +65,11 @@ export default function AdminPage() {
   const [wdTxHash, setWdTxHash] = useState("");
   const [userDetail, setUserDetail] = useState<any>(null);
   const [userDetailLoading, setUserDetailLoading] = useState(false);
+  const [opportunityAnalyticsMode, setOpportunityAnalyticsMode] = useState<"auto" | "custom">("auto");
+  const [badgeForm, setBadgeForm] = useState<Record<string, string>>({});
+  const [customStatsForm, setCustomStatsForm] = useState<Record<string, any>>({});
+  const [savingAnalytics, setSavingAnalytics] = useState(false);
+  const [showBadgeManager, setShowBadgeManager] = useState(false);
   const { data: analytics, isLoading: analyticsLoading } = useAdminGetAnalytics({ query: { queryKey: getAdminGetAnalyticsQueryKey(), staleTime: 30000 } });
   const { data: usersData } = useAdminGetUsers({ search: search || undefined, limit: 20 }, { query: { queryKey: getAdminGetUsersQueryKey({ search: search || undefined, limit: 20 }), staleTime: 20000 } });
   const { data: kycData } = useAdminGetKycSubmissions({ status: kycFilter }, { query: { queryKey: getAdminGetKycSubmissionsQueryKey({ status: kycFilter }), staleTime: 20000 } });
@@ -74,7 +79,7 @@ export default function AdminPage() {
   const { data: networks } = useQuery({ queryKey: ["admin-networks"], queryFn: () => adminApi("/admin/deposit-networks"), staleTime: 30000 });
   const { data: newsData } = useQuery({ queryKey: ["admin-news"], queryFn: () => adminApi("/admin/news"), staleTime: 30000 });
   const { data: depData, isLoading: depLoading } = useQuery({ queryKey: ["admin-deposits", depFilter], queryFn: () => adminApi(`/admin/deposits?status=${depFilter}`), staleTime: 20000, enabled: tab === "deposits" });
-  const { data: settingsData, refetch: refetchSettings } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" || tab === "content" });
+  const { data: settingsData, refetch: refetchSettings } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" || tab === "content" || tab === "plans" });
   const { data: resetLogs } = useQuery({ queryKey: ["admin-reset-logs"], queryFn: () => adminApi("/admin/password-reset-logs"), staleTime: 30000, enabled: tab === "logs" });
   const { data: appSettings, refetch: refetchAppSettings } = useQuery({ queryKey: ["admin-app-settings"], queryFn: () => adminApi("/admin/app-settings"), staleTime: 30000, enabled: tab === "app-settings" });
   const { data: aboutData, refetch: refetchAbout } = useQuery({ queryKey: ["admin-about"], queryFn: () => adminApi("/admin/about"), staleTime: 30000, enabled: tab === "about" });
@@ -108,6 +113,31 @@ export default function AdminPage() {
     onSuccess: () => { toast({ title: "Deposit rejected" }); setRejectModal(null); setRejectReason(""); queryClient.invalidateQueries({ queryKey: ["admin-deposits"] }); },
     onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
   });
+
+  useEffect(() => {
+    if (!settingsData) return;
+    const s = settingsData as Record<string, string>;
+    setOpportunityAnalyticsMode((s.opportunity_analytics_mode as "auto" | "custom") ?? "auto");
+    try { setBadgeForm(JSON.parse(s.opportunity_badges ?? "{}")); } catch { setBadgeForm({}); }
+    try { setCustomStatsForm(JSON.parse(s.opportunity_custom_stats ?? "{}")); } catch { setCustomStatsForm({}); }
+  }, [settingsData]);
+
+  const saveAnalyticsSettings = async () => {
+    setSavingAnalytics(true);
+    try {
+      await adminApi("/admin/settings", "PUT", {
+        opportunity_analytics_mode: opportunityAnalyticsMode,
+        opportunity_badges: JSON.stringify(badgeForm),
+        opportunity_custom_stats: JSON.stringify(customStatsForm),
+      });
+      toast({ title: "Analytics settings saved" });
+      refetchSettings();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message, variant: "destructive" });
+    } finally {
+      setSavingAnalytics(false);
+    }
+  };
 
   const savePlan = useMutation({
     mutationFn: (data: any) => planModal?.id ? adminApi(`/admin/plans/${planModal.id}`, "PUT", data) : adminApi("/admin/plans", "POST", data),
@@ -491,6 +521,127 @@ export default function AdminPage() {
           {/* OPPORTUNITIES (Plans) */}
           {tab === "plans" && (
             <div className="space-y-3">
+              {/* Analytics & Badge Manager */}
+              <div className="bg-white dark:bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors"
+                  onClick={() => setShowBadgeManager(v => !v)}
+                >
+                  <div className="flex items-center gap-2">
+                    <BarChart3 size={14} className="text-primary" />
+                    <p className="text-sm font-semibold text-foreground">Analytics & Badge Controls</p>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">{showBadgeManager ? "▲ collapse" : "▼ expand"}</span>
+                </button>
+
+                {showBadgeManager && (
+                  <div className="px-4 pb-4 space-y-4 border-t border-border pt-3">
+                    {/* Analytics Mode */}
+                    <div>
+                      <p className="text-xs font-semibold text-foreground mb-2">Analytics Mode</p>
+                      <div className="flex gap-2">
+                        {(["auto", "custom"] as const).map(m => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setOpportunityAnalyticsMode(m)}
+                            className={cn(
+                              "flex-1 py-2 rounded-xl text-xs font-semibold border transition-all",
+                              opportunityAnalyticsMode === m
+                                ? "bg-primary text-white border-primary"
+                                : "bg-muted text-muted-foreground border-border hover:border-primary/50"
+                            )}
+                          >
+                            {m === "auto" ? "🤖 Auto (Seeded)" : "✏️ Custom Data"}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1.5">
+                        {opportunityAnalyticsMode === "auto"
+                          ? "Stats are automatically generated from seeded algorithms."
+                          : "You can set custom participant counts and funding data per opportunity."}
+                      </p>
+                    </div>
+
+                    {/* Badge Overrides */}
+                    <div>
+                      <p className="text-xs font-semibold text-foreground mb-2">Badge Overrides <span className="text-[10px] font-normal text-muted-foreground">(leave as Auto to use algorithm)</span></p>
+                      <div className="space-y-2">
+                        {(plans ?? []).map((plan: any) => (
+                          <div key={plan.id} className="flex items-center justify-between gap-3">
+                            <p className="text-xs text-foreground truncate flex-1">{plan.name}</p>
+                            <Select
+                              value={badgeForm[String(plan.id)] ?? "auto"}
+                              onValueChange={v => setBadgeForm(f => ({ ...f, [String(plan.id)]: v === "auto" ? "" : v }))}
+                            >
+                              <SelectTrigger className="h-8 w-36 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="auto" className="text-xs">Auto</SelectItem>
+                                <SelectItem value="trending" className="text-xs">🔥 Trending</SelectItem>
+                                <SelectItem value="popular" className="text-xs">⭐ Popular</SelectItem>
+                                <SelectItem value="fast-growing" className="text-xs">🚀 Fast Growing</SelectItem>
+                                <SelectItem value="top-funded" className="text-xs">🏆 Top Funded</SelectItem>
+                                <SelectItem value="none" className="text-xs">None</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom Stats (visible when mode=custom) */}
+                    {opportunityAnalyticsMode === "custom" && (
+                      <div>
+                        <p className="text-xs font-semibold text-foreground mb-2">Custom Stats per Opportunity</p>
+                        <div className="space-y-3">
+                          {(plans ?? []).map((plan: any) => {
+                            const cs = customStatsForm[String(plan.id)] ?? {};
+                            const upd = (key: string, val: string) =>
+                              setCustomStatsForm(f => ({ ...f, [String(plan.id)]: { ...(f[String(plan.id)] ?? {}), [key]: val ? Number(val) : undefined } }));
+                            return (
+                              <div key={plan.id} className="border border-border rounded-xl p-3 space-y-2">
+                                <p className="text-[11px] font-semibold text-foreground">{plan.name}</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {[
+                                    { key: "participants",   label: "Participants",     placeholder: "250" },
+                                    { key: "raisedPct",     label: "Raised %",         placeholder: "72" },
+                                    { key: "capitalTargetK", label: "Target (K USDT)", placeholder: "120" },
+                                    { key: "joinedToday",   label: "Joined Today",     placeholder: "15" },
+                                    { key: "joinedWeek",    label: "Joined This Week", placeholder: "58" },
+                                  ].map(({ key, label, placeholder }) => (
+                                    <div key={key}>
+                                      <p className="text-[9px] text-muted-foreground mb-0.5">{label}</p>
+                                      <Input
+                                        type="number"
+                                        className="h-7 text-xs"
+                                        placeholder={placeholder}
+                                        value={cs[key] ?? ""}
+                                        onChange={e => upd(key, e.target.value)}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      className="w-full h-9 text-sm"
+                      onClick={saveAnalyticsSettings}
+                      disabled={savingAnalytics}
+                    >
+                      {savingAnalytics ? "Saving..." : "Save Analytics Settings"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <Button className="w-full h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, riskLevel: "medium", features: [], isActive: true })}>
                 <Plus size={15} className="mr-1.5" />Add Opportunity
               </Button>
