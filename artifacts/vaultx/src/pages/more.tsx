@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Info, Lock, FileText, Download, Headphones,
-  ChevronRight, Shield, Smartphone,
+  ChevronRight, Shield, Smartphone, PieChart, TrendingUp, BarChart3,
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,30 @@ export default function MorePage() {
 
   const platformName = settings?.platform_name || "VaultX";
   const appVersion = appInfo?.version ? `v${appInfo.version}` : "v2.0";
+
+  const platformItems = [
+    {
+      icon: PieChart,
+      label: "Capital Allocation",
+      description: "Platform portfolio composition and sector weights",
+      href: "/capital-allocation",
+      gradient: "from-blue-500 to-indigo-600",
+    },
+    {
+      icon: TrendingUp,
+      label: "Market Insights",
+      description: "Weekly analysis, trends and opportunity highlights",
+      href: "/market-insights",
+      gradient: "from-purple-500 to-violet-600",
+    },
+    {
+      icon: BarChart3,
+      label: "Performance Center",
+      description: "Platform capital, participants and historical data",
+      href: "/performance",
+      gradient: "from-emerald-500 to-teal-600",
+    },
+  ];
 
   const navItems = [
     {
@@ -78,29 +102,57 @@ export default function MorePage() {
               <Shield size={28} className="text-white" />
             </div>
             <h1 className="text-xl font-black text-white mb-1.5">{platformName}</h1>
-            <p className="text-sm text-white/60">Information, legal &amp; support</p>
+            <p className="text-sm text-white/60">Professional investment platform</p>
           </div>
         </div>
 
-        <div className="px-4 pt-5 max-w-screen-sm mx-auto space-y-3">
+        <div className="px-4 pt-5 max-w-screen-sm mx-auto space-y-5">
 
-          {/* Nav cards */}
-          {navItems.map(({ icon: Icon, label, description, href, gradient }) => (
-            <button
-              key={href}
-              onClick={() => setLocation(href)}
-              className="w-full flex items-center gap-4 bg-card border border-border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/30 active:scale-[0.98] transition-all text-left"
-            >
-              <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-sm shrink-0", gradient)}>
-                <Icon size={20} className="text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground">{label}</p>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
-              </div>
-              <ChevronRight size={16} className="text-muted-foreground shrink-0" />
-            </button>
-          ))}
+          {/* Platform tools section */}
+          <div>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 px-1">Platform Tools</p>
+            <div className="space-y-3">
+              {platformItems.map(({ icon: Icon, label, description, href, gradient }) => (
+                <button
+                  key={href}
+                  onClick={() => setLocation(href)}
+                  className="w-full flex items-center gap-4 bg-card border border-border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/30 active:scale-[0.98] transition-all text-left"
+                >
+                  <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-sm shrink-0", gradient)}>
+                    <Icon size={20} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
+                  </div>
+                  <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Info & legal section */}
+          <div>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 px-1">Information & Legal</p>
+            <div className="space-y-3">
+              {navItems.map(({ icon: Icon, label, description, href, gradient }) => (
+                <button
+                  key={href}
+                  onClick={() => setLocation(href)}
+                  className="w-full flex items-center gap-4 bg-card border border-border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/30 active:scale-[0.98] transition-all text-left"
+                >
+                  <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-sm shrink-0", gradient)}>
+                    <Icon size={20} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
+                  </div>
+                  <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Version card */}
           <div className="flex items-center gap-4 bg-muted/30 border border-border rounded-2xl p-4">
@@ -109,7 +161,7 @@ export default function MorePage() {
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-foreground">App Version</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{platformName} · Crypto Investment Platform</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{platformName} · Investment Platform</p>
             </div>
             <span className="text-sm font-bold font-mono text-primary">{appVersion}</span>
           </div>

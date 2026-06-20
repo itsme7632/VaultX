@@ -20,6 +20,10 @@ import WithdrawPage from "@/pages/withdraw";
 import TransferPage from "@/pages/transfer";
 import InvestmentsPage from "@/pages/investments";
 import InvestPage from "@/pages/invest";
+import OpportunityDetailPage from "@/pages/opportunity-detail";
+import CapitalAllocationPage from "@/pages/capital-allocation";
+import MarketInsightsPage from "@/pages/market-insights";
+import PerformancePage from "@/pages/performance";
 import PortfolioPage from "@/pages/portfolio";
 import ReferralsPage from "@/pages/referrals";
 import NotificationsPage from "@/pages/notifications";
@@ -113,6 +117,18 @@ function Router() {
       </Route>
       <Route path="/invest/:planId">
         <ProtectedRoute><InvestPage /></ProtectedRoute>
+      </Route>
+      <Route path="/opportunity/:planId">
+        <ProtectedRoute><OpportunityDetailPage /></ProtectedRoute>
+      </Route>
+      <Route path="/capital-allocation">
+        <ProtectedRoute><CapitalAllocationPage /></ProtectedRoute>
+      </Route>
+      <Route path="/market-insights">
+        <ProtectedRoute><MarketInsightsPage /></ProtectedRoute>
+      </Route>
+      <Route path="/performance">
+        <ProtectedRoute><PerformancePage /></ProtectedRoute>
       </Route>
       <Route path="/portfolio">
         <ProtectedRoute><PortfolioPage /></ProtectedRoute>

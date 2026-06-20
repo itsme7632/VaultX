@@ -175,8 +175,8 @@ export default function DashboardPage() {
 
   const stats = [
     { label: "Total Balance", value: summary ? formatUSDT(summary.totalBalance) : null, icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },
-    { label: "Active Investments", value: summary ? `${summary.activeInvestmentsCount} plans` : null, sub: summary ? formatUSDT(summary.activeInvestmentsValue) : null, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Daily Earnings", value: summary ? formatUSDT(summary.dailyEarnings) : null, icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Active Opportunities", value: summary ? `${summary.activeInvestmentsCount}` : null, sub: summary ? formatUSDT(summary.activeInvestmentsValue) : null, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Daily Returns", value: summary ? formatUSDT(summary.dailyEarnings) : null, icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
     { label: "Total Earned", value: summary ? formatUSDT(summary.totalEarnings) : null, icon: Zap, color: "text-purple-500", bg: "bg-purple-500/10" },
   ];
 
@@ -264,6 +264,28 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* Quick links to new pages */}
+        <div className="grid grid-cols-3 gap-2.5">
+          <Link href="/capital-allocation">
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-3 text-white shadow-sm text-center cursor-pointer hover:shadow-md transition-shadow">
+              <div className="text-lg mb-1">📊</div>
+              <p className="text-[10px] font-semibold leading-tight">Capital Allocation</p>
+            </div>
+          </Link>
+          <Link href="/market-insights">
+            <div className="bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl p-3 text-white shadow-sm text-center cursor-pointer hover:shadow-md transition-shadow">
+              <div className="text-lg mb-1">📈</div>
+              <p className="text-[10px] font-semibold leading-tight">Market Insights</p>
+            </div>
+          </Link>
+          <Link href="/performance">
+            <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-3 text-white shadow-sm text-center cursor-pointer hover:shadow-md transition-shadow">
+              <div className="text-lg mb-1">⚡</div>
+              <p className="text-[10px] font-semibold leading-tight">Performance</p>
+            </div>
+          </Link>
+        </div>
+
         {/* Referral Widget */}
         <ReferralWidget />
 
@@ -284,9 +306,9 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between mb-2.5">
               <h3 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
                 <Newspaper size={14} className="text-primary" />
-                Platform News
+                Market Insights
               </h3>
-              <Link href="/news" className="text-xs text-primary font-medium flex items-center gap-0.5">
+              <Link href="/market-insights" className="text-xs text-primary font-medium flex items-center gap-0.5">
                 View all <ArrowRight size={11} />
               </Link>
             </div>

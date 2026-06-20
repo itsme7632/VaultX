@@ -44,7 +44,7 @@ function EarningsHistory() {
   });
 
   return (
-    <div className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
+    <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
@@ -55,7 +55,7 @@ function EarningsHistory() {
             <BarChart2 size={15} className="text-primary" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Earnings Breakdown</p>
+            <p className="text-sm font-semibold text-foreground">Returns Breakdown</p>
             <p className="text-[11px] text-muted-foreground">Day-by-day claim &amp; reinvest history</p>
           </div>
         </div>
@@ -64,19 +64,17 @@ function EarningsHistory() {
 
       {open && (
         <div className="border-t border-border">
-          {/* Summary strip */}
           <div className="grid grid-cols-2 gap-px bg-border">
-            <div className="bg-emerald-50 px-4 py-3">
+            <div className="bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3">
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Claimed</p>
               <p className="font-bold text-emerald-600 text-sm mt-0.5">{formatUSDT(totalClaimed)}</p>
             </div>
-            <div className="bg-blue-50 px-4 py-3">
+            <div className="bg-blue-50 dark:bg-blue-950/20 px-4 py-3">
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Reinvested</p>
               <p className="font-bold text-primary text-sm mt-0.5">{formatUSDT(totalReinvested)}</p>
             </div>
           </div>
 
-          {/* Day-by-day rows */}
           {isLoading ? (
             <div className="p-4 space-y-2">
               {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 rounded-lg" />)}
@@ -84,7 +82,7 @@ function EarningsHistory() {
           ) : rows.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <RotateCcw size={20} className="text-muted-foreground mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground">No earnings history yet</p>
+              <p className="text-xs text-muted-foreground">No returns history yet</p>
             </div>
           ) : (
             <div className="divide-y divide-border max-h-80 overflow-y-auto">
@@ -112,7 +110,7 @@ function EarningsHistory() {
                           </div>
                           <p className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">
                             {r.type === "earning" ? "Claimed" : "Reinvested"}
-                            {r.note ? ` · ${r.note.replace(/Earnings claimed from |Reinvested .+ into /i, "inv ")}` : ""}
+                            {r.note ? ` · ${r.note.replace(/Earnings claimed from |Reinvested .+ into /i, "opp ")}` : ""}
                           </p>
                           <p className={cn(
                             "text-[11px] font-semibold shrink-0",
@@ -158,12 +156,12 @@ export default function PortfolioPage() {
 
   const handleClaim = (id: number, amount: number) => {
     if (amount <= 0) {
-      toast({ title: "No earnings yet", description: "Daily ROI is credited once every 24 hours", variant: "destructive" });
+      toast({ title: "No returns yet", description: "Daily ROI is credited once every 24 hours", variant: "destructive" });
       return;
     }
     claim.mutate({ id }, {
       onSuccess: () => {
-        toast({ title: "Profit Claimed!", description: `${formatUSDT(amount)} added to your wallet` });
+        toast({ title: "Returns Claimed!", description: `${formatUSDT(amount)} added to your wallet` });
         invalidate();
       },
       onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
@@ -172,7 +170,7 @@ export default function PortfolioPage() {
 
   const handleReinvest = async (id: number, amount: number) => {
     if (amount <= 0) {
-      toast({ title: "No earnings yet", description: "Daily ROI is credited once every 24 hours", variant: "destructive" });
+      toast({ title: "No returns yet", description: "Daily ROI is credited once every 24 hours", variant: "destructive" });
       return;
     }
     setReinvesting(id);
@@ -182,7 +180,7 @@ export default function PortfolioPage() {
         const err = await res.json();
         throw new Error(err.message ?? "Failed to reinvest");
       }
-      toast({ title: "Profit Reinvested!", description: "Earnings added to your investment principal" });
+      toast({ title: "Returns Reinvested!", description: "Earnings added to your investment principal" });
       invalidate();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -197,8 +195,8 @@ export default function PortfolioPage() {
         toast({
           title: current ? "Auto-Reinvest Disabled" : "Auto-Reinvest Enabled",
           description: current
-            ? "Daily profits will accumulate for manual claiming"
-            : "Daily profits will automatically reinvest into principal",
+            ? "Daily returns will accumulate for manual claiming"
+            : "Daily returns will automatically reinvest into principal",
         });
         invalidate();
       },
@@ -218,12 +216,12 @@ export default function PortfolioPage() {
         {/* Summary grid */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Active Capital", val: formatUSDT(totalValue), sub: `${activeInvestments.length} plan${activeInvestments.length !== 1 ? "s" : ""}`, color: "text-primary" },
-            { label: "Claimable Profit", val: formatUSDT(totalPending), sub: "Ready to claim", color: "text-emerald-600" },
+            { label: "Active Capital", val: formatUSDT(totalValue), sub: `${activeInvestments.length} opportunit${activeInvestments.length !== 1 ? "ies" : "y"}`, color: "text-primary" },
+            { label: "Claimable Returns", val: formatUSDT(totalPending), sub: "Ready to claim", color: "text-emerald-600" },
             { label: "Total Earned", val: formatUSDT(totalEarned), sub: "All time (ROI generated)", color: "text-purple-600" },
             { label: "Est. Daily ROI", val: formatUSDT(summary?.dailyEarnings ?? 0), sub: "Per day", color: "text-amber-600" },
           ].map(({ label, val, sub, color }) => (
-            <div key={label} className="bg-white border border-border rounded-xl p-3.5 shadow-sm">
+            <div key={label} className="bg-card border border-border rounded-xl p-3.5 shadow-sm">
               <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
               <p className={cn("font-bold text-base mt-0.5 leading-tight", color)}>{val}</p>
               <p className="text-[10px] text-muted-foreground mt-1">{sub}</p>
@@ -231,12 +229,12 @@ export default function PortfolioPage() {
           ))}
         </div>
 
-        {/* Active investments */}
+        {/* Active opportunities */}
         {isLoading ? (
           <div className="space-y-4">{[1, 2].map((i) => <Skeleton key={i} className="h-72 rounded-2xl" />)}</div>
         ) : activeInvestments.length > 0 ? (
           <div className="space-y-4">
-            <h3 className="font-semibold text-sm text-foreground">Active Plans</h3>
+            <h3 className="font-semibold text-sm text-foreground">Your Active Opportunities</h3>
             {activeInvestments.map((inv: any) => {
               const minRoi = inv.minRoiRate ?? 0.025;
               const maxRoi = inv.maxRoiRate ?? 0.030;
@@ -244,15 +242,15 @@ export default function PortfolioPage() {
               const hasPending = inv.pendingEarnings > 0;
 
               return (
-                <div key={inv.id} className="bg-white border border-border rounded-2xl overflow-hidden shadow-sm">
+                <div key={inv.id} className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
 
-                  {/* Plan header strip */}
+                  {/* Opportunity header strip */}
                   <div className="bg-gradient-to-r from-primary/90 to-blue-600 px-5 py-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="font-bold text-white text-base leading-tight">{inv.planName}</h4>
                         <p className="text-blue-100 text-[11px] mt-0.5">
-                          Daily ROI {(minRoi * 100).toFixed(1)}%–{(maxRoi * 100).toFixed(1)}% • {inv.daysTotal} days
+                          Daily ROI {(minRoi * 100).toFixed(1)}%–{(maxRoi * 100).toFixed(1)}% · {inv.daysTotal} days
                         </p>
                       </div>
                       <Badge className="bg-emerald-400/20 text-emerald-100 border-emerald-300/30 text-[11px] font-semibold">
@@ -265,12 +263,12 @@ export default function PortfolioPage() {
                   <div className="p-4 space-y-4">
                     {/* Stats grid */}
                     <div className="grid grid-cols-2 gap-2.5">
-                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Principal</p>
+                      <div className="bg-muted/40 border border-border rounded-xl p-3">
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Capital Allocated</p>
                         <p className="font-bold text-foreground text-sm mt-1">{formatUSDT(inv.amount)}</p>
                       </div>
-                      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Live Profit</p>
+                      <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800 rounded-xl p-3">
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Live Returns</p>
                         <div className="mt-1">
                           <LiveCounter
                             pendingEarnings={inv.pendingEarnings}
@@ -281,18 +279,18 @@ export default function PortfolioPage() {
                           />
                         </div>
                       </div>
-                      <div className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                      <div className="bg-muted/40 border border-border rounded-xl p-3">
                         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total ROI Generated</p>
                         <p className="font-semibold text-primary text-sm mt-1">{formatUSDT(inv.totalEarned)}</p>
                       </div>
-                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                      <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3">
                         <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Est. Daily</p>
                         <p className="font-semibold text-amber-600 text-sm mt-1">{formatUSDT(avgDailyEst)}</p>
                       </div>
                     </div>
 
                     {/* Next payout countdown */}
-                    <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-3.5 py-2.5">
+                    <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800 rounded-xl px-3.5 py-2.5">
                       <div className="flex items-center gap-2">
                         <Clock size={13} className="text-primary shrink-0" />
                         <p className="text-xs text-muted-foreground">Next payout</p>
@@ -322,7 +320,7 @@ export default function PortfolioPage() {
                           Day {Math.max(0, inv.daysTotal - inv.daysRemaining)} of {inv.daysTotal}
                         </span>
                       </div>
-                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full transition-all duration-500"
                           style={{ width: `${Math.max(2, inv.progressPercent)}%` }}
@@ -342,11 +340,11 @@ export default function PortfolioPage() {
                     </div>
 
                     {/* Auto-reinvest toggle */}
-                    <div className="flex items-center justify-between py-3 px-3.5 bg-slate-50 border border-slate-100 rounded-xl">
+                    <div className="flex items-center justify-between py-3 px-3.5 bg-muted/40 border border-border rounded-xl">
                       <div className="flex-1 min-w-0 mr-3">
                         <p className="text-xs font-semibold text-foreground">Auto-Reinvest</p>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {inv.autoCompound ? "Profits reinvest daily automatically" : "Profits accumulate for manual claiming"}
+                          {inv.autoCompound ? "Returns reinvest daily automatically" : "Returns accumulate for manual claiming"}
                         </p>
                       </div>
                       <button
@@ -356,7 +354,7 @@ export default function PortfolioPage() {
                         onClick={() => handleToggleAutoReinvest(inv.id, inv.autoCompound)}
                         className={cn(
                           "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none",
-                          inv.autoCompound ? "bg-emerald-500" : "bg-slate-200",
+                          inv.autoCompound ? "bg-emerald-500" : "bg-muted-foreground/30",
                         )}
                       >
                         <span
@@ -378,13 +376,13 @@ export default function PortfolioPage() {
                           "h-11 text-xs font-semibold gap-1.5 rounded-xl",
                           hasPending
                             ? "border-emerald-300 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100"
-                            : "border-slate-200 text-muted-foreground opacity-60",
+                            : "border-border text-muted-foreground opacity-60",
                         )}
                         onClick={() => handleClaim(inv.id, inv.pendingEarnings)}
                         disabled={claim.isPending}
                       >
                         <ArrowDownLeft size={14} />
-                        Claim Profit
+                        Claim Returns
                       </Button>
                       <Button
                         size="sm"
@@ -392,7 +390,7 @@ export default function PortfolioPage() {
                           "h-11 text-xs font-semibold gap-1.5 rounded-xl",
                           hasPending
                             ? "bg-primary hover:bg-primary/90 active:bg-primary/80"
-                            : "bg-slate-200 text-muted-foreground opacity-60",
+                            : "bg-muted text-muted-foreground opacity-60",
                         )}
                         onClick={() => handleReinvest(inv.id, inv.pendingEarnings)}
                         disabled={reinvesting === inv.id}
@@ -404,7 +402,7 @@ export default function PortfolioPage() {
 
                     {!hasPending && (
                       <p className="text-center text-[11px] text-muted-foreground -mt-1">
-                        Daily profit credited every 24 hours — keep growing!
+                        Daily returns credited every 24 hours — keep growing!
                       </p>
                     )}
                   </div>
@@ -413,32 +411,32 @@ export default function PortfolioPage() {
             })}
           </div>
         ) : !isLoading ? (
-          <div className="bg-white border border-border rounded-2xl p-10 text-center shadow-sm">
+          <div className="bg-card border border-border rounded-2xl p-10 text-center shadow-sm">
             <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <TrendingUp size={28} className="text-primary" />
             </div>
-            <p className="font-semibold text-foreground">No active investments</p>
-            <p className="text-xs text-muted-foreground mt-1.5">Start an investment plan to see your portfolio here</p>
+            <p className="font-semibold text-foreground">No active opportunities</p>
+            <p className="text-xs text-muted-foreground mt-1.5">Participate in an opportunity to see your portfolio here</p>
           </div>
         ) : null}
 
-        {/* Earnings Breakdown */}
+        {/* Returns Breakdown */}
         <EarningsHistory />
 
-        {/* Completed investments */}
+        {/* Completed */}
         {completedInvestments.length > 0 && (
           <div>
             <h3 className="font-semibold text-sm text-foreground mb-3">Completed</h3>
-            <div className="bg-white border border-border rounded-2xl divide-y divide-border shadow-sm overflow-hidden">
+            <div className="bg-card border border-border rounded-2xl divide-y divide-border shadow-sm overflow-hidden">
               {completedInvestments.map((inv: any) => (
                 <div key={inv.id} className="flex items-center gap-3 px-4 py-3.5">
-                  <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
                     <CheckCircle size={16} className="text-muted-foreground" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{inv.planName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatUSDT(inv.amount)} invested · {formatUSDT(inv.totalEarned)} earned
+                      {formatUSDT(inv.amount)} allocated · {formatUSDT(inv.totalEarned)} earned
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
                       {formatDate(inv.startDate)} – {formatDate(inv.endDate)}
@@ -456,7 +454,7 @@ export default function PortfolioPage() {
         {!isLoading && investments?.length === 0 && (
           <div className="text-center py-6">
             <RotateCcw size={20} className="text-muted-foreground mx-auto mb-2" />
-            <p className="text-xs text-muted-foreground">Your investment history will appear here</p>
+            <p className="text-xs text-muted-foreground">Your opportunity history will appear here</p>
           </div>
         )}
       </div>

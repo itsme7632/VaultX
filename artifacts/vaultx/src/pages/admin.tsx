@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -198,7 +198,9 @@ export default function AdminPage() {
     { id: "kyc", label: "KYC", icon: FileCheck },
     { id: "withdrawals", label: "Withdrawals", icon: ArrowUpRight },
     { id: "deposits", label: "Deposits", icon: ArrowDownLeft },
-    { id: "plans", label: "Plans", icon: DollarSign },
+    { id: "plans", label: "Opportunities", icon: TrendingUp },
+    { id: "allocation", label: "Allocation", icon: DollarSign },
+    { id: "performance", label: "Performance", icon: BarChart3 },
     { id: "networks", label: "Networks", icon: Network },
     { id: "news", label: "News", icon: Newspaper },
     { id: "broadcast", label: "Broadcast", icon: Bell },
@@ -486,20 +488,21 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* PLANS */}
+          {/* OPPORTUNITIES (Plans) */}
           {tab === "plans" && (
             <div className="space-y-3">
               <Button className="w-full h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, riskLevel: "medium", features: [], isActive: true })}>
-                <Plus size={15} className="mr-1.5" />Add Plan
+                <Plus size={15} className="mr-1.5" />Add Opportunity
               </Button>
               <div className="space-y-3">
                 {plans?.map((plan: any) => (
-                  <div key={plan.id} className="bg-white border border-border rounded-2xl p-4 shadow-sm">
+                  <div key={plan.id} className="bg-white dark:bg-card border border-border rounded-2xl p-4 shadow-sm">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-sm">{plan.name}</p>
                           <Badge variant="outline" className={cn("text-[9px]", plan.isActive ? "text-emerald-600 bg-emerald-50" : "text-muted-foreground")}>{plan.isActive ? "Active" : "Disabled"}</Badge>
+                          {plan.isFeatured && <Badge variant="outline" className="text-[9px] text-amber-600 bg-amber-50">Featured</Badge>}
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">{plan.description}</p>
                         <p className="text-xs text-primary font-semibold mt-1">
@@ -621,6 +624,70 @@ export default function AdminPage() {
 
           {tab === "settings" && (
             <SettingsTab settingsData={settingsData} toast={toast} />
+          )}
+
+          {/* CAPITAL ALLOCATION */}
+          {tab === "allocation" && (
+            <div className="space-y-3">
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-2">
+                <p className="font-semibold text-sm text-foreground">Capital Allocation Editor</p>
+                <p className="text-xs text-muted-foreground">Edit allocation percentages directly on the Capital Allocation page (accessible from Dashboard or More menu). Changes are saved to platform settings and visible to all users.</p>
+                <a href="/capital-allocation" className="block">
+                  <Button className="w-full h-10 text-sm mt-2">Open Capital Allocation Page →</Button>
+                </a>
+              </div>
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mb-1">How it works</p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-400/80">Allocation percentages must sum to 100%. Admin users see an edit button on the Capital Allocation page to update each sector weight. Changes are stored as platform settings and loaded by all users.</p>
+              </div>
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                <p className="font-semibold text-xs text-foreground mb-3">Default Allocations</p>
+                <div className="space-y-2">
+                  {[
+                    { label: "Digital Assets", pct: 35 },
+                    { label: "Technology Infrastructure", pct: 25 },
+                    { label: "AI Development", pct: 20 },
+                    { label: "Strategic Growth", pct: 15 },
+                    { label: "Reserve Fund", pct: 5 },
+                  ].map(({ label, pct }) => (
+                    <div key={label} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className="font-bold text-primary">{pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PERFORMANCE ADMIN */}
+          {tab === "performance" && (
+            <div className="space-y-3">
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-2">
+                <p className="font-semibold text-sm text-foreground">Performance Center</p>
+                <p className="text-xs text-muted-foreground">The Performance Center page displays live analytics from your platform. It uses data from the Analytics and Statistics tabs to show capital deployment, returns distributed, and active opportunities.</p>
+                <a href="/performance" className="block">
+                  <Button className="w-full h-10 text-sm mt-2">View Performance Center →</Button>
+                </a>
+              </div>
+              <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
+                <p className="font-semibold text-xs text-foreground mb-3">Data Sources</p>
+                <div className="space-y-2">
+                  {[
+                    { label: "Total Participants", source: "Users tab → Total Users" },
+                    { label: "Capital Deployed", source: "Analytics → Total Deposits" },
+                    { label: "Earnings Distributed", source: "Analytics → Earnings Paid" },
+                    { label: "Active Investments", source: "Analytics → Active Investments" },
+                    { label: "Monthly Charts", source: "Statistics → Monthly Data" },
+                  ].map(({ label, source }) => (
+                    <div key={label} className="flex justify-between items-start text-xs gap-2">
+                      <span className="text-muted-foreground">{label}</span>
+                      <span className="font-medium text-foreground text-right">{source}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
 
           {/* LOGS */}
@@ -846,14 +913,14 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Plan modal */}
+      {/* Opportunity (Plan) modal */}
       <Dialog open={!!planModal} onOpenChange={(o) => !o && setPlanModal(null)}>
         <DialogContent className="max-w-sm mx-4 max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{planModal?.id ? "Edit Plan" : "New Plan"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{planModal?.id ? "Edit Opportunity" : "New Opportunity"}</DialogTitle></DialogHeader>
           {planModal && (
             <div className="space-y-3 pt-2">
               {[
-                { label: "Name", field: "name", type: "text", placeholder: "e.g. Gold Plan" },
+                { label: "Name", field: "name", type: "text", placeholder: "e.g. Digital Assets Fund" },
                 { label: "Description", field: "description", type: "text", placeholder: "Short description" },
                 { label: "Min Amount (USDT)", field: "minAmount", type: "number", placeholder: "100" },
                 { label: "Max Amount (USDT)", field: "maxAmount", type: "number", placeholder: "10000" },
@@ -881,7 +948,7 @@ export default function AdminPage() {
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={planModal.isFeatured} onChange={(e) => setPlanModal((p: any) => ({ ...p, isFeatured: e.target.checked }))} />Featured</label>
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setPlanModal(null)}>Cancel</Button>
-                <Button className="flex-1" onClick={() => savePlan.mutate(planModal)} disabled={savePlan.isPending}>Save Plan</Button>
+                <Button className="flex-1" onClick={() => savePlan.mutate(planModal)} disabled={savePlan.isPending}>Save Opportunity</Button>
               </div>
             </div>
           )}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, Info, Wallet, Clock } from "lucide-react";
+import { CheckCircle, Info, Wallet, Clock, ArrowRight } from "lucide-react";
 import {
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
   useGetWallet, getGetWalletQueryKey,
@@ -15,11 +15,15 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT } from "@/lib/format";
 
-const PLAN_GRADIENTS: Record<number, string> = {
-  1: "from-slate-600 to-slate-800",
-  2: "from-blue-500 to-blue-700",
+const OPPORTUNITY_GRADIENTS: Record<number, string> = {
+  1: "from-blue-600 to-indigo-700",
+  2: "from-emerald-500 to-teal-700",
   3: "from-amber-500 to-orange-600",
-  4: "from-purple-600 to-purple-800",
+  4: "from-purple-600 to-violet-800",
+  5: "from-rose-500 to-pink-700",
+  6: "from-cyan-500 to-blue-700",
+  7: "from-lime-500 to-green-700",
+  8: "from-fuchsia-600 to-purple-800",
 };
 
 export default function InvestPage() {
@@ -59,7 +63,7 @@ export default function InvestPage() {
       { data: { planId: plan.id, amount: amountNum } },
       {
         onSuccess: () => {
-          toast({ title: "Investment Started! 🎉", description: `${formatUSDT(amountNum)} invested in ${plan.name}. Daily earnings begin now.` });
+          toast({ title: "Participation Confirmed! 🎉", description: `${formatUSDT(amountNum)} allocated to ${plan.name}. Daily returns begin now.` });
           queryClient.invalidateQueries({ queryKey: getGetUserInvestmentsQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetWalletQueryKey() });
           navigate("/portfolio");
@@ -69,11 +73,11 @@ export default function InvestPage() {
     );
   };
 
-  const gradient = PLAN_GRADIENTS[plan?.id as number] ?? "from-slate-600 to-slate-800";
+  const gradient = OPPORTUNITY_GRADIENTS[plan?.id as number] ?? "from-blue-600 to-indigo-700";
 
   if (plansLoading) {
     return (
-      <SubPageLayout title="Invest">
+      <SubPageLayout title="Participate">
         <div className="px-4 pt-5 space-y-4">
           <Skeleton className="h-40 rounded-2xl" />
           <Skeleton className="h-32 rounded-2xl" />
@@ -85,9 +89,9 @@ export default function InvestPage() {
 
   if (!plan) {
     return (
-      <SubPageLayout title="Invest">
+      <SubPageLayout title="Participate">
         <div className="px-4 pt-10 text-center">
-          <p className="font-semibold text-foreground">Plan not found</p>
+          <p className="font-semibold text-foreground">Opportunity not found</p>
           <Button variant="outline" className="mt-4" onClick={() => navigate("/investments")}>Go Back</Button>
         </div>
       </SubPageLayout>
@@ -95,10 +99,10 @@ export default function InvestPage() {
   }
 
   return (
-    <SubPageLayout title={`Invest in ${plan.name}`}>
+    <SubPageLayout title={`Participate in ${plan.name}`}>
       <div className="px-4 pt-5 pb-36 space-y-5">
 
-        {/* Plan header card */}
+        {/* Opportunity header card */}
         <div className={cn("rounded-2xl overflow-hidden shadow-md")}>
           <div className={cn("bg-gradient-to-br p-5 text-white", gradient)}>
             <div className="mb-4">
@@ -108,7 +112,7 @@ export default function InvestPage() {
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-white/15 rounded-xl py-3 text-center">
                 <p className="text-lg font-bold">{(minRoi * 100).toFixed(1)}%–{(maxRoi * 100).toFixed(1)}%</p>
-                <p className="text-[10px] text-white/70 mt-0.5">Daily ROI</p>
+                <p className="text-[10px] text-white/70 mt-0.5">Daily Return</p>
               </div>
               <div className="bg-white/15 rounded-xl py-3 text-center">
                 <p className="text-lg font-bold">{plan.durationDays}d</p>
@@ -124,7 +128,7 @@ export default function InvestPage() {
 
         {/* Balance & range info */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white border border-border rounded-2xl p-3.5 flex items-center gap-2.5">
+          <div className="bg-card border border-border rounded-2xl p-3.5 flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Wallet size={14} className="text-primary" />
             </div>
@@ -133,7 +137,7 @@ export default function InvestPage() {
               <p className="font-bold text-primary text-sm">{formatUSDT(balance)}</p>
             </div>
           </div>
-          <div className="bg-white border border-border rounded-2xl p-3.5 flex items-center gap-2.5">
+          <div className="bg-card border border-border rounded-2xl p-3.5 flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
               <Clock size={14} className="text-emerald-600" />
             </div>
@@ -147,7 +151,7 @@ export default function InvestPage() {
         {/* Amount input */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-bold text-foreground">Investment Amount (USDT)</p>
+            <p className="text-sm font-bold text-foreground">Capital Amount (USDT)</p>
             <button
               onClick={() => setAmount(String(Math.min(parseFloat(String(balance)), plan.maxAmount).toFixed(2)))}
               className="text-xs text-primary font-bold bg-primary/10 px-2.5 py-1 rounded-lg"
@@ -170,13 +174,13 @@ export default function InvestPage() {
 
         {/* Live projections */}
         {amountNum >= plan.minAmount && !hasError && !aboveMax && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-2.5">
+          <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-4 space-y-2.5">
             <div className="flex items-center gap-1.5 mb-1">
               <Info size={13} className="text-emerald-600" />
-              <p className="text-xs font-bold text-emerald-700">Estimated Returns</p>
+              <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Projected Returns</p>
             </div>
             {[
-              { label: "Daily Earnings", val: `${formatUSDT(dailyMin)} – ${formatUSDT(dailyMax)}`, color: "text-emerald-600" },
+              { label: "Daily Returns", val: `${formatUSDT(dailyMin)} – ${formatUSDT(dailyMax)}`, color: "text-emerald-600" },
               { label: `Total Return (${plan.durationDays} days)`, val: `${formatUSDT(totalMin)} – ${formatUSDT(totalMax)}`, color: "text-emerald-600 font-bold" },
               { label: "Est. Final Value", val: `~${formatUSDT(amountNum + dailyAvg * plan.durationDays)}`, color: "text-primary font-bold" },
             ].map(({ label, val, color }) => (
@@ -190,8 +194,8 @@ export default function InvestPage() {
 
         {/* Features */}
         {plan.features?.length > 0 && (
-          <div className="bg-white border border-border rounded-2xl p-4">
-            <p className="text-xs font-bold text-foreground mb-3">Plan Features</p>
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <p className="text-xs font-bold text-foreground mb-3">Opportunity Features</p>
             <div className="space-y-2">
               {plan.features.map((f: string, i: number) => (
                 <div key={i} className="flex items-center gap-2.5">
@@ -218,9 +222,13 @@ export default function InvestPage() {
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               Processing…
             </span>
-          ) : canInvest ? `Invest ${formatUSDT(amountNum)} Now` : "Enter Amount to Invest"}
+          ) : canInvest ? (
+            <span className="flex items-center gap-2">
+              Participate Now — {formatUSDT(amountNum)} <ArrowRight size={16} />
+            </span>
+          ) : "Enter Amount to Participate"}
         </Button>
-        {canInvest && <p className="text-center text-xs text-muted-foreground mt-2">Earnings start immediately after investment</p>}
+        {canInvest && <p className="text-center text-xs text-muted-foreground mt-2">Daily returns begin immediately after participation</p>}
       </div>
     </SubPageLayout>
   );

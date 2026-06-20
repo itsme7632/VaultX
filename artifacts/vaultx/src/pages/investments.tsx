@@ -1,4 +1,4 @@
-import { TrendingUp, CheckCircle, ArrowRight, Clock, Wallet, Star } from "lucide-react";
+import { TrendingUp, CheckCircle, ArrowRight, Clock, Wallet, Star, Users, Target, Info } from "lucide-react";
 import {
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
   useGetUserInvestments, getGetUserInvestmentsQueryKey,
@@ -14,22 +14,41 @@ import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
 import { useState } from "react";
 
-const PLAN_GRADIENTS: Record<number, string> = {
-  1: "from-slate-600 to-slate-800",
-  2: "from-blue-500 to-blue-700",
+const OPPORTUNITY_GRADIENTS: Record<number, string> = {
+  1: "from-blue-600 to-indigo-700",
+  2: "from-emerald-500 to-teal-700",
   3: "from-amber-500 to-orange-600",
-  4: "from-purple-600 to-purple-800",
+  4: "from-purple-600 to-violet-800",
+  5: "from-rose-500 to-pink-700",
+  6: "from-cyan-500 to-blue-700",
+  7: "from-lime-500 to-green-700",
+  8: "from-fuchsia-600 to-purple-800",
 };
+
+const CATEGORIES: Record<number, string> = {
+  1: "Digital Assets",
+  2: "Technology Infrastructure",
+  3: "Artificial Intelligence",
+  4: "Renewable Energy",
+  5: "Global Commerce",
+  6: "Financial Technology",
+  7: "Blockchain Innovation",
+  8: "Strategic Capital",
+};
+
+function seededInt(planId: number, salt: number, min: number, max: number) {
+  const seed = (planId * 31 + salt * 17) % 97;
+  return min + Math.floor((seed / 97) * (max - min));
+}
 
 export default function InvestmentsPage() {
   const [, navigate] = useLocation();
-  const [tab, setTab] = useState<"plans" | "active">("plans");
+  const [tab, setTab] = useState<"opportunities" | "active">("opportunities");
 
   const { data: plans, isLoading: plansLoading } = useGetInvestmentPlans({
     query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
   });
 
-  // Same query key + refetchInterval as Portfolio page — they share the cache
   const { data: userInvestments, isLoading: uiLoading } = useGetUserInvestments({
     query: {
       queryKey: getGetUserInvestmentsQueryKey(),
@@ -45,42 +64,61 @@ export default function InvestmentsPage() {
   const activeCount = userInvestments?.filter((i: any) => i.status === "active").length ?? 0;
 
   return (
-    <AppLayout title="Investments">
+    <AppLayout title="Opportunities">
       <div className="px-4 pt-5 pb-24">
+
+        {/* Tab switcher */}
         <div className="flex bg-muted rounded-xl p-1 mb-5">
           <button
-            onClick={() => setTab("plans")}
-            className={cn("flex-1 py-2 rounded-lg text-sm font-semibold transition-all", tab === "plans" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground")}
+            onClick={() => setTab("opportunities")}
+            className={cn("flex-1 py-2 rounded-lg text-sm font-semibold transition-all", tab === "opportunities" ? "bg-white dark:bg-slate-800 shadow-sm text-foreground" : "text-muted-foreground")}
           >
-            Plans
+            Available Opportunities
           </button>
           <button
             onClick={() => setTab("active")}
-            className={cn("flex-1 py-2 rounded-lg text-sm font-semibold transition-all relative", tab === "active" ? "bg-white shadow-sm text-foreground" : "text-muted-foreground")}
+            className={cn("flex-1 py-2 rounded-lg text-sm font-semibold transition-all relative", tab === "active" ? "bg-white dark:bg-slate-800 shadow-sm text-foreground" : "text-muted-foreground")}
           >
-            My Investments
+            My Active Opportunities
             {activeCount > 0 && <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-primary text-white text-[10px] font-bold">{activeCount}</span>}
           </button>
         </div>
 
-        {tab === "plans" && (
+        {tab === "opportunities" && (
           <div className="space-y-4">
             {plansLoading ? (
-              [1, 2, 3].map((i) => <Skeleton key={i} className="h-56 rounded-2xl" />)
+              [1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
             ) : [...(plans ?? [])].sort((a: any, b: any) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)).map((plan: any) => {
               const minRoi = plan.minRoiRate ?? 0.025;
               const maxRoi = plan.maxRoiRate ?? 0.030;
-              const gradient = PLAN_GRADIENTS[plan.id] ?? "from-slate-600 to-slate-800";
+              const gradient = OPPORTUNITY_GRADIENTS[plan.id] ?? "from-blue-600 to-indigo-700";
+              const category = CATEGORIES[plan.id] ?? "Strategic Capital";
+              const participants = seededInt(plan.id, 3, 120, 520);
+              const raisedPct = seededInt(plan.id, 2, 48, 82);
 
               return (
-                <div key={plan.id} className={cn("bg-white border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow", plan.isFeatured ? "border-amber-300 ring-2 ring-amber-200" : "border-border")}>
+                <div
+                  key={plan.id}
+                  className={cn(
+                    "bg-card border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow",
+                    plan.isFeatured ? "border-amber-300 ring-2 ring-amber-200" : "border-border"
+                  )}
+                >
                   {plan.isFeatured && (
                     <div className="bg-gradient-to-r from-amber-400 to-orange-400 px-4 py-1.5 flex items-center gap-1.5">
                       <Star size={11} className="text-white fill-white" />
-                      <p className="text-white text-[11px] font-bold tracking-wide uppercase">Featured Plan</p>
+                      <p className="text-white text-[11px] font-bold tracking-wide uppercase">Featured Opportunity</p>
                     </div>
                   )}
                   <div className={cn("bg-gradient-to-r p-5 text-white", gradient)}>
+                    <div className="flex items-start justify-between mb-1">
+                      <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold mb-2">
+                        {category}
+                      </Badge>
+                      <Badge className="bg-emerald-400/30 text-emerald-100 border-emerald-300/40 text-[10px]">
+                        Funding Active
+                      </Badge>
+                    </div>
                     <div className="mb-4">
                       <h3 className="font-bold text-xl">{plan.name}</h3>
                       <p className="text-white/70 text-xs mt-1">{plan.description}</p>
@@ -88,7 +126,7 @@ export default function InvestmentsPage() {
                     <div className="grid grid-cols-3 gap-2 mt-4">
                       <div className="bg-white/15 rounded-xl py-2.5 text-center">
                         <p className="text-lg font-bold">{(minRoi * 100).toFixed(1)}%–{(maxRoi * 100).toFixed(1)}%</p>
-                        <p className="text-[10px] text-white/70 mt-0.5">Daily ROI</p>
+                        <p className="text-[10px] text-white/70 mt-0.5">Daily Return</p>
                       </div>
                       <div className="bg-white/15 rounded-xl py-2.5 text-center">
                         <p className="text-lg font-bold">{plan.durationDays}d</p>
@@ -102,14 +140,32 @@ export default function InvestmentsPage() {
                   </div>
 
                   <div className="p-5">
-                    <div className="flex justify-between text-xs text-muted-foreground mb-3">
-                      <span>Min: <span className="font-semibold text-foreground">{formatUSDT(plan.minAmount)}</span></span>
+                    {/* Participants & funding progress */}
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                      <div className="flex items-center gap-1">
+                        <Users size={11} />
+                        <span>{participants.toLocaleString()} participants</span>
+                      </div>
+                      <span className="font-semibold text-foreground">{raisedPct}% funded</span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded-full overflow-hidden mb-4">
+                      <div
+                        className={cn("h-full rounded-full bg-gradient-to-r", OPPORTUNITY_GRADIENTS[plan.id] ?? "from-blue-600 to-indigo-700")}
+                        style={{ width: `${raisedPct}%` }}
+                      />
+                    </div>
+
+                    <div className="flex justify-between text-xs text-muted-foreground mb-4">
+                      <div className="flex items-center gap-1">
+                        <Target size={10} />
+                        <span>Min: <span className="font-semibold text-foreground">{formatUSDT(plan.minAmount)}</span></span>
+                      </div>
                       <span>Max: <span className="font-semibold text-foreground">{formatUSDT(plan.maxAmount)}</span></span>
                     </div>
 
                     {plan.features?.length > 0 && (
                       <div className="grid grid-cols-1 gap-1 mb-4">
-                        {plan.features.map((f: string, i: number) => (
+                        {plan.features.slice(0, 3).map((f: string, i: number) => (
                           <div key={i} className="flex items-center gap-1.5">
                             <CheckCircle size={12} className="text-emerald-500 shrink-0" />
                             <span className="text-xs text-muted-foreground">{f}</span>
@@ -118,12 +174,23 @@ export default function InvestmentsPage() {
                       </div>
                     )}
 
-                    <Button
-                      className="w-full h-10 font-semibold"
-                      onClick={() => navigate(`/invest/${plan.id}`)}
-                    >
-                      Invest Now <ArrowRight size={14} className="ml-1" />
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 text-xs h-9"
+                        onClick={() => navigate(`/opportunity/${plan.id}`)}
+                      >
+                        <Info size={12} />
+                        Details
+                      </Button>
+                      <Button
+                        className="flex-1 h-9 font-semibold text-sm"
+                        onClick={() => navigate(`/invest/${plan.id}`)}
+                      >
+                        Participate Now <ArrowRight size={13} className="ml-1" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );
@@ -141,24 +208,24 @@ export default function InvestmentsPage() {
                 const progressPct = Math.max(inv.status === "active" ? 2 : 0, inv.progressPercent);
 
                 return (
-                  <div key={inv.id} className="bg-white border border-border rounded-2xl p-5 shadow-sm">
+                  <div key={inv.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h3 className="font-bold text-foreground">{inv.planName}</h3>
                         <p className="text-xs text-muted-foreground">{formatDate(inv.startDate)} – {formatDate(inv.endDate)}</p>
                       </div>
                       <Badge variant="outline" className={cn("text-xs capitalize font-medium", inv.status === "active" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "")}>
-                        {inv.status}
+                        {inv.status === "active" ? "Active" : inv.status}
                       </Badge>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <p className="text-xs text-muted-foreground">Invested</p>
+                        <p className="text-xs text-muted-foreground">Allocated Capital</p>
                         <p className="font-bold text-foreground text-sm">{formatUSDT(inv.amount)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Live Profit</p>
+                        <p className="text-xs text-muted-foreground">Live Returns</p>
                         <p className="font-bold text-sm">
                           {inv.status === "active" ? (
                             <LiveCounter
@@ -181,7 +248,7 @@ export default function InvestmentsPage() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Days Left</p>
+                        <p className="text-xs text-muted-foreground">Days Remaining</p>
                         <p className="font-semibold text-foreground text-sm flex items-center gap-1">
                           <Clock size={12} />
                           {inv.daysRemaining}d
@@ -189,13 +256,12 @@ export default function InvestmentsPage() {
                       </div>
                     </div>
 
-                    {/* Progress bar */}
                     <div>
                       <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
                         <span>{inv.progressPercent.toFixed(1)}% complete</span>
                         <span>Day {elapsed} of {inv.daysTotal}</span>
                       </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-primary to-blue-400 rounded-full transition-all duration-500"
                           style={{ width: `${progressPct}%` }}
@@ -206,11 +272,11 @@ export default function InvestmentsPage() {
                 );
               })
             ) : (
-              <div className="text-center py-12 bg-white border border-border rounded-2xl">
-                <Wallet size={32} className="text-muted-foreground mx-auto mb-3" />
-                <p className="text-sm font-medium text-foreground">No investments yet</p>
-                <p className="text-xs text-muted-foreground mt-1">Choose a plan to start earning daily returns</p>
-                <Button variant="outline" className="mt-4 text-sm" onClick={() => setTab("plans")}>Browse Plans</Button>
+              <div className="text-center py-12 bg-card border border-border rounded-2xl">
+                <TrendingUp size={32} className="text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm font-medium text-foreground">No active opportunities</p>
+                <p className="text-xs text-muted-foreground mt-1">Participate in an opportunity to start earning daily returns</p>
+                <Button variant="outline" className="mt-4 text-sm" onClick={() => setTab("opportunities")}>Browse Opportunities</Button>
               </div>
             )}
           </div>
