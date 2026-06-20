@@ -180,7 +180,7 @@ export default function InvestPage() {
               <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Projected Returns</p>
             </div>
             {[
-              { label: "Daily Returns", val: `${formatUSDT(dailyMin)} – ${formatUSDT(dailyMax)}`, color: "text-emerald-600" },
+              { label: "Daily Distribution", val: `${formatUSDT(dailyMin)} – ${formatUSDT(dailyMax)}`, color: "text-emerald-600" },
               { label: `Total Return (${plan.durationDays} days)`, val: `${formatUSDT(totalMin)} – ${formatUSDT(totalMax)}`, color: "text-emerald-600 font-bold" },
               { label: "Est. Final Value", val: `~${formatUSDT(amountNum + dailyAvg * plan.durationDays)}`, color: "text-primary font-bold" },
             ].map(({ label, val, color }) => (

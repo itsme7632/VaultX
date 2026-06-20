@@ -109,7 +109,7 @@ export default function PerformancePage() {
           {[
             { label: "Total Participants", value: analyticsLoading ? null : (analytics?.totalUsers ?? 0).toLocaleString(), icon: Users, color: "text-primary", bg: "bg-primary/10" },
             { label: "Capital Deployed", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalDeposits ?? 0), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
-            { label: "Earnings Distributed", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalEarningsPaid ?? 0), icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50" },
+            { label: "Distributions Paid", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalEarningsPaid ?? 0), icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50" },
             { label: "Active Investments", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalInvestments ?? 0), icon: Activity, color: "text-amber-600", bg: "bg-amber-50" },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} className="bg-card border border-border rounded-xl p-3.5 shadow-sm">
@@ -146,8 +146,8 @@ export default function PerformancePage() {
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="font-semibold text-sm text-foreground">Returns Distributed</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Monthly earnings paid out</p>
+              <p className="font-semibold text-sm text-foreground">Distributions Paid</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Monthly distributions paid out</p>
             </div>
             <Zap size={16} className="text-amber-500" />
           </div>
@@ -183,7 +183,7 @@ export default function PerformancePage() {
               <div className="grid grid-cols-4 bg-muted/40 px-4 py-2.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
                 <span>Month</span>
                 <span className="text-right">Inflow</span>
-                <span className="text-right">Returns</span>
+                <span className="text-right">Distributions</span>
                 <span className="text-right">Users</span>
               </div>
               <div className="divide-y divide-border max-h-72 overflow-y-auto">

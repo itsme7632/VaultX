@@ -192,7 +192,7 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
     userId: req.session.userId!,
     type: "investment",
     title: "Investment Started",
-    message: `Your ${amount} USDT investment in ${plan.name} is now active. Daily ROI: ${(midRoi * 100).toFixed(2)}% — profits will be ready in 24 hours.`,
+    message: `Your ${amount} USDT investment in ${plan.name} is now active. Daily ROI: ${(midRoi * 100).toFixed(2)}% — distributions will be ready in 24 hours.`,
   });
 
   res.status(201).json(

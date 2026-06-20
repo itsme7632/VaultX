@@ -102,7 +102,9 @@ export default function WalletPage() {
               <SelectContent>
                 <SelectItem value="all">All types</SelectItem>
                 {(["deposit", "withdrawal", "earning", "reinvest", "investment", "transfer", "referral"] as GetTransactionsType[]).map((t) => (
-                  <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                  <SelectItem key={t} value={t} className="capitalize">
+                    {t === "earning" ? "Distribution" : t}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

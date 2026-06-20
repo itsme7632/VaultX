@@ -145,7 +145,7 @@ function ReferralWidget() {
       {pendingEarnings > 0 && (
         <Link href="/referrals">
           <p className="text-[10px] text-emerald-300 mt-2 font-medium text-center animate-pulse">
-            💰 Tap "View" to claim your pending earnings →
+            💰 Tap "View" to claim your pending distributions →
           </p>
         </Link>
       )}
@@ -250,8 +250,8 @@ export default function DashboardPage() {
   const stats = [
     { label: "Total Balance", value: summary ? formatUSDT(summary.totalBalance) : null, icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },
     { label: "Active Opportunities", value: summary ? `${summary.activeInvestmentsCount}` : null, sub: summary ? formatUSDT(summary.activeInvestmentsValue) : null, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Daily Returns", value: summary ? formatUSDT(summary.dailyEarnings) : null, icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Total Earned", value: summary ? formatUSDT(summary.totalEarnings) : null, icon: Zap, color: "text-purple-500", bg: "bg-purple-500/10" },
+    { label: "Today's Distribution", value: summary ? formatUSDT(summary.dailyEarnings) : null, icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Total Distributions", value: summary ? formatUSDT(summary.totalEarnings) : null, icon: Zap, color: "text-purple-500", bg: "bg-purple-500/10" },
   ];
 
   const categoryLabel: Record<string, string> = {
@@ -311,7 +311,7 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center gap-1.5 mt-2">
             <div className="flex items-center gap-1 bg-white/20 rounded-full px-2.5 py-0.5">
               <TrendingUp size={11} className="text-green-200" />
-              <span className="text-xs text-green-100 font-medium">{formatUSDT(summary?.dailyEarnings ?? 0)}/day</span>
+              <span className="text-xs text-green-100 font-medium">{formatUSDT(summary?.dailyEarnings ?? 0)}/day distribution</span>
             </div>
             {summary && summary.pendingEarnings > 0 && (
               <div className="flex items-center gap-1 bg-white/15 rounded-full px-2.5 py-0.5">

@@ -55,8 +55,8 @@ function EarningsHistory() {
             <BarChart2 size={15} className="text-primary" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Returns Breakdown</p>
-            <p className="text-[11px] text-muted-foreground">Day-by-day claim &amp; reinvest history</p>
+            <p className="text-sm font-semibold text-foreground">Distribution History</p>
+            <p className="text-[11px] text-muted-foreground">Day-by-day distribution &amp; reinvest history</p>
           </div>
         </div>
         {open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
@@ -66,7 +66,7 @@ function EarningsHistory() {
         <div className="border-t border-border">
           <div className="grid grid-cols-2 gap-px bg-border">
             <div className="bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3">
-              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Claimed</p>
+              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Distributions Claimed</p>
               <p className="font-bold text-emerald-600 text-sm mt-0.5">{formatUSDT(totalClaimed)}</p>
             </div>
             <div className="bg-blue-50 dark:bg-blue-950/20 px-4 py-3">
@@ -82,7 +82,7 @@ function EarningsHistory() {
           ) : rows.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <RotateCcw size={20} className="text-muted-foreground mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground">No returns history yet</p>
+              <p className="text-xs text-muted-foreground">No distribution history yet</p>
             </div>
           ) : (
             <div className="divide-y divide-border max-h-80 overflow-y-auto">
@@ -109,8 +109,8 @@ function EarningsHistory() {
                             }
                           </div>
                           <p className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">
-                            {r.type === "earning" ? "Claimed" : "Reinvested"}
-                            {r.note ? ` · ${r.note.replace(/Earnings claimed from |Reinvested .+ into /i, "opp ")}` : ""}
+                            {r.type === "earning" ? "Distribution Claimed" : "Reinvested"}
+                            {r.note ? ` · ${r.note.replace(/Earnings claimed from |Distributions claimed from |Reinvested .+ into /i, "opp ")}` : ""}
                           </p>
                           <p className={cn(
                             "text-[11px] font-semibold shrink-0",
@@ -156,12 +156,12 @@ export default function PortfolioPage() {
 
   const handleClaim = (id: number, amount: number) => {
     if (amount <= 0) {
-      toast({ title: "No returns yet", description: "Daily ROI is credited once every 24 hours", variant: "destructive" });
+      toast({ title: "No distribution yet", description: "Distributions are credited once every 24 hours", variant: "destructive" });
       return;
     }
     claim.mutate({ id }, {
       onSuccess: () => {
-        toast({ title: "Returns Claimed!", description: `${formatUSDT(amount)} added to your wallet` });
+        toast({ title: "Distribution Claimed!", description: `${formatUSDT(amount)} added to your wallet` });
         invalidate();
       },
       onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
@@ -170,7 +170,7 @@ export default function PortfolioPage() {
 
   const handleReinvest = async (id: number, amount: number) => {
     if (amount <= 0) {
-      toast({ title: "No returns yet", description: "Daily ROI is credited once every 24 hours", variant: "destructive" });
+      toast({ title: "No distribution yet", description: "Distributions are credited once every 24 hours", variant: "destructive" });
       return;
     }
     setReinvesting(id);
@@ -180,7 +180,7 @@ export default function PortfolioPage() {
         const err = await res.json();
         throw new Error(err.message ?? "Failed to reinvest");
       }
-      toast({ title: "Returns Reinvested!", description: "Earnings added to your investment principal" });
+      toast({ title: "Distribution Reinvested!", description: "Distribution added to your investment principal" });
       invalidate();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -195,8 +195,8 @@ export default function PortfolioPage() {
         toast({
           title: current ? "Auto-Reinvest Disabled" : "Auto-Reinvest Enabled",
           description: current
-            ? "Daily returns will accumulate for manual claiming"
-            : "Daily returns will automatically reinvest into principal",
+            ? "Distributions will accumulate for manual claiming"
+            : "Distributions will automatically reinvest into principal",
         });
         invalidate();
       },
@@ -217,9 +217,9 @@ export default function PortfolioPage() {
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: "Active Capital", val: formatUSDT(totalValue), sub: `${activeInvestments.length} opportunit${activeInvestments.length !== 1 ? "ies" : "y"}`, color: "text-primary" },
-            { label: "Claimable Returns", val: formatUSDT(totalPending), sub: "Ready to claim", color: "text-emerald-600" },
-            { label: "Total Earned", val: formatUSDT(totalEarned), sub: "All time (ROI generated)", color: "text-purple-600" },
-            { label: "Est. Daily ROI", val: formatUSDT(summary?.dailyEarnings ?? 0), sub: "Per day", color: "text-amber-600" },
+            { label: "Available Distribution", val: formatUSDT(totalPending), sub: "Ready to claim", color: "text-emerald-600" },
+            { label: "Total Distributions", val: formatUSDT(totalEarned), sub: "All time received", color: "text-purple-600" },
+            { label: "Today's Distribution", val: formatUSDT(summary?.dailyEarnings ?? 0), sub: "Est. per day", color: "text-amber-600" },
           ].map(({ label, val, sub, color }) => (
             <div key={label} className="bg-card border border-border rounded-xl p-3.5 shadow-sm">
               <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
@@ -268,7 +268,7 @@ export default function PortfolioPage() {
                         <p className="font-bold text-foreground text-sm mt-1">{formatUSDT(inv.amount)}</p>
                       </div>
                       <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800 rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Live Returns</p>
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Live Distribution</p>
                         <div className="mt-1">
                           <LiveCounter
                             pendingEarnings={inv.pendingEarnings}
@@ -280,11 +280,11 @@ export default function PortfolioPage() {
                         </div>
                       </div>
                       <div className="bg-muted/40 border border-border rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total ROI Generated</p>
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Distributions</p>
                         <p className="font-semibold text-primary text-sm mt-1">{formatUSDT(inv.totalEarned)}</p>
                       </div>
                       <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Est. Daily</p>
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Est. Daily Dist.</p>
                         <p className="font-semibold text-amber-600 text-sm mt-1">{formatUSDT(avgDailyEst)}</p>
                       </div>
                     </div>
@@ -293,7 +293,7 @@ export default function PortfolioPage() {
                     <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800 rounded-xl px-3.5 py-2.5">
                       <div className="flex items-center gap-2">
                         <Clock size={13} className="text-primary shrink-0" />
-                        <p className="text-xs text-muted-foreground">Next payout</p>
+                        <p className="text-xs text-muted-foreground">Next Distribution</p>
                       </div>
                       <PayoutCountdown nextPayoutAt={inv.nextPayoutAt} />
                     </div>
@@ -382,7 +382,7 @@ export default function PortfolioPage() {
                         disabled={claim.isPending}
                       >
                         <ArrowDownLeft size={14} />
-                        Claim Returns
+                        Claim Distribution
                       </Button>
                       <Button
                         size="sm"
@@ -396,13 +396,13 @@ export default function PortfolioPage() {
                         disabled={reinvesting === inv.id}
                       >
                         <RefreshCcw size={14} className={reinvesting === inv.id ? "animate-spin" : ""} />
-                        {reinvesting === inv.id ? "Reinvesting…" : "Reinvest"}
+                        {reinvesting === inv.id ? "Reinvesting…" : "Reinvest Distribution"}
                       </Button>
                     </div>
 
                     {!hasPending && (
                       <p className="text-center text-[11px] text-muted-foreground -mt-1">
-                        Daily returns credited every 24 hours — keep growing!
+                        Distributions credited every 24 hours — keep growing!
                       </p>
                     )}
                   </div>
@@ -436,7 +436,7 @@ export default function PortfolioPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{inv.planName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatUSDT(inv.amount)} allocated · {formatUSDT(inv.totalEarned)} earned
+                      {formatUSDT(inv.amount)} allocated · {formatUSDT(inv.totalEarned)} distributed
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
                       {formatDate(inv.startDate)} – {formatDate(inv.endDate)}

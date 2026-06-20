@@ -29,7 +29,7 @@ const STATUS_CONFIG: Record<string, { icon: React.ElementType; color: string; ri
 
 const TYPE_LABEL: Record<string, string> = {
   deposit: "DEPOSIT", withdrawal: "WITHDRAWAL", transfer: "TRANSFER",
-  earning: "PROFIT", referral: "REFERRAL BONUS", reinvest: "REINVESTMENT",
+  earning: "DISTRIBUTION", referral: "REFERRAL BONUS", reinvest: "REINVESTMENT",
   investment: "INVESTMENT", admin_adjustment: "ADJUSTMENT",
 };
 

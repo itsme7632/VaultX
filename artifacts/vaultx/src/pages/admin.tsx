@@ -290,7 +290,7 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-foreground">Manual ROI Payout</p>
-                    <p className="text-[11px] text-muted-foreground">Force-credit daily earnings on all active investments now</p>
+                    <p className="text-[11px] text-muted-foreground">Force-credit daily distributions on all active investments now</p>
                   </div>
                 </div>
 
@@ -827,7 +827,7 @@ export default function AdminPage() {
                   {[
                     { label: "Total Participants", source: "Users tab → Total Users" },
                     { label: "Capital Deployed", source: "Analytics → Total Deposits" },
-                    { label: "Earnings Distributed", source: "Analytics → Earnings Paid" },
+                    { label: "Distributions Paid", source: "Analytics → Distributions Paid" },
                     { label: "Active Investments", source: "Analytics → Active Investments" },
                     { label: "Monthly Charts", source: "Statistics → Monthly Data" },
                   ].map(({ label, source }) => (
@@ -955,7 +955,7 @@ export default function AdminPage() {
                       { label: "Total Deposited", value: formatUSDT((userDetail ?? userModal).totalDeposited), color: "text-emerald-600" },
                       { label: "Total Withdrawn", value: formatUSDT((userDetail ?? userModal).totalWithdrawn), color: "text-red-500" },
                       { label: "Total Earnings", value: formatUSDT((userDetail ?? userModal).totalEarnings ?? 0), color: "text-amber-500" },
-                      { label: "Investment Profit", value: formatUSDT(userDetail?.totalInvestmentProfit ?? 0), color: "text-purple-500" },
+                      { label: "Total Distributions", value: formatUSDT(userDetail?.totalInvestmentProfit ?? 0), color: "text-purple-500" },
                       { label: "Referral Earnings", value: formatUSDT(userDetail?.referralPendingEarnings ?? 0), color: "text-blue-500" },
                     ].map(({ label, value, color }) => (
                       <div key={label} className="bg-white border border-border rounded-xl p-2.5">

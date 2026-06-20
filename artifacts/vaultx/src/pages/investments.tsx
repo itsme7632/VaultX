@@ -443,7 +443,7 @@ export default function InvestmentsPage() {
                         <p className="font-bold text-foreground text-sm">{formatUSDT(inv.amount)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Live Returns</p>
+                        <p className="text-xs text-muted-foreground">Live Distribution</p>
                         <p className="font-bold text-sm">
                           {inv.status === "active" ? (
                             <LiveCounter
@@ -488,7 +488,7 @@ export default function InvestmentsPage() {
               <div className="text-center py-12 bg-card border border-border rounded-2xl">
                 <TrendingUp size={32} className="text-muted-foreground mx-auto mb-3" />
                 <p className="text-sm font-medium text-foreground">No active opportunities</p>
-                <p className="text-xs text-muted-foreground mt-1">Participate in an opportunity to start earning daily returns</p>
+                <p className="text-xs text-muted-foreground mt-1">Participate in an opportunity to start receiving daily distributions</p>
                 <Button variant="outline" className="mt-4 text-sm" onClick={() => setTab("opportunities")}>Browse Opportunities</Button>
               </div>
             )}

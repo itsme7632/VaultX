@@ -143,14 +143,14 @@ export default function AboutPage() {
     { icon: UserPlus, step: "01", title: "Create Your Account", desc: "Sign up in minutes with your email and personal details." },
     { icon: Wallet, step: "02", title: "Fund Your Wallet", desc: "Deposit USDT to your wallet using our supported networks." },
     { icon: TrendingUp, step: "03", title: "Choose Investment Opportunities", desc: "Browse and select from carefully structured investment plans." },
-    { icon: PieChart, step: "04", title: "Track Performance & Manage Portfolio", desc: "Monitor earnings, manage investments, and withdraw profits." },
+    { icon: PieChart, step: "04", title: "Track Performance & Manage Portfolio", desc: "Monitor distributions, manage investments, and claim your distributions." },
   ];
 
   const faqs = [
     { q: "How do I create an account?", a: "Click 'Sign Up' on the login page, fill in your name, email, and create a secure password. Your account will be ready immediately and you may receive a signup bonus." },
     { q: "How do I fund my wallet?", a: "Navigate to the Deposit section, choose your preferred USDT network (e.g. TRC20, ERC20), copy the wallet address, and send your funds. Deposits are confirmed after network verification." },
     { q: "How do withdrawals work?", a: "Go to Withdraw, enter the amount and your USDT wallet address, and submit. Withdrawals are reviewed by our team and typically processed within 24 hours." },
-    { q: "How can I track my investments?", a: "Your Portfolio page shows all active and completed investments, daily earnings, total returns, and performance charts in real time." },
+    { q: "How can I track my investments?", a: "Your Portfolio page shows all active and completed investments, daily distributions, total distributions received, and performance charts in real time." },
     { q: "How do I contact support?", a: "Use the Help & Support section in the app to open a support ticket, or reach us via email, Telegram, or WhatsApp listed on this page." },
   ];
 

@@ -350,7 +350,7 @@ export default function SupportPage() {
   const FAQ = [
     { q: "How long do withdrawals take?", a: "Processed within 24 hours after admin approval." },
     { q: "What is the minimum deposit?", a: "Minimum deposit varies by network. TRC20 minimum is 10 USDT." },
-    { q: "How are ROI profits calculated?", a: "Daily profits based on your invested amount and the plan's daily ROI rate." },
+    { q: "How are ROI distributions calculated?", a: "Daily distributions are based on your invested amount and the opportunity's daily ROI rate." },
     { q: "How do I enable 2FA?", a: "Go to Settings → Security → Enable 2FA and scan the QR code with Google Authenticator." },
   ];
 
