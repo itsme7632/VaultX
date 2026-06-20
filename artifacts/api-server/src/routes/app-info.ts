@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, platformSettingsTable } from "@workspace/db";
+import { db, platformSettingsTable, notificationsTable, usersTable } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/auth";
 
@@ -140,6 +140,48 @@ router.post("/admin/app-settings/reset-counter/:server", requireAdmin, async (re
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? "Failed to reset counter" });
+  }
+});
+
+// ─── Admin: broadcast update notification to all users ─────────────────────
+router.post("/admin/app-settings/notify-update", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const s = await getAppSettings();
+    const version = s.app_version?.trim();
+
+    if (!version) {
+      res.status(400).json({ error: "No app version configured. Set a version before sending notifications." });
+      return;
+    }
+
+    const users = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(eq(usersTable.isActive, true));
+
+    if (users.length === 0) {
+      res.json({ success: true, sentTo: 0 });
+      return;
+    }
+
+    const title = `🔔 New App Update Available`;
+    const message = `VaultX v${version} is now available. Tap to download the latest version.`;
+
+    const values = users.map((u) => ({
+      userId: u.id,
+      type: "announcement",
+      title,
+      message,
+      isBroadcast: true,
+    }));
+
+    for (let i = 0; i < values.length; i += 100) {
+      await db.insert(notificationsTable).values(values.slice(i, i + 100));
+    }
+
+    res.json({ success: true, sentTo: users.length, version });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? "Failed to send notifications" });
   }
 });
 

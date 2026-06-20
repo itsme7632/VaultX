@@ -1082,6 +1082,7 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
     app_last_updated: "",
     release_notes: "",
     changelog: "",
+    force_update_enabled: "false",
     github_download_url: "",
     mediafire_download_url: "",
     gdrive_download_url: "",
@@ -1092,6 +1093,7 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
   });
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState<string | null>(null);
+  const [notifying, setNotifying] = useState(false);
 
   useEffect(() => {
     if (settings && typeof settings === "object") {
@@ -1125,6 +1127,25 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
       toast({ title: "Error", description: "Failed to reset counter.", variant: "destructive" });
     } finally {
       setResetting(null);
+    }
+  };
+
+  const handleNotifyUpdate = async () => {
+    if (!form.app_version?.trim()) {
+      toast({ title: "No version set", description: "Please set an app version before sending update notifications.", variant: "destructive" });
+      return;
+    }
+    setNotifying(true);
+    try {
+      const data = await adminApi("/admin/app-settings/notify-update", "POST");
+      toast({
+        title: "🔔 Notifications sent!",
+        description: `Update notification for v${form.app_version} sent to ${data.sentTo ?? 0} users.`,
+      });
+    } catch {
+      toast({ title: "Error", description: "Failed to send notifications. Please try again.", variant: "destructive" });
+    } finally {
+      setNotifying(false);
     }
   };
 
@@ -1261,6 +1282,75 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
             );
           })}
         </div>
+      </div>
+
+      {/* Force Update */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+            <AlertTriangle size={15} className="text-amber-600" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Force Update</p>
+            <p className="text-[11px] text-muted-foreground">Block app access until users install the latest version</p>
+          </div>
+        </div>
+        <div className={cn(
+          "flex items-center justify-between rounded-xl px-4 py-3 border transition-colors",
+          form.force_update_enabled === "true"
+            ? "bg-amber-500/10 border-amber-500/30"
+            : "bg-muted/30 border-border"
+        )}>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Force Update Mode</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {form.force_update_enabled === "true"
+                ? "🟠 Active — users with older versions will be blocked"
+                : "Disabled — users can use the app with any version"}
+            </p>
+          </div>
+          <Switch
+            checked={form.force_update_enabled === "true"}
+            onCheckedChange={(checked) =>
+              setForm((f) => ({ ...f, force_update_enabled: checked ? "true" : "false" }))
+            }
+          />
+        </div>
+      </div>
+
+      {/* Send Update Notification */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Bell size={15} className="text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-foreground">Notify Users of Update</p>
+            <p className="text-[11px] text-muted-foreground">Send a push notification to all active users about the new version</p>
+          </div>
+        </div>
+        {form.app_version ? (
+          <div className="bg-primary/5 border border-primary/15 rounded-xl px-3 py-2.5">
+            <p className="text-xs text-muted-foreground">Notification preview:</p>
+            <p className="text-sm font-semibold text-foreground mt-0.5">🔔 New App Update Available</p>
+            <p className="text-xs text-muted-foreground mt-0.5">VaultX v{form.app_version} is now available. Tap to download the latest version.</p>
+          </div>
+        ) : (
+          <div className="bg-muted/40 border border-border rounded-xl px-3 py-2.5">
+            <p className="text-xs text-muted-foreground">Set a version number above before sending notifications.</p>
+          </div>
+        )}
+        <Button
+          className="w-full h-10 font-semibold gap-2 text-sm"
+          variant="outline"
+          onClick={handleNotifyUpdate}
+          disabled={notifying || !form.app_version?.trim()}
+        >
+          {notifying
+            ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full" /> Sending…</>
+            : <><Bell size={15} /> Notify All Users</>
+          }
+        </Button>
       </div>
 
       {/* Save */}
