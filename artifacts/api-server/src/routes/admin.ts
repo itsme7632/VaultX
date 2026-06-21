@@ -769,8 +769,7 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
       .where(eq(userInvestmentsTable.status, "active"))
       .groupBy(userInvestmentsTable.planId),
     db.select({ c: sql<number>`count(distinct ${userInvestmentsTable.userId})` })
-      .from(userInvestmentsTable)
-      .where(eq(userInvestmentsTable.status, "active")),
+      .from(userInvestmentsTable),
     db.select({ s: sum(userInvestmentsTable.amount) }).from(userInvestmentsTable),
   ]);
 
@@ -812,11 +811,11 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
     revenueToday: parseFloat(depositsTodayRes[0]?.s ?? "0"),
     totalInvestments: parseFloat(invValueRes[0]?.s ?? "0"),
     totalOpportunities: plansRes.length,
-    activeOpportunities: plansRes.filter((p) => (p as any).isActive).length,
+    activeOpportunities: plansByStatus["active"] ?? 0,
     expiredOpportunities: plansByStatus["expired"] ?? 0,
     fullyAllocatedOpportunities: plansByStatus["fully_allocated"] ?? 0,
     totalParticipants: Number(participantsRes?.c ?? 0),
-    totalCapitalAllocated: parseFloat(totalCapitalRow?.s ?? "0"),
+    totalCapitalAllocated: parseFloat(invValueRes[0]?.s ?? "0"),
     opportunityStats,
     plansByStatus,
   });
@@ -900,6 +899,24 @@ router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
   } as any).returning();
 
   res.status(201).json(serializeAdminPlan(plan));
+});
+
+router.put("/admin/plans/reorder", requireAdmin, async (req, res): Promise<void> => {
+  const { items } = req.body as { items: Array<{ id: number; sortOrder: number }> };
+
+  if (!Array.isArray(items)) {
+    res.status(400).json({ error: "items must be an array of { id, sortOrder }" });
+    return;
+  }
+
+  for (const item of items) {
+    await db
+      .update(investmentPlansTable)
+      .set({ sortOrder: item.sortOrder } as any)
+      .where(eq(investmentPlansTable.id, item.id));
+  }
+
+  res.json({ success: true });
 });
 
 router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => {
@@ -1009,24 +1026,6 @@ router.post("/admin/plans/:id/duplicate", requireAdmin, async (req, res): Promis
   } as any).returning();
 
   res.status(201).json(serializeAdminPlan(copy));
-});
-
-router.put("/admin/plans/reorder", requireAdmin, async (req, res): Promise<void> => {
-  const { items } = req.body as { items: Array<{ id: number; sortOrder: number }> };
-
-  if (!Array.isArray(items)) {
-    res.status(400).json({ error: "items must be an array of { id, sortOrder }" });
-    return;
-  }
-
-  for (const item of items) {
-    await db
-      .update(investmentPlansTable)
-      .set({ sortOrder: item.sortOrder } as any)
-      .where(eq(investmentPlansTable.id, item.id));
-  }
-
-  res.json({ success: true });
 });
 
 router.post("/admin/roi/trigger", requireAdmin, async (req, res): Promise<void> => {
