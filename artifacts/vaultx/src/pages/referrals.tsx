@@ -70,7 +70,7 @@ export default function ReferralsPage() {
 
   const handleShare = () => {
     if (!referralLink) return;
-    const text = `Join VaultX and start earning crypto! Sign up with my link:\n${referralLink}`;
+    const text = `Join Wexora and start earning crypto! Sign up with my link:\n${referralLink}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 

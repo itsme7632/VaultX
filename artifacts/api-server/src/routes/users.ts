@@ -120,8 +120,8 @@ router.post("/2fa/setup", requireAuth, async (req, res): Promise<void> => {
     .limit(1);
 
   const secret = speakeasy.generateSecret({
-    name: `VaultX (${user.email})`,
-    issuer: "VaultX",
+    name: `Wexora (${user.email})`,
+    issuer: "Wexora",
   });
 
   await db

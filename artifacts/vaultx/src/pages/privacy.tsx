@@ -11,7 +11,7 @@ const DEFAULT_SECTIONS = [
   },
   {
     title: "Account Information",
-    content: `When you register for a VaultX account, we collect your full name, email address, username, and password. You may also provide optional profile information. If you complete identity verification (KYC), we collect government-issued identification documents and related personal information as required by applicable regulations.`,
+    content: `When you register for a Wexora account, we collect your full name, email address, username, and password. You may also provide optional profile information. If you complete identity verification (KYC), we collect government-issued identification documents and related personal information as required by applicable regulations.`,
   },
   {
     title: "Transaction Data",
@@ -19,7 +19,7 @@ const DEFAULT_SECTIONS = [
   },
   {
     title: "Security Practices",
-    content: `VaultX employs industry-standard security measures to protect your personal information. All data is transmitted via encrypted HTTPS connections. Passwords are hashed using strong cryptographic algorithms and never stored in plain text. We implement session management, two-factor authentication (2FA), and monitor for suspicious access patterns.`,
+    content: `Wexora employs industry-standard security measures to protect your personal information. All data is transmitted via encrypted HTTPS connections. Passwords are hashed using strong cryptographic algorithms and never stored in plain text. We implement session management, two-factor authentication (2FA), and monitor for suspicious access patterns.`,
   },
   {
     title: "Cookies & Analytics",
@@ -74,7 +74,7 @@ export default function PrivacyPolicyPage() {
 
   const customContent = settings?.privacy_policy_content?.trim() || "";
   const updatedDate = settings?.privacy_policy_updated?.trim() || "";
-  const platformName = settings?.platform_name || "VaultX";
+  const platformName = settings?.platform_name || "Wexora";
 
   const formattedDate = updatedDate
     ? new Date(updatedDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })

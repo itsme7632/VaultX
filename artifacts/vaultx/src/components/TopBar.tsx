@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { playNotificationSound } from "@/lib/notificationSound";
+import wxLogo from "/wx-logo.png";
 
 export function TopBar({ title }: { title?: string }) {
   const { user } = useAuth();
@@ -58,10 +59,10 @@ export function TopBar({ title }: { title?: string }) {
 
   const initials = user?.fullName
     ?.split(" ")
-    .map((n) => n[0])
+    .map((n: string) => n[0])
     .join("")
     .slice(0, 2)
-    .toUpperCase() ?? "V";
+    .toUpperCase() ?? "W";
 
   const menuItems = [
     { icon: User,            label: "Profile",           href: "/profile" },
@@ -76,11 +77,13 @@ export function TopBar({ title }: { title?: string }) {
     <header className="topbar-header sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border">
       <div className="flex items-center justify-between px-4 py-3 max-w-screen-sm mx-auto">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center">
-            <span className="text-white font-bold text-xs">V</span>
-          </div>
+          <img
+            src={wxLogo}
+            alt="Wexora"
+            className="w-7 h-7 rounded-lg object-cover"
+          />
           <span className="font-bold text-foreground text-base tracking-tight">
-            {title || "VaultX"}
+            {title || "Wexora"}
           </span>
         </div>
 

@@ -6,19 +6,35 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="theme-color" content="#0B1220" />
-    <title>VaultX — Crypto Investment Platform</title>
-    <meta name="description" content="VaultX is a secure crypto investment platform offering daily ROI, flexible investment plans, and real-time portfolio tracking." />
+    <meta name="theme-color" content="#060d1a" />
+    <title>Wexora Global — Digital Investment Platform</title>
+    <meta name="description" content="Wexora Global is a secure digital investment platform offering global opportunities, daily ROI, flexible investment plans, and real-time portfolio tracking." />
+    <meta name="application-name" content="Wexora Global" />
     <meta name="robots" content="index, follow" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Open Graph -->
+    <meta property="og:title" content="Wexora Global — Digital Investment Platform" />
+    <meta property="og:description" content="Global Opportunities. Smarter Growth. Join Wexora Global and access premium digital investment opportunities." />
+    <meta property="og:image" content="/wx-social.png" />
+    <meta property="og:url" content="https://wexoraglobal.com" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Wexora Global" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Wexora Global" />
+    <meta name="twitter:description" content="Global Opportunities. Smarter Growth." />
+    <meta name="twitter:image" content="/wx-social.png" />
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" href="/wx-logo.png" />
+    <link rel="apple-touch-icon" href="/wx-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
       /* Prevent any white flash before JS runs */
       html { background-color: #f8fafc; }
-      html.app-mode { background-color: #0B1220 !important; }
-      html.app-mode body { background-color: #0B1220 !important; }
+      html.app-mode { background-color: #060d1a !important; }
+      html.app-mode body { background-color: #060d1a !important; }
       html.dark { background-color: hsl(222, 47%, 9%); }
     </style>
     <script>
@@ -26,7 +42,7 @@
       (function() {
         try {
           // Apply saved theme
-          var theme = localStorage.getItem('vaultx-theme');
+          var theme = localStorage.getItem('wexora-theme');
           if (theme === 'dark') {
             document.documentElement.classList.add('dark');
           }

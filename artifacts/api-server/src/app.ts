@@ -54,7 +54,7 @@ const PgSession = connectPgSimple(session);
 app.use(
   session({
     store: new PgSession({ pool, createTableIfMissing: true }),
-    secret: process.env.SESSION_SECRET ?? "vaultx-secret-change-in-production",
+    secret: process.env.SESSION_SECRET ?? "wexora-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {

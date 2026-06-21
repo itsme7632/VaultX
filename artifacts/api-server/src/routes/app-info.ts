@@ -43,7 +43,7 @@ router.get("/app-info", async (_req, res): Promise<void> => {
   try {
     const s = await getAppSettings();
     res.json({
-      appName:             s.app_name || "VaultX",
+      appName:             s.app_name || "Wexora",
       version:             s.app_version || "",
       size:                s.apk_size || "",
       lastUpdated:         s.app_last_updated || "",
@@ -165,7 +165,7 @@ router.post("/admin/app-settings/notify-update", requireAdmin, async (req, res):
     }
 
     const title = `🔔 New App Update Available`;
-    const message = `VaultX v${version} is now available. Tap to download the latest version.`;
+    const message = `Wexora v${version} is now available. Tap to download the latest version.`;
 
     const values = users.map((u) => ({
       userId: u.id,

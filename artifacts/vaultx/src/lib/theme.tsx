@@ -16,7 +16,7 @@ const ThemeContext = createContext<ThemeContextValue>({
 
 function getInitialTheme(): Theme {
   try {
-    const stored = localStorage.getItem("vaultx-theme");
+    const stored = localStorage.getItem("wexora-theme");
     if (stored === "dark" || stored === "light") return stored;
   } catch {}
   return "light";
@@ -30,7 +30,7 @@ function applyTheme(theme: Theme) {
     root.classList.remove("dark");
   }
   try {
-    localStorage.setItem("vaultx-theme", theme);
+    localStorage.setItem("wexora-theme", theme);
   } catch {}
 }
 

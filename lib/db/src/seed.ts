@@ -269,12 +269,12 @@ async function seedPlatformSettings(db: ReturnType<typeof drizzle<typeof schema>
   }
 
   const settings: Array<{ key: string; value: string }> = [
-    { key: "platform_name", value: "VaultX" },
-    { key: "platform_tagline", value: "Secure Crypto Investment Platform" },
-    { key: "platform_description", value: "VaultX is a secure, trusted crypto investment platform delivering daily ROI of 2.5%–3.5% to thousands of investors worldwide." },
-    { key: "support_email", value: "support@vaultx.io" },
+    { key: "platform_name", value: "Wexora" },
+    { key: "platform_tagline", value: "Global Opportunities. Smarter Growth." },
+    { key: "platform_description", value: "Wexora Global is a secure digital investment platform providing access to capital allocation opportunities across global industries. Join thousands of participants growing their portfolios worldwide." },
+    { key: "support_email", value: "support@wexoraglobal.com" },
     { key: "support_whatsapp", value: "+1 (800) 555-0100" },
-    { key: "support_telegram", value: "@VaultXSupport" },
+    { key: "support_telegram", value: "@WexoraGlobal" },
     { key: "support_response_time", value: "Within 24 hours" },
     { key: "min_withdrawal", value: "10" },
     { key: "withdrawal_fee_percent", value: "1.5" },
@@ -285,8 +285,8 @@ async function seedPlatformSettings(db: ReturnType<typeof drizzle<typeof schema>
     { key: "kyc_required_for_withdrawal", value: "false" },
     { key: "kyc_enabled", value: "true" },
     { key: "max_withdrawal_per_day", value: "50000" },
-    { key: "admin_email", value: "admin@vaultx.io" },
-    { key: "site_url", value: "https://vaultx.replit.app" },
+    { key: "admin_email", value: "admin@wexoraglobal.com" },
+    { key: "site_url", value: "https://wexoraglobal.com" },
     { key: "withdrawal_processing_time", value: "24–48 hours" },
     { key: "deposit_confirmation_blocks", value: "6" },
     { key: "roi_distribution_time", value: "Daily at 00:00 UTC" },
@@ -307,13 +307,13 @@ async function seedNews(db: ReturnType<typeof drizzle<typeof schema>>) {
 
   await db.insert(newsPostsTable).values([
     {
-      title: "Welcome to VaultX — Your Trusted Crypto Investment Platform",
-      content: `We're thrilled to welcome you to VaultX, the next-generation crypto investment platform designed to help you grow your wealth with confidence.
+      title: "Welcome to Wexora — Your Trusted Crypto Investment Platform",
+      content: `We're thrilled to welcome you to Wexora, the next-generation crypto investment platform designed to help you grow your wealth with confidence.
 
-**What is VaultX?**
-VaultX is a secure, transparent crypto investment platform that delivers consistent daily returns of 2.5%–3.5% through our proprietary trading algorithms and market strategies.
+**What is Wexora?**
+Wexora is a secure, transparent crypto investment platform that delivers consistent daily returns of 2.5%–3.5% through our proprietary trading algorithms and market strategies.
 
-**Why choose VaultX?**
+**Why choose Wexora?**
 - **Daily ROI**: Earn 2.5%–3.5% every single day on your invested capital
 - **Multiple Opportunities**: Choose from five curated investment opportunities
 - **Instant Deposits**: Multiple crypto networks accepted (USDT TRC20, ERC20, BTC, ETH, BNB)
@@ -328,8 +328,8 @@ VaultX is a secure, transparent crypto investment platform that delivers consist
 4. Choose an investment opportunity
 5. Watch your earnings grow daily!
 
-Start your journey to financial freedom with VaultX today.`,
-      excerpt: "Welcome to VaultX — the secure crypto investment platform delivering 2.5%–3.5% daily ROI. Learn about our opportunities, features, and how to get started.",
+Start your journey to financial freedom with Wexora today.`,
+      excerpt: "Welcome to Wexora — the secure crypto investment platform delivering 2.5%–3.5% daily ROI. Learn about our opportunities, features, and how to get started.",
       category: "announcement",
       isFeatured: true,
       isPublished: true,
@@ -366,8 +366,8 @@ Start your journey to financial freedom with VaultX today.`,
 - Daily ROI: 3.0%–3.5%
 - Duration: 90 days
 
-Invest wisely, invest with VaultX.`,
-      excerpt: "VaultX launches five curated investment opportunities with up to 3.5% daily ROI and auto-compounding support.",
+Invest wisely, invest with Wexora.`,
+      excerpt: "Wexora launches five curated investment opportunities with up to 3.5% daily ROI and auto-compounding support.",
       category: "investment",
       isFeatured: false,
       isPublished: true,
@@ -383,11 +383,11 @@ Invest wisely, invest with VaultX.`,
 - USDT remains stable, continuing its role as the preferred stable store of value
 - BNB up 4.7% as Binance Smart Chain DeFi activity increases
 
-**What This Means for VaultX Investors**
+**What This Means for Wexora Investors**
 Our trading algorithms are designed to profit from market volatility in both directions. Whether markets are rising or falling, our strategies continue to generate the consistent returns our investors expect.
 
-Stay informed, stay invested. The VaultX team is working around the clock to ensure your investments continue to perform.`,
-      excerpt: "Bitcoin surges 8.3% this week as institutional demand grows. See how market movements affect VaultX's investment strategies.",
+Stay informed, stay invested. The Wexora team is working around the clock to ensure your investments continue to perform.`,
+      excerpt: "Bitcoin surges 8.3% this week as institutional demand grows. See how market movements affect Wexora's investment strategies.",
       category: "market",
       isFeatured: false,
       isPublished: true,
@@ -395,7 +395,7 @@ Stay informed, stay invested. The VaultX team is working around the clock to ens
     },
     {
       title: "Security Update: Enhanced 2FA and Account Protection",
-      content: `Your security is our top priority. We've implemented several new security features to better protect your VaultX account and funds.
+      content: `Your security is our top priority. We've implemented several new security features to better protect your Wexora account and funds.
 
 **New Security Features:**
 
@@ -414,8 +414,8 @@ We track and log all login attempts and flag suspicious activity automatically.
 3. Never share your login credentials
 4. Always log out on shared devices
 
-If you notice any suspicious activity, contact our support team immediately at support@vaultx.io.`,
-      excerpt: "VaultX launches enhanced security features including improved 2FA, withdrawal locks, IP monitoring, and real-time email alerts.",
+If you notice any suspicious activity, contact our support team immediately at support@wexoraglobal.com.`,
+      excerpt: "Wexora launches enhanced security features including improved 2FA, withdrawal locks, IP monitoring, and real-time email alerts.",
       category: "security",
       isFeatured: false,
       isPublished: true,
@@ -427,7 +427,7 @@ If you notice any suspicious activity, contact our support team immediately at s
 }
 
 async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>) {
-  const ADMIN_EMAIL = "admin@vaultx.com";
+  const ADMIN_EMAIL = "admin@wexoraglobal.com";
   const ADMIN_PASSWORD = "Admin123@";
 
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
@@ -455,12 +455,12 @@ async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>)
       .values({ userId: existing.id })
       .onConflictDoNothing();
 
-    console.log("[seed] Admin account verified/updated ✓ (admin@vaultx.com / Admin123@)");
+    console.log("[seed] Admin account verified/updated ✓ (admin@wexoraglobal.com / Admin123@)");
     return;
   }
 
-  const candidateUsernames = ["admin", "vaultxadmin", "superadmin", "admin_vx"];
-  let chosenUsername = "admin_vx";
+  const candidateUsernames = ["admin", "wexoraadmin", "superadmin", "admin_wx"];
+  let chosenUsername = "admin_wx";
   for (const candidate of candidateUsernames) {
     const [taken] = await db
       .select({ id: usersTable.id })
@@ -496,7 +496,7 @@ async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>)
     .insert(usersTable)
     .values({
       displayId,
-      fullName: "VaultX Admin",
+      fullName: "Wexora Admin",
       username: chosenUsername,
       email: ADMIN_EMAIL,
       passwordHash,
@@ -521,7 +521,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
   const existing = await db
     .select({ c: count() })
     .from(usersTable)
-    .where(eq(usersTable.email, "demo@vaultx.io"));
+    .where(eq(usersTable.email, "demo@wexoraglobal.com"));
 
   if ((existing[0]?.c ?? 0) > 0) {
     console.log("[seed] Demo user already exists, skipping");
@@ -536,7 +536,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       displayId: "100042",
       fullName: "Alex Johnson",
       username: "alexj",
-      email: "demo@vaultx.io",
+      email: "demo@wexoraglobal.com",
       passwordHash,
       referralCode: "ALEXJ42",
       kycStatus: "approved",
@@ -705,13 +705,13 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
     {
       userId: demo.id,
       type: "announcement",
-      title: "Welcome to VaultX!",
-      message: "Thank you for joining VaultX. Your account is fully verified. Start investing today and earn daily returns of 2.5%–3.5%.",
+      title: "Welcome to Wexora!",
+      message: "Thank you for joining Wexora. Your account is fully verified. Start investing today and earn daily returns of 2.5%–3.5%.",
       isRead: false,
     },
   ]);
 
-  console.log("[seed] Demo user seeded ✓ (demo@vaultx.io / Demo@12345)");
+  console.log("[seed] Demo user seeded ✓ (demo@wexoraglobal.com / Demo@12345)");
 }
 
 export async function runSeed(): Promise<void> {

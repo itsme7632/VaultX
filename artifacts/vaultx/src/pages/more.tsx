@@ -22,7 +22,7 @@ export default function MorePage() {
     staleTime: 60000,
   });
 
-  const platformName = settings?.platform_name || "VaultX";
+  const platformName = settings?.platform_name || "Wexora";
   const appVersion = appInfo?.version ? `v${appInfo.version}` : "v2.0";
 
   const platformItems = [
@@ -52,7 +52,7 @@ export default function MorePage() {
   const navItems = [
     {
       icon: Info,
-      label: "About VaultX",
+      label: "About Wexora",
       description: "Mission, features, platform stats and FAQ",
       href: "/about",
       gradient: "from-indigo-500 to-violet-600",

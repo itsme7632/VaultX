@@ -44,10 +44,10 @@ export async function generateReceiptImageUrl(tx: ReceiptTx, settings: ReceiptSe
   const statusColor = isCompleted ? "#22c55e" : isFailed ? "#ef4444" : "#f59e0b";
   const statusLabel = isCompleted ? "COMPLETED" : isFailed ? "REJECTED" : "PENDING";
   const amountColor = isIncoming ? "#4ade80" : "#f87171";
-  const platformName = settings.platformName || "VaultX";
+  const platformName = settings.platformName || "Wexora";
 
   const rows: [string, string, boolean?][] = [
-    ["VaultX TxID", tx.txId ?? `#${tx.id}`, true],
+    ["Wexora TxID", tx.txId ?? `#${tx.id}`, true],
     ["Type", tx.type.replace(/_/g, " ")],
     ["Status", statusLabel],
     ["Submitted", fmtDt(tx.createdAt)],
@@ -212,7 +212,7 @@ export async function generateReceiptImageUrl(tx: ReceiptTx, settings: ReceiptSe
 // ─── Download PNG to device ───────────────────────────────────────────────────
 export async function downloadReceiptImage(tx: ReceiptTx, settings: ReceiptSettings): Promise<void> {
   const dataUrl = await generateReceiptImageUrl(tx, settings);
-  const fileName = `VaultX-Receipt-${tx.txId ?? tx.id}.png`;
+  const fileName = `Wexora-Receipt-${tx.txId ?? tx.id}.png`;
 
   try {
     const res = await fetch(dataUrl);
@@ -237,7 +237,7 @@ export async function downloadReceiptImage(tx: ReceiptTx, settings: ReceiptSetti
 
 // ─── Native share with image file, fallback to text ──────────────────────────
 export async function shareReceiptImage(tx: ReceiptTx, settings: ReceiptSettings): Promise<boolean> {
-  const platformName = settings.platformName || "VaultX";
+  const platformName = settings.platformName || "Wexora";
 
   // Build text summary (used as fallback)
   const textLines = [
@@ -255,7 +255,7 @@ export async function shareReceiptImage(tx: ReceiptTx, settings: ReceiptSettings
     const dataUrl = await generateReceiptImageUrl(tx, settings);
     const fetchRes = await fetch(dataUrl);
     const blob = await fetchRes.blob();
-    const file = new File([blob], `VaultX-Receipt-${tx.txId ?? tx.id}.png`, { type: "image/png" });
+    const file = new File([blob], `Wexora-Receipt-${tx.txId ?? tx.id}.png`, { type: "image/png" });
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       await navigator.share({ files: [file], title: `${platformName} Receipt` });
@@ -284,7 +284,7 @@ export async function downloadReceiptPDF(tx: ReceiptTx, settings: ReceiptSetting
   const isIncoming = INCOMING_TYPES.includes(tx.type);
   const isCompleted = tx.status === "completed";
   const isFailed = tx.status === "failed";
-  const platformName = settings.platformName || "VaultX";
+  const platformName = settings.platformName || "Wexora";
   const statusLabel = isCompleted ? "COMPLETED" : isFailed ? "REJECTED" : "PENDING";
   const statusClr: [number, number, number] = isCompleted ? [34, 197, 94] : isFailed ? [239, 68, 68] : [245, 158, 11];
   const amountClr: [number, number, number] = isIncoming ? [74, 222, 128] : [248, 113, 113];
@@ -342,7 +342,7 @@ export async function downloadReceiptPDF(tx: ReceiptTx, settings: ReceiptSetting
   doc.line(12, 68, W - 12, 68);
 
   const rows: [string, string][] = [
-    ["VaultX TxID", tx.txId ?? `#${tx.id}`],
+    ["Wexora TxID", tx.txId ?? `#${tx.id}`],
     ["Type", tx.type.replace(/_/g, " ")],
     ["Status", statusLabel],
     ["Submitted", fmtDt(tx.createdAt)],
@@ -366,7 +366,7 @@ export async function downloadReceiptPDF(tx: ReceiptTx, settings: ReceiptSetting
     doc.setFont("helvetica", "normal");
     doc.text(label, 14, y);
 
-    doc.setTextColor(label === "VaultX TxID" ? 96 : 226, label === "VaultX TxID" ? 165 : 232, label === "VaultX TxID" ? 250 : 240);
+    doc.setTextColor(label === "Wexora TxID" ? 96 : 226, label === "Wexora TxID" ? 165 : 232, label === "Wexora TxID" ? 250 : 240);
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
     doc.text(value, W - 14, y, { align: "right" });
@@ -397,5 +397,5 @@ export async function downloadReceiptPDF(tx: ReceiptTx, settings: ReceiptSetting
   );
   doc.text("This is an official transaction receipt.", W / 2, y + 17, { align: "center" });
 
-  doc.save(`VaultX-Receipt-${tx.txId ?? tx.id}.pdf`);
+  doc.save(`Wexora-Receipt-${tx.txId ?? tx.id}.pdf`);
 }

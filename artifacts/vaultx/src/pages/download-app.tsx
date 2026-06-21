@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-const VERSION_KEY = "vaultx-installed-version";
+const VERSION_KEY = "wexora-installed-version";
 
 interface AppInfo {
   appName: string;
@@ -141,10 +141,10 @@ function ForceUpdateScreen({
       </div>
       <h1 className="text-2xl font-black text-foreground mb-2">Update Required</h1>
       <p className="text-muted-foreground text-sm mb-1">
-        VaultX <span className="font-bold text-amber-500">v{appInfo.version}</span> is now available.
+        Wexora <span className="font-bold text-amber-500">v{appInfo.version}</span> is now available.
       </p>
       <p className="text-muted-foreground text-xs mb-8">
-        Please update the app to continue using VaultX.
+        Please update the app to continue using Wexora.
       </p>
 
       <div className="w-full max-w-sm space-y-3">
@@ -265,7 +265,7 @@ export default function DownloadAppPage() {
               <span className="text-2xl font-black text-white">V</span>
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-black text-white">{appInfo?.appName ?? "VaultX"}</h1>
+              <h1 className="text-xl font-black text-white">{appInfo?.appName ?? "Wexora"}</h1>
               <p className="text-blue-200 text-sm mt-0.5">Crypto Investment Platform</p>
             </div>
           </div>
@@ -323,7 +323,7 @@ export default function DownloadAppPage() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-foreground">You are using the latest version</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">VaultX v{installedVersion} is up to date.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Wexora v{installedVersion} is up to date.</p>
                 </div>
               </div>
             ) : (
@@ -453,7 +453,7 @@ export default function DownloadAppPage() {
                 "Open your device Settings → Security.",
                 'Enable "Install from Unknown Sources" or "Allow from this source".',
                 "Open the downloaded APK file and tap Install.",
-                "Launch VaultX and sign in to your account.",
+                "Launch Wexora and sign in to your account.",
               ].map((step, i) => (
                 <div key={i} className="flex gap-2.5 items-start">
                   <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">

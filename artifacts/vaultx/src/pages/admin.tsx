@@ -1619,11 +1619,11 @@ function AboutTab({ data, onRefresh, toast }: { data: any; onRefresh: () => void
   };
 
   const FIELDS = [
-    { key: "about_hero_title", label: "Hero Title", placeholder: "About VaultX", multiline: false },
+    { key: "about_hero_title", label: "Hero Title", placeholder: "About Wexora", multiline: false },
     { key: "about_hero_subtitle", label: "Hero Subtitle", placeholder: "A Modern Digital Investment Platform…", multiline: false },
-    { key: "about_hero_description", label: "Hero Description", placeholder: "VaultX is a digital investment platform…", multiline: true },
-    { key: "about_mission_text", label: "Mission Text", placeholder: "At VaultX, our mission is to…", multiline: true },
-    { key: "about_security_text", label: "Security & Compliance Text", placeholder: "VaultX prioritizes platform security…", multiline: true },
+    { key: "about_hero_description", label: "Hero Description", placeholder: "Wexora is a digital investment platform…", multiline: true },
+    { key: "about_mission_text", label: "Mission Text", placeholder: "At Wexora, our mission is to…", multiline: true },
+    { key: "about_security_text", label: "Security & Compliance Text", placeholder: "Wexora prioritizes platform security…", multiline: true },
   ];
 
   return (
@@ -1781,7 +1781,7 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
         <div className="grid grid-cols-2 gap-3">
           <div>
             <Label className="text-xs text-muted-foreground">App Name</Label>
-            <Input value={form.app_name} onChange={set("app_name")} placeholder="VaultX" className="mt-1 h-9 text-sm" />
+            <Input value={form.app_name} onChange={set("app_name")} placeholder="Wexora" className="mt-1 h-9 text-sm" />
           </div>
           <div>
             <Label className="text-xs text-muted-foreground">Version</Label>
@@ -1837,7 +1837,7 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
                 <Input
                   value={url}
                   onChange={set(urlKey)}
-                  placeholder={`https://example.com/vaultx-${key}.apk`}
+                  placeholder={`https://example.com/wexora-${key}.apk`}
                   className="h-9 text-sm font-mono flex-1"
                 />
                 {url && (
@@ -1938,7 +1938,7 @@ function AppSettingsTab({ settings, onRefresh, toast }: { settings: any; onRefre
           <div className="bg-primary/5 border border-primary/15 rounded-xl px-3 py-2.5">
             <p className="text-xs text-muted-foreground">Notification preview:</p>
             <p className="text-sm font-semibold text-foreground mt-0.5">🔔 New App Update Available</p>
-            <p className="text-xs text-muted-foreground mt-0.5">VaultX v{form.app_version} is now available. Tap to download the latest version.</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Wexora v{form.app_version} is now available. Tap to download the latest version.</p>
           </div>
         ) : (
           <div className="bg-muted/40 border border-border rounded-xl px-3 py-2.5">
@@ -1993,12 +1993,12 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
   }, [settingsData]);
 
   const TEXT_FIELDS = [
-    { key: "platform_name",      label: "Platform Name",              placeholder: "VaultX",                          section: "Branding" },
+    { key: "platform_name",      label: "Platform Name",              placeholder: "Wexora",                          section: "Branding" },
     { key: "platform_logo_url",  label: "Platform Logo URL",          placeholder: "https://example.com/logo.png",    section: "Branding" },
-    { key: "platform_url",       label: "Platform Website URL",       placeholder: "https://vaultx.app",              section: "Branding" },
-    { key: "support_email",      label: "Support Email",              placeholder: "support@vaultx.com",              section: "Support" },
-    { key: "support_telegram",   label: "Telegram Support Link",      placeholder: "https://t.me/vaultxsupport",      section: "Support" },
-    { key: "support_telegram_group",   label: "Telegram Community Group Link",  placeholder: "https://t.me/vaultxcommunity",    section: "Support" },
+    { key: "platform_url",       label: "Platform Website URL",       placeholder: "https://wexoraglobal.com",              section: "Branding" },
+    { key: "support_email",      label: "Support Email",              placeholder: "support@wexoraglobal.com",              section: "Support" },
+    { key: "support_telegram",   label: "Telegram Support Link",      placeholder: "https://t.me/WexoraGlobal",      section: "Support" },
+    { key: "support_telegram_group",   label: "Telegram Community Group Link",  placeholder: "https://t.me/WexoraCommunity",    section: "Support" },
     { key: "support_whatsapp",         label: "WhatsApp Support Number",        placeholder: "+1234567890",                     section: "Support" },
     { key: "support_whatsapp_community", label: "WhatsApp Community Link",      placeholder: "https://chat.whatsapp.com/xxxx",  section: "Support" },
     { key: "min_deposit", label: "Min. Deposit (USDT)", placeholder: "10" },

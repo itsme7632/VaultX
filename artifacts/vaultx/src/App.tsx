@@ -70,11 +70,11 @@ function detectIsAppMode(): boolean {
 // Only show splash once per session, never on desktop browser
 const IS_APP_MODE = detectIsAppMode();
 const SPLASH_ALREADY_SHOWN = (() => {
-  try { return !!sessionStorage.getItem("vaultx-splash-shown"); } catch { return false; }
+  try { return !!sessionStorage.getItem("wexora-splash-shown"); } catch { return false; }
 })();
 const SHOW_SPLASH = IS_APP_MODE && !SPLASH_ALREADY_SHOWN;
 if (SHOW_SPLASH) {
-  try { sessionStorage.setItem("vaultx-splash-shown", "1"); } catch {}
+  try { sessionStorage.setItem("wexora-splash-shown", "1"); } catch {}
 }
 
 // ─── KYC route guard ──────────────────────────────────────────────────────────
@@ -240,7 +240,7 @@ function MaintenanceBanner() {
       <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
         We're currently performing scheduled maintenance. Please check back shortly.
       </p>
-      <p className="mt-6 text-xs text-slate-500">{settings?.platform_name ?? "VaultX"} Team</p>
+      <p className="mt-6 text-xs text-slate-500">{settings?.platform_name ?? "Wexora"} Team</p>
     </div>
   );
 }

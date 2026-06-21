@@ -154,7 +154,7 @@ export default function AboutPage() {
     { q: "How do I contact support?", a: "Use the Help & Support section in the app to open a support ticket, or reach us via email, Telegram, or WhatsApp listed on this page." },
   ];
 
-  const platformName = content.platform_name || "VaultX";
+  const platformName = content.platform_name || "Wexora";
 
   function renderStatCards() {
     const statDefs = [
@@ -250,13 +250,13 @@ export default function AboutPage() {
               <span className="text-[10px] text-white/70 font-semibold uppercase tracking-widest">Digital Investment Platform</span>
             </div>
             <h1 className="text-2xl font-black text-white leading-tight mb-3">
-              {content.hero_title || "About VaultX"}
+              {content.hero_title || "About Wexora"}
             </h1>
             <p className="text-sm text-white/80 font-medium leading-relaxed mb-3">
               {content.hero_subtitle || "A Modern Digital Investment Platform Designed for Growth, Transparency, and Security."}
             </p>
             <p className="text-xs text-white/60 leading-relaxed">
-              {content.hero_description || "VaultX is a digital investment platform that provides users with access to carefully structured investment opportunities across global industries."}
+              {content.hero_description || "Wexora is a digital investment platform that provides users with access to carefully structured investment opportunities across global industries."}
             </p>
           </div>
         </div>
@@ -272,11 +272,11 @@ export default function AboutPage() {
               <h2 className="text-base font-bold text-foreground">Our Mission</h2>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              {content.mission_text || "At VaultX, our mission is to provide a secure, user-friendly, and innovative investment platform that helps members access investment opportunities with confidence."}
+              {content.mission_text || "At Wexora, our mission is to provide a secure, user-friendly, and innovative investment platform that helps members access investment opportunities with confidence."}
             </p>
           </div>
 
-          {/* ── Why Choose VaultX ── */}
+          {/* ── Why Choose Wexora ── */}
           <div>
             <h2 className="text-base font-bold text-foreground mb-3">Why Choose {platformName}</h2>
             <div className="grid grid-cols-2 gap-3">
@@ -320,7 +320,7 @@ export default function AboutPage() {
             </div>
           </div>
 
-          {/* ── How VaultX Works ── */}
+          {/* ── How Wexora Works ── */}
           <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
             <h2 className="text-base font-bold text-foreground mb-4">How {platformName} Works</h2>
             <div className="space-y-0">
@@ -355,7 +355,7 @@ export default function AboutPage() {
               <div>
                 <h2 className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mb-1.5">Security &amp; Compliance</h2>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  {content.security_text || "VaultX prioritizes platform security through account protection measures, encrypted connections, and continuous monitoring."}
+                  {content.security_text || "Wexora prioritizes platform security through account protection measures, encrypted connections, and continuous monitoring."}
                 </p>
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   {["Encrypted Connections", "Account Protection", "Continuous Monitoring"].map((badge) => (

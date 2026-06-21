@@ -1,4 +1,4 @@
-const MUTE_KEY = "vaultx-notifications-muted";
+const MUTE_KEY = "wexora-notifications-muted";
 
 export function isNotificationMuted(): boolean {
   try { return localStorage.getItem(MUTE_KEY) === "true"; } catch { return false; }

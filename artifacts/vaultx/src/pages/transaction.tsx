@@ -83,7 +83,7 @@ function ShareSheet({ txId, txDbId, onClose, onShare, onSaveImage, onDownloadPdf
           </div>
           <div className="text-left">
             <p className="font-semibold text-sm text-foreground">Save as Image</p>
-            <p className="text-[11px] text-muted-foreground">VaultX-Receipt-{displayId}.png</p>
+            <p className="text-[11px] text-muted-foreground">Wexora-Receipt-{displayId}.png</p>
           </div>
         </button>
 
@@ -97,7 +97,7 @@ function ShareSheet({ txId, txDbId, onClose, onShare, onSaveImage, onDownloadPdf
           </div>
           <div className="text-left">
             <p className="font-semibold text-sm text-foreground">Download PDF</p>
-            <p className="text-[11px] text-muted-foreground">VaultX-Receipt-{displayId}.pdf</p>
+            <p className="text-[11px] text-muted-foreground">Wexora-Receipt-{displayId}.pdf</p>
           </div>
         </button>
 
@@ -184,7 +184,7 @@ export default function TransactionPage() {
   };
 
   const receiptSettings: ReceiptSettings = {
-    platformName: settings?.platform_name ?? "VaultX",
+    platformName: settings?.platform_name ?? "Wexora",
     platformLogoUrl: settings?.platform_logo_url ?? undefined,
     platformUrl: settings?.platform_url ?? undefined,
   };
@@ -230,7 +230,7 @@ export default function TransactionPage() {
     setShareLoading(true);
     try {
       await downloadReceiptImage(receiptTx, receiptSettings);
-      toast({ title: "Receipt downloaded!", description: `VaultX-Receipt-${receiptTx.txId ?? receiptTx.id}.png saved.` });
+      toast({ title: "Receipt downloaded!", description: `Wexora-Receipt-${receiptTx.txId ?? receiptTx.id}.png saved.` });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
@@ -244,7 +244,7 @@ export default function TransactionPage() {
     setShareLoading(true);
     try {
       await downloadReceiptPDF(receiptTx, receiptSettings);
-      toast({ title: "PDF downloaded!", description: `VaultX-Receipt-${receiptTx.txId ?? receiptTx.id}.pdf saved.` });
+      toast({ title: "PDF downloaded!", description: `Wexora-Receipt-${receiptTx.txId ?? receiptTx.id}.pdf saved.` });
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
     } finally {
@@ -317,7 +317,7 @@ export default function TransactionPage() {
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Transaction Details</p>
               </div>
               {[
-                ...(tx.txId ? [{ label: "VaultX TxID", val: tx.txId, copyKey: "txid", mono: true, highlight: true }] : []),
+                ...(tx.txId ? [{ label: "Wexora TxID", val: tx.txId, copyKey: "txid", mono: true, highlight: true }] : []),
                 { label: "Type",        val: tx.type.replace(/_/g, " "),   capitalize: true },
                 { label: "Amount",      val: formatUSDT(tx.amount) },
                 ...(tx.fee > 0 ? [{ label: "Fee", val: formatUSDT(tx.fee) }] : []),
@@ -419,7 +419,7 @@ export default function TransactionPage() {
               <AlertCircle size={14} className="text-blue-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-[12px] text-blue-600 dark:text-blue-400 leading-snug">
-                  For assistance regarding this transaction, please contact support and provide your VaultX Transaction ID.
+                  For assistance regarding this transaction, please contact support and provide your Wexora Transaction ID.
                 </p>
                 {tx.txId && (
                   <button

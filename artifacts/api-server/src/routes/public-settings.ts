@@ -55,7 +55,7 @@ router.get("/settings/public", async (_req, res): Promise<void> => {
     referral_commission_rate: "5",
     maintenance_mode: "false",
     announcement_text: "",
-    platform_name: "VaultX",
+    platform_name: "Wexora",
     support_email: "",
     support_telegram: "",
     support_whatsapp: "",

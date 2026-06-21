@@ -60,12 +60,12 @@ router.get("/about", async (_req, res): Promise<void> => {
 
     res.json({
       content: {
-        hero_title:        s.about_hero_title        || "About VaultX",
+        hero_title:        s.about_hero_title        || "About Wexora",
         hero_subtitle:     s.about_hero_subtitle     || "A Modern Digital Investment Platform Designed for Growth, Transparency, and Security.",
-        hero_description:  s.about_hero_description  || "VaultX is a digital investment platform that provides users with access to carefully structured investment opportunities across global industries.",
-        mission_text:      s.about_mission_text      || "At VaultX, our mission is to provide a secure, user-friendly, and innovative investment platform that helps members access investment opportunities with confidence.",
-        security_text:     s.about_security_text     || "VaultX prioritizes platform security through account protection measures, encrypted connections, and continuous monitoring.",
-        platform_name:     s.platform_name           || "VaultX",
+        hero_description:  s.about_hero_description  || "Wexora is a digital investment platform that provides users with access to carefully structured investment opportunities across global industries.",
+        mission_text:      s.about_mission_text      || "At Wexora, our mission is to provide a secure, user-friendly, and innovative investment platform that helps members access investment opportunities with confidence.",
+        security_text:     s.about_security_text     || "Wexora prioritizes platform security through account protection measures, encrypted connections, and continuous monitoring.",
+        platform_name:     s.platform_name           || "Wexora",
         support_email:     s.support_email           || "",
         support_telegram:  s.support_telegram        || "",
         support_whatsapp:  s.support_whatsapp        || "",

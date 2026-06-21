@@ -128,9 +128,9 @@ export default function TransferPage() {
             <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 space-y-1.5">
               <p className="text-xs font-bold text-blue-700 mb-2">Transfer Information</p>
               {[
-                "Transfers between VaultX users are instant",
+                "Transfers between Wexora users are instant",
                 "No fee is charged for internal transfers",
-                "The recipient must have a verified VaultX account",
+                "The recipient must have a verified Wexora account",
               ].map((info) => (
                 <div key={info} className="flex items-start gap-1.5">
                   <div className="w-1 h-1 rounded-full bg-blue-400 mt-2 shrink-0" />
