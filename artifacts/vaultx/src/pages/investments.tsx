@@ -1,4 +1,4 @@
-import { TrendingUp, CheckCircle, ArrowRight, Clock, Star, Users, Target, Info, ChevronDown, ChevronUp, Zap, BarChart3, Calendar } from "lucide-react";
+import { TrendingUp, CheckCircle, ArrowRight, Clock, Star, Users, Target, Info, ChevronDown, ChevronUp, Zap, BarChart3, Calendar, Flame, Minus, TrendingDown } from "lucide-react";
 import {
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
   useGetUserInvestments, getGetUserInvestmentsQueryKey,
@@ -51,6 +51,43 @@ const BADGE_DISPLAY: Record<BadgeKey, { label: string; cls: string }> = {
   "top-funded":   { label: "🏆 Top Funded",   cls: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-300/50" },
   none:           { label: "",                 cls: "" },
 };
+
+/* ─── Momentum Indicator ────────────────────────────────────────────────── */
+
+type MomentumLevel = "high" | "stable" | "cooling";
+
+const MOMENTUM_CONFIG: Record<MomentumLevel, { label: string; icon: typeof Flame; bg: string; text: string; arrow: string }> = {
+  high:    { label: "High Momentum",  icon: Flame,       bg: "bg-orange-100 dark:bg-orange-950/40", text: "text-orange-600 dark:text-orange-400", arrow: "↑ Accelerating" },
+  stable:  { label: "Stable Demand",  icon: Minus,       bg: "bg-blue-100 dark:bg-blue-950/40",    text: "text-blue-600 dark:text-blue-400",   arrow: "→ Steady" },
+  cooling: { label: "Cooling Down",   icon: TrendingDown, bg: "bg-amber-100 dark:bg-amber-950/40",  text: "text-amber-600 dark:text-amber-400", arrow: "↓ Slowing" },
+};
+
+function computeMomentum(joinedToday: number, joinedWeek: number): MomentumLevel {
+  if (joinedWeek <= 0) return "stable";
+  const ratio = joinedToday / joinedWeek;
+  if (ratio > 0.20) return "high";
+  if (ratio < 0.08) return "cooling";
+  return "stable";
+}
+
+function MomentumBadge({ level, compact = false }: { level: MomentumLevel; compact?: boolean }) {
+  const cfg = MOMENTUM_CONFIG[level];
+  const Icon = cfg.icon;
+  if (compact) {
+    return (
+      <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold", cfg.bg, cfg.text)}>
+        <Icon size={9} />
+        {level === "high" ? "🔥" : level === "stable" ? "⭐" : "⚠"} {cfg.label}
+        <span className="opacity-70 font-normal">({cfg.arrow})</span>
+      </span>
+    );
+  }
+  return (
+    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold", cfg.bg, cfg.text)}>
+      {level === "high" ? "🔥" : level === "stable" ? "⭐" : "⚠"} {cfg.arrow}
+    </span>
+  );
+}
 
 /* ─── Seeded stat helpers ───────────────────────────────────────────────── */
 
@@ -206,6 +243,11 @@ export default function InvestmentsPage() {
   const customStatsMap: Record<string, any> = (() => {
     try { return JSON.parse(settings?.opportunity_custom_stats ?? "{}"); } catch { return {}; }
   })();
+  const momentumEnabled: boolean = settings?.momentum_enabled !== "false";
+  const momentumMode: string = settings?.momentum_mode ?? "real";
+  const momentumOverrides: Record<string, MomentumLevel> = (() => {
+    try { return JSON.parse(settings?.momentum_overrides ?? "{}"); } catch { return {}; }
+  })();
 
   const activeCount = userInvestments?.filter((i: any) => i.status === "active").length ?? 0;
   const activePlans = (plans ?? []).filter((p: any) => p.isActive);
@@ -228,6 +270,13 @@ export default function InvestmentsPage() {
     const raisedPct      = capitalTarget > 0 ? Math.round((capitalRaised / capitalTarget) * 100) : (custom?.raisedPct ?? base.raisedPct);
     const capitalRemaining = capitalTarget - capitalRaised;
     return { participants, raisedPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
+  };
+
+  const getPlanMomentum = (plan: any, s: ReturnType<typeof getPlanStats>): MomentumLevel | null => {
+    if (!momentumEnabled) return null;
+    const override = momentumOverrides[String(plan.id)];
+    if (momentumMode === "custom" && override) return override;
+    return computeMomentum(s.joinedToday, s.joinedWeek);
   };
 
   return (
@@ -270,6 +319,7 @@ export default function InvestmentsPage() {
                 const category = plan.category ?? "Strategic Capital";
                 const badge = badges[plan.id] ?? null;
                 const s = getPlanStats(plan);
+                const momentum = getPlanMomentum(plan, s);
                 const isExpanded = expandedId === plan.id;
                 const sb = planStatusBadge(plan.status);
 
@@ -337,27 +387,37 @@ export default function InvestmentsPage() {
 
                     <div className="p-4 space-y-3">
                       {/* Social proof strip */}
-                      <div className="flex items-center justify-between bg-muted/40 border border-border rounded-xl px-3 py-2">
-                        <div className="flex items-center gap-1.5 text-xs text-foreground font-semibold">
-                          <Users size={12} className="text-primary" />
-                          <span>{s.participants.toLocaleString()} participants</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
-                            <Zap size={9} />
-                            <span className="text-[10px] font-bold">+{s.joinedToday} today</span>
+                      <div className="bg-muted/40 border border-border rounded-xl px-3 py-2 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-xs text-foreground font-semibold">
+                            <Users size={12} className="text-primary" />
+                            <span>{s.participants.toLocaleString()} participants</span>
                           </div>
-                          <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                            <Calendar size={9} />
-                            <span className="text-[10px] font-bold">+{s.joinedWeek} this week</span>
+                          <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full">
+                              <Zap size={9} />
+                              <span className="text-[10px] font-bold">+{s.joinedToday} today</span>
+                            </div>
+                            <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                              <Calendar size={9} />
+                              <span className="text-[10px] font-bold">+{s.joinedWeek} this week</span>
+                            </div>
                           </div>
                         </div>
+                        {/* Momentum badge — near participant count */}
+                        {momentum && (
+                          <MomentumBadge level={momentum} compact />
+                        )}
                       </div>
 
                       {/* Funding progress */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs text-muted-foreground font-medium">{s.raisedPct}% funded</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground font-medium">{s.raisedPct}% funded</span>
+                            {/* Momentum badge — near funding progress (compact arrow) */}
+                            {momentum && <MomentumBadge level={momentum} />}
+                          </div>
                           <span className="text-xs font-bold text-foreground">{formatUSDT(s.capitalRaised)} / {formatUSDT(s.capitalTarget)}</span>
                         </div>
                         <AnimatedBar pct={s.raisedPct} gradient={planGradient(plan.colorTheme)} />

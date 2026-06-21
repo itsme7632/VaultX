@@ -86,6 +86,9 @@ export default function AdminPage() {
   const [userDetailLoading, setUserDetailLoading] = useState(false);
   const [selectedPlanIds, setSelectedPlanIds] = useState<Set<number>>(new Set());
   const [opportunityAnalyticsMode, setOpportunityAnalyticsMode] = useState<"auto" | "custom">("auto");
+  const [momentumEnabled, setMomentumEnabled] = useState(true);
+  const [momentumMode, setMomentumMode] = useState<"real" | "custom">("real");
+  const [momentumOverrides, setMomentumOverrides] = useState<Record<string, "high" | "stable" | "cooling" | "">>({});
   const [badgeForm, setBadgeForm] = useState<Record<string, string>>({});
   const [customStatsForm, setCustomStatsForm] = useState<Record<string, any>>({});
   const [savingAnalytics, setSavingAnalytics] = useState(false);
@@ -138,8 +141,11 @@ export default function AdminPage() {
     if (!settingsData) return;
     const s = settingsData as Record<string, string>;
     setOpportunityAnalyticsMode((s.opportunity_analytics_mode as "auto" | "custom") ?? "auto");
+    setMomentumEnabled(s.momentum_enabled !== "false");
+    setMomentumMode((s.momentum_mode as "real" | "custom") ?? "real");
     try { setBadgeForm(JSON.parse(s.opportunity_badges ?? "{}")); } catch { setBadgeForm({}); }
     try { setCustomStatsForm(JSON.parse(s.opportunity_custom_stats ?? "{}")); } catch { setCustomStatsForm({}); }
+    try { setMomentumOverrides(JSON.parse(s.momentum_overrides ?? "{}")); } catch { setMomentumOverrides({}); }
   }, [settingsData]);
 
   const saveAnalyticsSettings = async () => {
@@ -149,6 +155,9 @@ export default function AdminPage() {
         opportunity_analytics_mode: opportunityAnalyticsMode,
         opportunity_badges: JSON.stringify(badgeForm),
         opportunity_custom_stats: JSON.stringify(customStatsForm),
+        momentum_enabled: String(momentumEnabled),
+        momentum_mode: momentumMode,
+        momentum_overrides: JSON.stringify(momentumOverrides),
       });
       toast({ title: "Analytics settings saved" });
       refetchSettings();
@@ -696,6 +705,83 @@ export default function AdminPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* ── Momentum Indicator Settings ── */}
+                    <div className="border-t border-border pt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground">Momentum Indicators</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">Show 🔥 / ⭐ / ⚠ badges on opportunity cards</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setMomentumEnabled(e => !e)}
+                          className={cn(
+                            "relative w-10 h-5 rounded-full transition-colors shrink-0",
+                            momentumEnabled ? "bg-primary" : "bg-muted-foreground/30"
+                          )}
+                        >
+                          <span className={cn("absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all", momentumEnabled ? "left-[22px]" : "left-0.5")} />
+                        </button>
+                      </div>
+
+                      {momentumEnabled && (
+                        <>
+                          <div>
+                            <p className="text-xs font-semibold text-foreground mb-2">Indicator Mode</p>
+                            <div className="flex gap-2">
+                              {(["real", "custom"] as const).map(m => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setMomentumMode(m)}
+                                  className={cn(
+                                    "flex-1 py-2 rounded-xl text-xs font-semibold border transition-all",
+                                    momentumMode === m
+                                      ? "bg-primary text-white border-primary"
+                                      : "bg-muted text-muted-foreground border-border hover:border-primary/50"
+                                  )}
+                                >
+                                  {m === "real" ? "📊 Real Data" : "✏️ Custom"}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground mt-1.5">
+                              {momentumMode === "real"
+                                ? "Auto-computed from participant join rates (today vs. weekly)."
+                                : "Manually set momentum level per opportunity."}
+                            </p>
+                          </div>
+
+                          {momentumMode === "custom" && (
+                            <div>
+                              <p className="text-xs font-semibold text-foreground mb-2">Per-Opportunity Momentum</p>
+                              <div className="space-y-2">
+                                {(plans ?? []).map((plan: any) => (
+                                  <div key={plan.id} className="flex items-center justify-between gap-3">
+                                    <p className="text-xs text-foreground truncate flex-1">{plan.name}</p>
+                                    <Select
+                                      value={momentumOverrides[String(plan.id)] || "auto"}
+                                      onValueChange={v =>
+                                        setMomentumOverrides(prev => ({ ...prev, [String(plan.id)]: v === "auto" ? "" : v as any }))
+                                      }
+                                    >
+                                      <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="auto" className="text-xs">Auto (Real Data)</SelectItem>
+                                        <SelectItem value="high" className="text-xs">🔥 High Momentum</SelectItem>
+                                        <SelectItem value="stable" className="text-xs">⭐ Stable Demand</SelectItem>
+                                        <SelectItem value="cooling" className="text-xs">⚠ Cooling Down</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
 
                     <Button
                       className="w-full h-9 text-sm"
