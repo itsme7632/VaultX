@@ -1,5 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 
+export interface PlanMetricsItem {
+  id: number;
+  participants: number;
+  capitalRaised: number;
+  fundingGoal: number;
+  fundingPct: number;
+  fundingDisplay: string;
+  barPct: number;
+  capitalRemaining: number;
+  joinedToday: number;
+  joinedWeek: number;
+}
+
 export interface PlatformMetrics {
   totalRaised: number;
   totalTarget: number;
@@ -12,6 +25,7 @@ export interface PlatformMetrics {
   mostPopular: { id: number; name: string; participants: number } | null;
   topFunded: { id: number; name: string; fundingPct: number } | null;
   fastestGrowing: { id: number; name: string } | null;
+  plans: PlanMetricsItem[];
 }
 
 export const PLATFORM_METRICS_QUERY_KEY = ["platform-metrics"];

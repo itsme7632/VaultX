@@ -12,8 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LiveCounter } from "@/components/LiveCounter";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
-import { useState, useEffect, useRef } from "react";
-import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { usePlatformMetrics, type PlanMetricsItem } from "@/hooks/usePlatformMetrics";
 
 /* ─── Shared constants ──────────────────────────────────────────────────── */
 
@@ -135,21 +135,35 @@ function autoStats(id: number) {
   return { participants, raisedPct, joinedToday, joinedWeek, capitalTargetK };
 }
 
-/* ─── Badge auto-assignment (uses REAL plan data for accuracy) ───────────── */
+/* ─── Badge auto-assignment (uses canonical platform metrics) ────────────── */
 
-function computeAutoBadges(plans: any[]): Record<number, BadgeKey> {
+function computeAutoBadges(plans: any[], metricsMap: Record<number, PlanMetricsItem> = {}): Record<number, BadgeKey> {
   if (!plans.length) return {};
 
-  // Build comparison data from REAL plan DB fields — not seeded values
+  // Use canonical stats from the platform-metrics endpoint (single source of truth)
   const planData = plans.map(p => {
-    const fundingGoal    = p.fundingGoal != null ? Number(p.fundingGoal) : null;
-    const capitalRaised  = p.currentFunding != null ? Number(p.currentFunding) : 0;
-    const raisedPct      = fundingGoal && fundingGoal > 0 ? (capitalRaised / fundingGoal) * 100 : 0;
-    const participants   = p.totalParticipants != null ? Number(p.totalParticipants) : 0;
-    // Activity score: blend real funding level with plan-stable seed for relative comparison
-    const activityBase   = Math.max(2, Math.floor(raisedPct / 5));
-    const joinedToday    = activityBase + seededInt(p.id, 5, 1, 8);
-    return { id: p.id, raisedPct, participants, capitalRaised, joinedToday };
+    const m = metricsMap[p.id];
+    if (m) {
+      return {
+        id: p.id,
+        raisedPct: m.fundingPct,
+        participants: m.participants,
+        capitalRaised: m.capitalRaised,
+        joinedToday: m.joinedToday,
+        joinedWeek: m.joinedWeek,
+      };
+    }
+    // Fallback while metrics load: use real DB fields only
+    const fundingGoal   = p.fundingGoal != null ? Number(p.fundingGoal) : null;
+    const capitalRaised = p.currentFunding != null ? Number(p.currentFunding) : 0;
+    const raisedPct     = fundingGoal && fundingGoal > 0 ? (capitalRaised / fundingGoal) * 100 : 0;
+    const participants  = p.displayParticipantCount != null ? Number(p.displayParticipantCount)
+      : p.totalParticipants != null ? Number(p.totalParticipants) : 0;
+    const activityBase  = Math.max(1, Math.floor(raisedPct / 8));
+    const planSeed      = ((p.id * 31 + 7) % 97) / 97;
+    const joinedToday   = capitalRaised > 0 ? Math.max(1, Math.round(activityBase * (0.7 + planSeed * 0.6))) : 0;
+    const joinedWeek    = capitalRaised > 0 ? joinedToday * 4 + Math.floor(planSeed * 15) : 0;
+    return { id: p.id, raisedPct, participants, capitalRaised, joinedToday, joinedWeek };
   });
 
   const badges: Record<number, BadgeKey> = {};
@@ -160,13 +174,13 @@ function computeAutoBadges(plans: any[]): Record<number, BadgeKey> {
     if (winner) { badges[winner.id] = badge; assigned.add(winner.id); }
   };
 
-  // 🏆 Top Funded = highest real funding percentage
+  // 🏆 Top Funded = highest funding percentage
   assignTop([...planData].sort((a, b) => b.raisedPct - a.raisedPct), "top-funded");
-  // 🔥 Trending = most activity today (real-funding-scaled)
+  // 🔥 Trending = most activity today
   assignTop([...planData].sort((a, b) => b.joinedToday - a.joinedToday), "trending");
-  // 🚀 Fast Growing = highest growth rate vs participant base
-  assignTop([...planData].sort((a, b) => (b.joinedToday / Math.max(1, b.participants || 10)) - (a.joinedToday / Math.max(1, a.participants || 10))), "fast-growing");
-  // ⭐ Popular = most total real participants
+  // 🚀 Fast Growing = highest growth rate (joinedWeek / participants)
+  assignTop([...planData].sort((a, b) => (b.joinedWeek / Math.max(1, b.participants)) - (a.joinedWeek / Math.max(1, a.participants))), "fast-growing");
+  // ⭐ Popular = most total participants
   assignTop([...planData].sort((a, b) => b.participants - a.participants), "popular");
 
   return badges;
@@ -259,6 +273,14 @@ export default function InvestmentsPage() {
     staleTime: 60000,
   });
 
+  // Canonical per-plan stats — single source of truth shared with Opportunity Insights
+  const { data: metrics } = usePlatformMetrics();
+  const metricsPlansMap = useMemo<Record<number, PlanMetricsItem>>(() => {
+    const m: Record<number, PlanMetricsItem> = {};
+    for (const p of (metrics?.plans ?? [])) m[p.id] = p;
+    return m;
+  }, [metrics]);
+
   const analyticsMode: string = settings?.opportunity_analytics_mode ?? "auto";
   const badgeOverrides: Record<string, BadgeKey> = (() => {
     try { return JSON.parse(settings?.opportunity_badges ?? "{}"); } catch { return {}; }
@@ -275,69 +297,52 @@ export default function InvestmentsPage() {
   const activeCount = userInvestments?.filter((i: any) => i.status === "active").length ?? 0;
   const activePlans = (plans ?? []).filter((p: any) => p.isActive);
 
-  // Compute auto badges then apply admin overrides
-  const autoBadges = computeAutoBadges(activePlans);
+  // Compute auto badges using canonical metrics (single source of truth)
+  const autoBadges = computeAutoBadges(activePlans, metricsPlansMap);
   const badges: Record<number, BadgeKey> = { ...autoBadges };
   Object.entries(badgeOverrides).forEach(([planId, badge]) => {
     if (badge) badges[Number(planId)] = badge;
   });
 
   const getPlanStats = (plan: any) => {
-    const useReal = analyticsMode === "real";
-    const custom = analyticsMode === "custom" && customStatsMap[String(plan.id)];
-    const base = autoStats(plan.id);
-
-    const joinedToday = custom?.joinedToday ?? base.joinedToday;
-    const joinedWeek  = custom?.joinedWeek  ?? base.joinedWeek;
-
-    // Capital target: prefer DB value, then custom, then seeded
-    const capitalTarget = (plan.fundingGoal != null ? plan.fundingGoal : null)
-      ?? (custom?.capitalTargetK != null ? custom.capitalTargetK * 1000 : null)
-      ?? base.capitalTargetK * 1000;
-
-    // Capital raised: prefer DB value, then custom %, then seeded %
-    const capitalRaised = (plan.currentFunding != null ? plan.currentFunding : null)
-      ?? (custom?.raisedPct != null ? Math.floor(capitalTarget * (custom.raisedPct / 100)) : null)
-      ?? Math.floor(capitalTarget * (base.raisedPct / 100));
-
-    // Funding % — derive from real raised/target when available
-    const raisedPctRaw = capitalTarget > 0
-      ? Math.min(100, (capitalRaised / capitalTarget) * 100)
-      : (custom?.raisedPct ?? base.raisedPct);
-    const raisedPct = Math.round(raisedPctRaw);
-    // Display string: show "< 1%" instead of "0%" when there is real capital raised
-    const fundingDisplay = capitalRaised > 0 && raisedPct === 0 ? "< 1%" : `${raisedPct}%`;
-    // Bar percentage — use raw value with a minimum visible width when raised > 0
-    const barPct = capitalRaised > 0 ? Math.max(0.5, raisedPctRaw) : raisedPct;
-
-    // Participants — priority order:
-    //   1. Admin override (displayParticipantCount) — highest trust
-    //   2. Real DB participant count (totalParticipants) — when > 0
-    //   3. Custom stats override
-    //   4. Auto-generate from capital raised (only when raised > 0)
-    //   5. Seeded base (only in "auto" mode and when raised > 0)
-    // Rule: if capitalRaised = 0, participants MUST be 0 regardless of mode
-    const displayOverride = plan.displayParticipantCount != null ? Number(plan.displayParticipantCount) : null;
-    const dbParticipants  = plan.totalParticipants != null ? Number(plan.totalParticipants) : null;
-
-    let participants: number;
-    if (displayOverride !== null) {
-      participants = displayOverride;
-    } else if (capitalRaised <= 0) {
-      // No capital raised = no participants can logically be shown
-      participants = 0;
-    } else if (dbParticipants !== null && dbParticipants > 0) {
-      participants = dbParticipants;
-    } else if (custom?.participants != null) {
-      participants = custom.participants;
-    } else if (useReal) {
-      participants = autoParticipantsFromRaised(capitalRaised, plan.id);
-    } else {
-      participants = base.participants;
+    // Always use canonical backend stats — single source of truth
+    const canonical = metricsPlansMap[plan.id];
+    if (canonical) {
+      return {
+        participants:     canonical.participants,
+        raisedPct:        Math.round(canonical.fundingPct),
+        raisedPctRaw:     canonical.fundingPct,
+        fundingDisplay:   canonical.fundingDisplay,
+        barPct:           canonical.barPct,
+        capitalTarget:    canonical.fundingGoal,
+        capitalRaised:    canonical.capitalRaised,
+        capitalRemaining: canonical.capitalRemaining,
+        joinedToday:      canonical.joinedToday,
+        joinedWeek:       canonical.joinedWeek,
+      };
     }
 
+    // Fallback while metrics endpoint first loads
+    const capitalTarget   = plan.fundingGoal != null ? Number(plan.fundingGoal) : 0;
+    const capitalRaised   = plan.currentFunding != null ? Number(plan.currentFunding) : 0;
+    const displayOverride = plan.displayParticipantCount != null ? Number(plan.displayParticipantCount) : null;
+
+    let participants: number;
+    if (displayOverride !== null)  participants = displayOverride;
+    else if (capitalRaised <= 0)   participants = 0;
+    else                           participants = autoParticipantsFromRaised(capitalRaised, plan.id);
+
+    const raisedPctRaw   = capitalTarget > 0 ? Math.min(100, (capitalRaised / capitalTarget) * 100) : 0;
+    const raisedPct      = Math.round(raisedPctRaw);
+    const fundingDisplay = capitalRaised > 0 && raisedPct === 0 ? "< 1%" : `${raisedPct}%`;
+    const barPct         = capitalRaised > 0 ? Math.max(0.5, raisedPctRaw) : 0;
     const capitalRemaining = Math.max(0, capitalTarget - capitalRaised);
-    return { participants, raisedPct, raisedPctRaw, fundingDisplay, barPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
+    const planSeed       = ((plan.id * 31 + 7) % 97) / 97;
+    const activityBase   = capitalRaised > 0 ? Math.max(1, Math.floor(raisedPctRaw / 8)) : 0;
+    const joinedToday    = capitalRaised > 0 ? Math.max(1, Math.round(activityBase * (0.7 + planSeed * 0.6))) : 0;
+    const joinedWeek     = capitalRaised > 0 ? joinedToday * 4 + Math.floor(planSeed * 15) : 0;
+
+    return { participants, raisedPct, raisedPctRaw, fundingDisplay, barPct, capitalTarget, capitalRaised, capitalRemaining, joinedToday, joinedWeek };
   };
 
   const getPlanMomentum = (plan: any, s: ReturnType<typeof getPlanStats>): MomentumLevel | null => {
