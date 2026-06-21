@@ -9,7 +9,7 @@ import { SplashScreen } from "@/components/SplashScreen";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Wrench, RefreshCw, MessageCircle, Phone } from "lucide-react";
+import { Wrench, RefreshCw, MessageCircle, Phone, Clock } from "lucide-react";
 
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
@@ -219,12 +219,50 @@ function Router() {
   );
 }
 
+// ─── Countdown timer hook ──────────────────────────────────────────────────────
+function useCountdown(isoEta: string) {
+  const [remaining, setRemaining] = useState<{ h: number; m: number; s: number } | null>(null);
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    if (!isoEta) return;
+    const target = new Date(isoEta).getTime();
+    if (isNaN(target)) return;
+
+    const tick = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setRemaining(null);
+        setExpired(true);
+        return;
+      }
+      const totalSecs = Math.floor(diff / 1000);
+      setRemaining({
+        h: Math.floor(totalSecs / 3600),
+        m: Math.floor((totalSecs % 3600) / 60),
+        s: totalSecs % 60,
+      });
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [isoEta]);
+
+  return { remaining, expired };
+}
+
 // ─── Maintenance page ─────────────────────────────────────────────────────────
 function MaintenancePage({ settings }: { settings: Record<string, string> | undefined }) {
   const platformName   = settings?.platform_name       ?? "Wexora Global";
   const telegramLink   = settings?.support_telegram_group ?? settings?.support_telegram ?? "";
   const whatsappLink   = settings?.support_whatsapp_community ?? settings?.support_whatsapp ?? "";
   const supportEmail   = settings?.support_email       ?? "";
+  const eta            = settings?.maintenance_eta      ?? "";
+
+  const { remaining, expired } = useCountdown(eta);
+  const etaDate = eta ? new Date(eta) : null;
+  const etaValid = etaDate && !isNaN(etaDate.getTime());
 
   const handleRefresh = () => window.location.reload();
 
@@ -261,10 +299,54 @@ function MaintenancePage({ settings }: { settings: Record<string, string> | unde
         Thank you for your patience. Wexora Global is currently undergoing scheduled
         maintenance to improve platform performance and security.
       </p>
-      <p className="text-slate-500 text-xs leading-relaxed max-w-sm mb-8">
+      <p className="text-slate-500 text-xs leading-relaxed max-w-sm mb-6">
         Your account, investments, and balances remain safe and will be fully
         accessible once maintenance is complete.
       </p>
+
+      {/* Countdown timer */}
+      {etaValid && (
+        <div className="mb-8 w-full max-w-xs">
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+            <div className="flex items-center justify-center gap-1.5 text-slate-400 text-xs mb-3">
+              <Clock size={12} />
+              <span>
+                {expired
+                  ? "Expected return time has passed — finalising shortly…"
+                  : `Back by ${etaDate!.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`}
+              </span>
+            </div>
+            {!expired && remaining && (
+              <div className="flex items-center justify-center gap-3">
+                {[
+                  { value: remaining.h, label: "HRS" },
+                  { value: remaining.m, label: "MIN" },
+                  { value: remaining.s, label: "SEC" },
+                ].map(({ value, label }) => (
+                  <div key={label} className="flex flex-col items-center">
+                    <div className="w-16 h-14 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
+                      <span className="text-2xl font-bold text-white tabular-nums">
+                        {String(value).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <span className="text-slate-500 text-[9px] font-semibold tracking-widest mt-1.5">
+                      {label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {expired && (
+              <p className="text-center text-amber-400 text-xs font-medium">
+                Maintenance completing soon — please refresh
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* No ETA spacer */}
+      {!etaValid && <div className="mb-2" />}
 
       {/* Action buttons */}
       <div className="flex flex-col gap-3 w-full max-w-xs">
