@@ -188,14 +188,27 @@ const COUNTRIES = [
 
 const schema = z
   .object({
-    fullName: z.string().min(2, "Full name required"),
-    username: z.string().min(3, "At least 3 characters").regex(/^[a-z0-9_]+$/i, "Letters, numbers, underscores only"),
-    email: z.string().email("Invalid email"),
+    fullName: z.string().min(1, "Full name is required").min(2, "Full name must be at least 2 characters"),
+    username: z
+      .string()
+      .min(1, "Username is required")
+      .min(3, "At least 3 characters")
+      .regex(/^[a-z0-9_]+$/i, "Letters, numbers, underscores only"),
+    email: z
+      .string()
+      .min(1, "Email address is required")
+      .email("Enter a valid email address"),
     country: z.string().min(1, "Select your country"),
     dialCode: z.string().optional(),
-    whatsapp: z.string().min(5, "WhatsApp number is required"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z.string(),
+    whatsapp: z
+      .string()
+      .min(1, "WhatsApp number is required")
+      .min(5, "Enter a valid WhatsApp number"),
+    password: z
+      .string()
+      .min(1, "Password is required")
+      .min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
     referralCode: z.string().optional(),
   })
   .refine((d) => d.password === d.confirmPassword, {
@@ -321,7 +334,7 @@ export default function SignupPage() {
       toast({ title: "Username taken", description: "Please choose a different username.", variant: "destructive" });
       return;
     }
-    const whatsappFull = data.whatsapp ? `${data.dialCode ?? ""}${data.whatsapp.replace(/^0+/, "")}` : undefined;
+    const whatsappFull = `${data.dialCode ?? ""}${data.whatsapp.replace(/^0+/, "")}`;
     signup.mutate(
       { data: { ...data, whatsapp: whatsappFull } },
       {

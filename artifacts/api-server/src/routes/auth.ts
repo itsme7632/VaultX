@@ -47,8 +47,35 @@ async function generateDisplayId(): Promise<string> {
 router.post("/auth/signup", async (req, res): Promise<void> => {
   const { fullName, username, email, whatsapp, country, password, confirmPassword, referralCode } = req.body;
 
-  if (!fullName || !username || !email || !password || !confirmPassword) {
-    res.status(400).json({ error: "Missing required fields", message: "Please fill in all required fields" });
+  // --- Individual field validation ---
+  if (!fullName || !String(fullName).trim()) {
+    res.status(400).json({ error: "Full name required", message: "Full name is required" });
+    return;
+  }
+
+  if (!username || !String(username).trim()) {
+    res.status(400).json({ error: "Username required", message: "Username is required" });
+    return;
+  }
+
+  if (!email || !String(email).trim()) {
+    res.status(400).json({ error: "Email required", message: "Email address is required" });
+    return;
+  }
+
+  const whatsappTrimmed = whatsapp != null ? String(whatsapp).trim() : "";
+  if (!whatsappTrimmed) {
+    res.status(400).json({ error: "WhatsApp required", message: "WhatsApp number is required for account recovery and notifications" });
+    return;
+  }
+
+  if (!password) {
+    res.status(400).json({ error: "Password required", message: "Password is required" });
+    return;
+  }
+
+  if (!confirmPassword) {
+    res.status(400).json({ error: "Confirm password required", message: "Please confirm your password" });
     return;
   }
 
@@ -95,13 +122,13 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
       fullName,
       username: username.toLowerCase(),
       email: email.toLowerCase(),
-      whatsapp: whatsapp || null,
+      whatsapp: whatsappTrimmed,
       country: country || null,
       passwordHash,
       referralCode: newReferralCode,
       referredBy: referredById || null,
       ipAddress: req.ip ?? null,
-      whatsappLocked: !!(whatsapp),
+      whatsappLocked: true,
     })
     .returning();
 
