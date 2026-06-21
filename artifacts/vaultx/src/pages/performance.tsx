@@ -45,16 +45,22 @@ export default function PerformancePage() {
 
   const currentMonth = new Date().getMonth();
 
-  const FALLBACK_DEPOSITS = [12000, 18500, 22000, 31000, 28000, 42000, 38000, 51000, 47000, 62000, 58000, 75000];
-  const FALLBACK_EARNINGS = [800, 1200, 1600, 2400, 2100, 3200, 2800, 4100, 3700, 5200, 4800, 6400];
+  // Real monthly investment inflow — reconciled with Platform Capital via backend surplus logic.
+  // No fallback arrays: if data is zero that is the true platform state.
+  const monthlyDeposits: number[] = chartData?.monthlyDeposits ?? new Array(currentMonth + 1).fill(0);
 
-  const rawMonthlyDeposits: number[] = chartData?.monthlyDeposits ?? [];
-  const hasRealDepositData = rawMonthlyDeposits.some((v: number) => v > 0);
-  const monthlyData: number[] = hasRealDepositData ? rawMonthlyDeposits : FALLBACK_DEPOSITS.slice(0, currentMonth + 1);
+  // Real monthly distributions paid from earning/reinvest transactions.
+  const monthlyEarnings: number[] = chartData?.monthlyEarnings ?? new Array(currentMonth + 1).fill(0);
 
-  const rawMonthlyEarnings: number[] = chartData?.monthlyEarnings ?? [];
-  const hasRealEarningData = rawMonthlyEarnings.some((v: number) => v > 0);
-  const monthlyEarnings: number[] = hasRealEarningData ? rawMonthlyEarnings : FALLBACK_EARNINGS.slice(0, currentMonth + 1);
+  // Real new user registrations per month from users.created_at.
+  const monthlyNewUsers: number[] = chartData?.monthlyNewUsers ?? new Array(currentMonth + 1).fill(0);
+
+  // Cumulative user totals (running total including users registered before this year).
+  const monthlyCumulativeUsers: number[] = chartData?.monthlyCumulativeUsers ?? new Array(currentMonth + 1).fill(0);
+
+  // Slice to current month for chart display
+  const monthlyDepositsSlice  = monthlyDeposits.slice(0, currentMonth + 1);
+  const monthlyEarningsSlice  = monthlyEarnings.slice(0, currentMonth + 1);
 
   const isLoading = metricsLoading;
 
@@ -152,19 +158,26 @@ export default function PerformancePage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <p className="font-semibold text-sm text-foreground">Capital Deployment</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Monthly inflow trend ({new Date().getFullYear()})</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Monthly investment inflow ({new Date().getFullYear()})</p>
             </div>
             <div className="flex items-center gap-1 bg-primary/10 px-2 py-1 rounded-lg">
               <TrendingUp size={11} className="text-primary" />
-              <span className="text-[10px] text-primary font-bold">Growing</span>
+              <span className="text-[10px] text-primary font-bold">Live</span>
             </div>
           </div>
-          <MiniBarChart values={monthlyData} color="bg-primary" />
+          {chartLoading ? (
+            <Skeleton className="h-16 rounded-lg" />
+          ) : (
+            <MiniBarChart values={monthlyDepositsSlice} color="bg-primary" />
+          )}
           <div className="flex justify-between mt-2">
             {MONTHLY_LABELS.slice(0, currentMonth + 1).map((m) => (
               <span key={m} className="text-[9px] text-muted-foreground flex-1 text-center">{m}</span>
             ))}
           </div>
+          <p className="text-[10px] text-muted-foreground mt-2 text-right">
+            Total: {formatUSDTCompact(metrics?.totalRaised ?? 0)}
+          </p>
         </div>
 
         {/* Earnings distributed chart */}
@@ -176,12 +189,19 @@ export default function PerformancePage() {
             </div>
             <Zap size={16} className="text-amber-500" />
           </div>
-          <MiniBarChart values={monthlyEarnings} color="bg-emerald-500" />
+          {chartLoading ? (
+            <Skeleton className="h-16 rounded-lg" />
+          ) : (
+            <MiniBarChart values={monthlyEarningsSlice} color="bg-emerald-500" />
+          )}
           <div className="flex justify-between mt-2">
             {MONTHLY_LABELS.slice(0, currentMonth + 1).map((m) => (
               <span key={m} className="text-[9px] text-muted-foreground flex-1 text-center">{m}</span>
             ))}
           </div>
+          <p className="text-[10px] text-muted-foreground mt-2 text-right">
+            Total: {formatUSDTCompact(metrics?.distributionsPaid ?? 0)}
+          </p>
         </div>
 
         {/* Monthly statistics table */}
@@ -197,7 +217,7 @@ export default function PerformancePage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">Monthly Statistics</p>
-                <p className="text-[11px] text-muted-foreground">Historical performance breakdown</p>
+                <p className="text-[11px] text-muted-foreground">Breakdown by month — {new Date().getFullYear()}</p>
               </div>
             </div>
             {showMonthly ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
@@ -205,29 +225,62 @@ export default function PerformancePage() {
 
           {showMonthly && (
             <div className="border-t border-border">
+              {/* Column headers */}
               <div className="grid grid-cols-4 bg-muted/40 px-4 py-2.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wide">
                 <span>Month</span>
                 <span className="text-right">Inflow</span>
                 <span className="text-right">Distributions</span>
-                <span className="text-right">Users</span>
+                <span className="text-right">New Users</span>
               </div>
-              <div className="divide-y divide-border max-h-72 overflow-y-auto">
-                {MONTHLY_LABELS.slice(0, currentMonth + 1).map((month, i) => (
-                  <div key={month} className="grid grid-cols-4 px-4 py-3 text-sm">
-                    <span className="text-foreground font-medium">{month}</span>
-                    <span className="text-right text-foreground font-semibold">{formatUSDTCompact(monthlyData[i] ?? 0)}</span>
-                    <span className="text-right text-emerald-600 font-semibold">{formatUSDTCompact(monthlyEarnings[i] ?? 0)}</span>
-                    <span className="text-right text-muted-foreground">
-                      {10 + i * 8 + (metrics?.totalParticipants ? Math.floor(metrics.totalParticipants / 12) : 5)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+
+              {chartLoading ? (
+                <div className="p-4 space-y-2">
+                  {[1,2,3].map(i => <Skeleton key={i} className="h-9 rounded-lg" />)}
+                </div>
+              ) : (
+                <div className="divide-y divide-border max-h-72 overflow-y-auto">
+                  {MONTHLY_LABELS.slice(0, currentMonth + 1).map((month, i) => {
+                    const inflow   = monthlyDeposits[i] ?? 0;
+                    const distrib  = monthlyEarnings[i] ?? 0;
+                    const newUsers = monthlyNewUsers[i] ?? 0;
+                    return (
+                      <div key={month} className="grid grid-cols-4 px-4 py-3 text-sm">
+                        <span className="text-foreground font-medium">{month}</span>
+                        <span className="text-right text-foreground font-semibold">
+                          {inflow > 0 ? formatUSDTCompact(inflow) : "—"}
+                        </span>
+                        <span className="text-right text-emerald-600 font-semibold">
+                          {distrib > 0 ? formatUSDTCompact(distrib) : "—"}
+                        </span>
+                        <span className="text-right text-muted-foreground">
+                          {newUsers > 0 ? `+${newUsers}` : "—"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Totals row */}
+              {!chartLoading && (
+                <div className="grid grid-cols-4 px-4 py-3 bg-muted/30 border-t border-border text-sm font-bold">
+                  <span className="text-foreground">Total</span>
+                  <span className="text-right text-foreground">
+                    {formatUSDTCompact(metrics?.totalRaised ?? 0)}
+                  </span>
+                  <span className="text-right text-emerald-600">
+                    {formatUSDTCompact(metrics?.distributionsPaid ?? 0)}
+                  </span>
+                  <span className="text-right text-muted-foreground">
+                    {(metrics?.totalParticipants ?? 0).toLocaleString()}
+                  </span>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Top opportunities */}
+        {/* Opportunity highlights */}
         {(metrics?.mostPopular || metrics?.topFunded || metrics?.fastestGrowing) && (
           <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
             <p className="font-semibold text-sm text-foreground mb-3 flex items-center gap-2">
@@ -236,18 +289,43 @@ export default function PerformancePage() {
             </p>
             <div className="space-y-2.5">
               {[
-                { icon: "⭐", label: "Most Popular", plan: metrics?.mostPopular },
-                { icon: "🏆", label: "Top Funded", plan: metrics?.topFunded },
-                { icon: "🚀", label: "Fastest Growing", plan: metrics?.fastestGrowing },
-              ].filter(({ plan }) => plan != null).map(({ icon, label, plan }) => (
+                {
+                  icon: "⭐",
+                  label: "Most Popular",
+                  plan: metrics?.mostPopular,
+                  sub: metrics?.mostPopular
+                    ? `${(metrics.mostPopular.participants ?? 0).toLocaleString()} participants`
+                    : null,
+                },
+                {
+                  icon: "🏆",
+                  label: "Top Funded",
+                  plan: metrics?.topFunded,
+                  sub: metrics?.topFunded
+                    ? `${metrics.topFunded.fundingPct ?? 0}% funded`
+                    : null,
+                },
+                {
+                  icon: "🚀",
+                  label: "Fastest Growing",
+                  plan: metrics?.fastestGrowing,
+                  sub: null,
+                },
+              ].filter(({ plan }) => plan != null).map(({ icon, label, plan, sub }) => (
                 <div key={label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <span className="text-sm text-muted-foreground flex items-center gap-1.5">
                     <span>{icon}</span>{label}
                   </span>
-                  <span className="text-sm font-semibold text-foreground">{plan?.name}</span>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-foreground">{plan?.name}</p>
+                    {sub && <p className="text-[10px] text-muted-foreground">{sub}</p>}
+                  </div>
                 </div>
               ))}
             </div>
+            <p className="text-[10px] text-muted-foreground mt-3">
+              Rankings update automatically from live platform data.
+            </p>
           </div>
         )}
       </div>
