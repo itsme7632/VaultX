@@ -702,7 +702,7 @@ export default function AdminPage() {
               </div>
 
               <div className="flex gap-2">
-                <Button className="flex-1 h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, features: [], isActive: true, isFeatured: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompound: false, fundingGoal: null, currentFunding: 0 })}>
+                <Button className="flex-1 h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, features: [], isActive: true, isFeatured: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompoundAvailable: false, fundingGoal: null, currentFunding: 0 })}>
                   <Plus size={15} className="mr-1.5" />Add Opportunity
                 </Button>
                 {plans?.length > 0 && (
@@ -1242,7 +1242,7 @@ export default function AdminPage() {
                 { label: "Max Daily ROI (e.g. 0.030)", field: "maxRoiRate", type: "number", placeholder: "0.030" },
                 { label: "Duration (days)", field: "durationDays", type: "number", placeholder: "30" },
                 { label: "Sort Order", field: "sortOrder", type: "number", placeholder: "0" },
-                { label: "Banner URL (optional)", field: "bannerUrl", type: "text", placeholder: "https://..." },
+                { label: "Banner URL (optional)", field: "bannerImageUrl", type: "text", placeholder: "https://..." },
                 { label: "Funding Goal (USDT)", field: "fundingGoal", type: "number", placeholder: "1000000" },
                 { label: "Current Funding (USDT)", field: "currentFunding", type: "number", placeholder: "0" },
               ].map(({ label, field, type, placeholder }) => (
@@ -1307,7 +1307,7 @@ export default function AdminPage() {
               <div className="space-y-2 pt-1">
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isActive} onChange={(e) => setPlanModal((p: any) => ({ ...p, isActive: e.target.checked }))} />Active</label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isFeatured} onChange={(e) => setPlanModal((p: any) => ({ ...p, isFeatured: e.target.checked }))} />Featured</label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.autoCompound} onChange={(e) => setPlanModal((p: any) => ({ ...p, autoCompound: e.target.checked }))} />Auto Compound</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.autoCompoundAvailable} onChange={(e) => setPlanModal((p: any) => ({ ...p, autoCompoundAvailable: e.target.checked }))} />Auto Compound</label>
               </div>
 
               <div className="flex gap-2 pt-1">

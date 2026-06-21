@@ -415,14 +415,31 @@ export default function InvestmentsPage() {
                       )}
 
                       {/* Action buttons */}
-                      <div className="flex gap-2 pt-1">
-                        <Button variant="outline" size="sm" className="gap-1 text-xs h-9" onClick={() => navigate(`/opportunity/${plan.id}`)}>
-                          <Info size={12} /> Details
-                        </Button>
-                        <Button className="flex-1 h-9 font-semibold text-sm" onClick={() => navigate(`/invest/${plan.id}`)}>
-                          Participate Now <ArrowRight size={13} className="ml-1" />
-                        </Button>
-                      </div>
+                      {(() => {
+                        const BLOCKED = ["paused", "expired", "closed", "fully_allocated"];
+                        const ended = plan.endDate && new Date(plan.endDate).getTime() < Date.now();
+                        const isBlocked = BLOCKED.includes(plan.status ?? "") || ended;
+                        const blockedMsg = plan.status === "fully_allocated" ? "Fully Allocated"
+                          : plan.status === "paused" ? "Paused"
+                          : plan.status === "closed" || plan.status === "expired" || ended ? "Closed"
+                          : null;
+                        return (
+                          <div className="flex gap-2 pt-1">
+                            <Button variant="outline" size="sm" className="gap-1 text-xs h-9" onClick={() => navigate(`/opportunity/${plan.id}`)}>
+                              <Info size={12} /> Details
+                            </Button>
+                            {isBlocked ? (
+                              <Button className="flex-1 h-9 font-semibold text-sm opacity-50 cursor-not-allowed" disabled>
+                                {blockedMsg}
+                              </Button>
+                            ) : (
+                              <Button className="flex-1 h-9 font-semibold text-sm" onClick={() => navigate(`/invest/${plan.id}`)}>
+                                Participate Now <ArrowRight size={13} className="ml-1" />
+                              </Button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
