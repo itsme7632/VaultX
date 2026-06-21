@@ -324,6 +324,16 @@ const COLUMN_MIGRATIONS_SQL = [
   `ALTER TABLE "wallets" ADD COLUMN IF NOT EXISTS "referral_pending_earnings" numeric(18, 8) DEFAULT '0' NOT NULL`,
   `ALTER TABLE "app_releases" ADD COLUMN IF NOT EXISTS "uploaded_by" text`,
   `ALTER TABLE "app_releases" ADD COLUMN IF NOT EXISTS "download_count" integer DEFAULT 0 NOT NULL`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "category" text DEFAULT 'General' NOT NULL`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "banner_image_url" text`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "funding_goal" numeric(18, 8)`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "current_funding" numeric(18, 8) DEFAULT '0' NOT NULL`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'active' NOT NULL`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "color_theme" text DEFAULT 'blue' NOT NULL`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "auto_compound_available" boolean DEFAULT true NOT NULL`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "start_date" timestamp with time zone`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "end_date" timestamp with time zone`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "sort_order" integer DEFAULT 0 NOT NULL`,
 ];
 
 const sslConfig =

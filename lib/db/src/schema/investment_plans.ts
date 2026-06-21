@@ -31,6 +31,20 @@ export const investmentPlansTable = pgTable("investment_plans", {
   features: text("features").array().notNull().default([]),
   isActive: boolean("is_active").notNull().default(true),
   isFeatured: boolean("is_featured").notNull().default(false),
+  category: text("category").notNull().default("General"),
+  bannerImageUrl: text("banner_image_url"),
+  fundingGoal: numeric("funding_goal", { precision: 18, scale: 8 }),
+  currentFunding: numeric("current_funding", { precision: 18, scale: 8 })
+    .notNull()
+    .default("0"),
+  status: text("status").notNull().default("active"),
+  colorTheme: text("color_theme").notNull().default("blue"),
+  autoCompoundAvailable: boolean("auto_compound_available")
+    .notNull()
+    .default(true),
+  startDate: timestamp("start_date", { withTimezone: true }),
+  endDate: timestamp("end_date", { withTimezone: true }),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

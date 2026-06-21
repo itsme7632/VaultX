@@ -727,21 +727,67 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
   const weekStart = new Date(now);
   weekStart.setDate(weekStart.getDate() - 7);
 
-  const [totalUsersRes] = await db.select({ c: count() }).from(usersTable);
-  const [activeUsersRes] = await db.select({ c: count() }).from(usersTable).where(eq(usersTable.isActive, true));
-  const [activeInvsRes] = await db.select({ c: count() }).from(userInvestmentsTable).where(eq(userInvestmentsTable.status, "active"));
-  const [newTodayRes] = await db.select({ c: count() }).from(usersTable).where(gte(usersTable.createdAt, todayStart));
-  const [pendingKycRes] = await db.select({ c: count() }).from(kycSubmissionsTable).where(eq(kycSubmissionsTable.status, "pending"));
-  const [pendingWdRes] = await db.select({ c: count() }).from(transactionsTable).where(and(eq(transactionsTable.type, "withdrawal"), eq(transactionsTable.status, "pending")));
-  const [pendingDepRes] = await db.select({ c: count() }).from(transactionsTable).where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "pending")));
+  const [
+    [totalUsersRes],
+    [activeUsersRes],
+    [activeInvsRes],
+    [newTodayRes],
+    [pendingKycRes],
+    [pendingWdRes],
+    [pendingDepRes],
+    depositsRes,
+    withdrawalsRes,
+    earningsRes,
+    invValueRes,
+    depositsTodayRes,
+    withdrawalsTodayRes,
+    plansRes,
+    planStats,
+  ] = await Promise.all([
+    db.select({ c: count() }).from(usersTable),
+    db.select({ c: count() }).from(usersTable).where(eq(usersTable.isActive, true)),
+    db.select({ c: count() }).from(userInvestmentsTable).where(eq(userInvestmentsTable.status, "active")),
+    db.select({ c: count() }).from(usersTable).where(gte(usersTable.createdAt, todayStart)),
+    db.select({ c: count() }).from(kycSubmissionsTable).where(eq(kycSubmissionsTable.status, "pending")),
+    db.select({ c: count() }).from(transactionsTable).where(and(eq(transactionsTable.type, "withdrawal"), eq(transactionsTable.status, "pending"))),
+    db.select({ c: count() }).from(transactionsTable).where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "pending"))),
+    db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "completed"))),
+    db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "withdrawal"), eq(transactionsTable.status, "completed"))),
+    db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(or(eq(transactionsTable.type, "earning"), eq(transactionsTable.type, "reinvest")), eq(transactionsTable.status, "completed"))),
+    db.select({ s: sum(userInvestmentsTable.amount) }).from(userInvestmentsTable).where(eq(userInvestmentsTable.status, "active")),
+    db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "completed"), gte(transactionsTable.createdAt, todayStart))),
+    db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "withdrawal"), eq(transactionsTable.status, "completed"), gte(transactionsTable.createdAt, todayStart))),
+    db.select().from(investmentPlansTable).orderBy((investmentPlansTable as any).sortOrder, investmentPlansTable.id),
+    db.select({
+      planId: userInvestmentsTable.planId,
+      activeCount: count(),
+      totalValue: sum(userInvestmentsTable.amount),
+    })
+      .from(userInvestmentsTable)
+      .where(eq(userInvestmentsTable.status, "active"))
+      .groupBy(userInvestmentsTable.planId),
+  ]);
 
-  const depositsRes = await db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "completed")));
-  const withdrawalsRes = await db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "withdrawal"), eq(transactionsTable.status, "completed")));
-  const earningsRes = await db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(or(eq(transactionsTable.type, "earning"), eq(transactionsTable.type, "reinvest")), eq(transactionsTable.status, "completed")));
-  const invValueRes = await db.select({ s: sum(userInvestmentsTable.amount) }).from(userInvestmentsTable).where(eq(userInvestmentsTable.status, "active"));
+  const planStatsMap = Object.fromEntries(
+    planStats.map((s) => [s.planId, { activeCount: s.activeCount, totalValue: parseFloat(s.totalValue ?? "0") }])
+  );
 
-  const depositsTodayRes = await db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "completed"), gte(transactionsTable.createdAt, todayStart)));
-  const withdrawalsTodayRes = await db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "withdrawal"), eq(transactionsTable.status, "completed"), gte(transactionsTable.createdAt, todayStart)));
+  const opportunityStats = plansRes.map((p) => ({
+    id: p.id,
+    name: p.name,
+    status: (p as any).status ?? "active",
+    category: (p as any).category ?? "General",
+    activeInvestors: planStatsMap[p.id]?.activeCount ?? 0,
+    totalValue: planStatsMap[p.id]?.totalValue ?? 0,
+    currentFunding: parseFloat((p as any).currentFunding ?? "0"),
+    fundingGoal: (p as any).fundingGoal ? parseFloat((p as any).fundingGoal) : null,
+  }));
+
+  const plansByStatus = plansRes.reduce<Record<string, number>>((acc, p) => {
+    const st = (p as any).status ?? "active";
+    acc[st] = (acc[st] ?? 0) + 1;
+    return acc;
+  }, {});
 
   res.json({
     totalUsers: totalUsersRes?.c ?? 0,
@@ -759,12 +805,15 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
     newUsersToday: newTodayRes?.c ?? 0,
     revenueToday: parseFloat(depositsTodayRes[0]?.s ?? "0"),
     totalInvestments: parseFloat(invValueRes[0]?.s ?? "0"),
+    totalOpportunities: plansRes.length,
+    activeOpportunities: plansRes.filter((p) => (p as any).isActive).length,
+    opportunityStats,
+    plansByStatus,
   });
 });
 
-router.get("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
-  const plans = await db.select().from(investmentPlansTable).orderBy(investmentPlansTable.id);
-  res.json(plans.map((p) => ({
+function serializeAdminPlan(p: typeof investmentPlansTable.$inferSelect) {
+  return {
     id: p.id,
     name: p.name,
     description: p.description,
@@ -778,11 +827,35 @@ router.get("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     features: p.features ?? [],
     isActive: p.isActive,
     isFeatured: p.isFeatured,
-  })));
+    category: (p as any).category ?? "General",
+    bannerImageUrl: (p as any).bannerImageUrl ?? null,
+    fundingGoal: (p as any).fundingGoal ? parseFloat((p as any).fundingGoal) : null,
+    currentFunding: parseFloat((p as any).currentFunding ?? "0"),
+    status: (p as any).status ?? "active",
+    colorTheme: (p as any).colorTheme ?? "blue",
+    autoCompoundAvailable: (p as any).autoCompoundAvailable ?? true,
+    startDate: (p as any).startDate ?? null,
+    endDate: (p as any).endDate ?? null,
+    sortOrder: (p as any).sortOrder ?? 0,
+    createdAt: p.createdAt,
+  };
+}
+
+router.get("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
+  const plans = await db
+    .select()
+    .from(investmentPlansTable)
+    .orderBy((investmentPlansTable as any).sortOrder, investmentPlansTable.id);
+  res.json(plans.map(serializeAdminPlan));
 });
 
 router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
-  const { name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate, durationDays, riskLevel, features, isActive, isFeatured } = req.body;
+  const {
+    name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
+    durationDays, riskLevel, features, isActive, isFeatured,
+    category, bannerImageUrl, fundingGoal, status, colorTheme, autoCompoundAvailable,
+    startDate, endDate, sortOrder,
+  } = req.body;
 
   if (!name || !description || !minAmount || !maxAmount || !durationDays) {
     res.status(400).json({ error: "Name, description, amounts, and duration required" });
@@ -804,21 +877,38 @@ router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     features: features ?? [],
     isActive: isActive ?? true,
     isFeatured: isFeatured ?? false,
-  }).returning();
+    category: category ?? "General",
+    bannerImageUrl: bannerImageUrl ?? null,
+    fundingGoal: fundingGoal !== undefined ? fundingGoal.toString() : null,
+    currentFunding: "0",
+    status: status ?? "active",
+    colorTheme: colorTheme ?? "blue",
+    autoCompoundAvailable: autoCompoundAvailable ?? true,
+    startDate: startDate ? new Date(startDate) : null,
+    endDate: endDate ? new Date(endDate) : null,
+    sortOrder: sortOrder ?? 0,
+  } as any).returning();
 
-  res.status(201).json(plan);
+  res.status(201).json(serializeAdminPlan(plan));
 });
 
 router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  const { name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate, durationDays, riskLevel, features, isActive, isFeatured } = req.body;
+  const {
+    name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
+    durationDays, riskLevel, features, isActive, isFeatured,
+    category, bannerImageUrl, fundingGoal, currentFunding, status, colorTheme,
+    autoCompoundAvailable, startDate, endDate, sortOrder,
+  } = req.body;
 
   const [existing] = await db.select().from(investmentPlansTable).where(eq(investmentPlansTable.id, id)).limit(1);
   if (!existing) {
     res.status(404).json({ error: "Plan not found" });
     return;
   }
+
+  const ex = existing as any;
 
   const [updated] = await db.update(investmentPlansTable).set({
     name: name ?? existing.name,
@@ -833,15 +923,88 @@ router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => 
     features: features !== undefined ? features : existing.features,
     isActive: isActive !== undefined ? isActive : existing.isActive,
     isFeatured: isFeatured !== undefined ? isFeatured : existing.isFeatured,
-  }).where(eq(investmentPlansTable.id, id)).returning();
+    category: category !== undefined ? category : (ex.category ?? "General"),
+    bannerImageUrl: bannerImageUrl !== undefined ? bannerImageUrl : (ex.bannerImageUrl ?? null),
+    fundingGoal: fundingGoal !== undefined ? (fundingGoal !== null ? fundingGoal.toString() : null) : (ex.fundingGoal ?? null),
+    currentFunding: currentFunding !== undefined ? currentFunding.toString() : (ex.currentFunding ?? "0"),
+    status: status !== undefined ? status : (ex.status ?? "active"),
+    colorTheme: colorTheme !== undefined ? colorTheme : (ex.colorTheme ?? "blue"),
+    autoCompoundAvailable: autoCompoundAvailable !== undefined ? autoCompoundAvailable : (ex.autoCompoundAvailable ?? true),
+    startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : (ex.startDate ?? null),
+    endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : (ex.endDate ?? null),
+    sortOrder: sortOrder !== undefined ? sortOrder : (ex.sortOrder ?? 0),
+  } as any).where(eq(investmentPlansTable.id, id)).returning();
 
-  res.json(updated);
+  res.json(serializeAdminPlan(updated));
 });
 
 router.delete("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  await db.update(investmentPlansTable).set({ isActive: false }).where(eq(investmentPlansTable.id, id));
+  await db.update(investmentPlansTable).set({ isActive: false, status: "closed" } as any).where(eq(investmentPlansTable.id, id));
+  res.json({ success: true });
+});
+
+router.post("/admin/plans/:id/duplicate", requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [existing] = await db.select().from(investmentPlansTable).where(eq(investmentPlansTable.id, id)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+
+  const ex = existing as any;
+
+  const allPlans = await db
+    .select({ sortOrder: (investmentPlansTable as any).sortOrder })
+    .from(investmentPlansTable);
+  const maxSortOrder = Math.max(0, ...allPlans.map((p: any) => p.sortOrder ?? 0));
+
+  const [copy] = await db.insert(investmentPlansTable).values({
+    name: `${existing.name} (Copy)`,
+    description: existing.description,
+    minAmount: existing.minAmount,
+    maxAmount: existing.maxAmount,
+    dailyReturnRate: existing.dailyReturnRate,
+    minRoiRate: existing.minRoiRate,
+    maxRoiRate: existing.maxRoiRate,
+    durationDays: existing.durationDays,
+    riskLevel: existing.riskLevel,
+    features: existing.features,
+    isActive: false,
+    isFeatured: false,
+    category: ex.category ?? "General",
+    bannerImageUrl: ex.bannerImageUrl ?? null,
+    fundingGoal: ex.fundingGoal ?? null,
+    currentFunding: "0",
+    status: "paused",
+    colorTheme: ex.colorTheme ?? "blue",
+    autoCompoundAvailable: ex.autoCompoundAvailable ?? true,
+    startDate: null,
+    endDate: null,
+    sortOrder: maxSortOrder + 1,
+  } as any).returning();
+
+  res.status(201).json(serializeAdminPlan(copy));
+});
+
+router.post("/admin/plans/reorder", requireAdmin, async (req, res): Promise<void> => {
+  const { order } = req.body as { order: Array<{ id: number; sortOrder: number }> };
+
+  if (!Array.isArray(order)) {
+    res.status(400).json({ error: "order must be an array of { id, sortOrder }" });
+    return;
+  }
+
+  for (const item of order) {
+    await db
+      .update(investmentPlansTable)
+      .set({ sortOrder: item.sortOrder } as any)
+      .where(eq(investmentPlansTable.id, item.id));
+  }
+
   res.json({ success: true });
 });
 

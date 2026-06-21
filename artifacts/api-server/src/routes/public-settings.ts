@@ -36,6 +36,7 @@ const PUBLIC_KEYS = [
   "privacy_policy_updated",
   "terms_content",
   "terms_updated",
+  "kyc_enabled",
 ];
 
 router.get("/settings/public", async (_req, res): Promise<void> => {
@@ -67,6 +68,7 @@ router.get("/settings/public", async (_req, res): Promise<void> => {
     privacy_policy_updated: "",
     terms_content: "",
     terms_updated: "",
+    kyc_enabled: "true",
   };
 
   for (const key of PUBLIC_KEYS) {

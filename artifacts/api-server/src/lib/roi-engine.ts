@@ -66,6 +66,31 @@ export async function processAllInvestments(force = false): Promise<{ processed:
       continue;
     }
 
+    const planEndDate = (plan as any).endDate ? new Date((plan as any).endDate) : null;
+    if (planEndDate && now > planEndDate) {
+      if ((plan as any).status !== "expired" && (plan as any).status !== "closed") {
+        await db
+          .update(investmentPlansTable)
+          .set({ status: "expired", isActive: false } as any)
+          .where(eq(investmentPlansTable.id, plan.id));
+      }
+      if (inv.status === "active") {
+        await db
+          .update(userInvestmentsTable)
+          .set({ status: "completed", updatedAt: now })
+          .where(eq(userInvestmentsTable.id, inv.id));
+
+        await db.insert(notificationsTable).values({
+          userId: inv.userId,
+          type: "investment",
+          title: "Investment Closed — Opportunity Expired",
+          message: `The ${plan.name} opportunity has closed. Your investment has been completed with a total earnings of ${parseFloat(inv.totalEarned).toFixed(2)} USDT.`,
+        });
+        matured++;
+      }
+      continue;
+    }
+
     const minRate = parseFloat(plan.minRoiRate ?? "0.025");
     const maxRate = parseFloat(plan.maxRoiRate ?? "0.030");
     const dailyRate = randomRoi(minRate, maxRate);

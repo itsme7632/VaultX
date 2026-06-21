@@ -24,6 +24,106 @@ async function getDb() {
   return { db, pool };
 }
 
+const OPPORTUNITIES = [
+  {
+    name: "Digital Asset Allocation",
+    description: "A diversified approach to digital asset investment, allocating capital across top-tier crypto assets for steady, low-risk daily returns.",
+    minAmount: "500.00000000",
+    maxAmount: "9999.00000000",
+    dailyReturnRate: "0.027500",
+    minRoiRate: "0.025000",
+    maxRoiRate: "0.030000",
+    durationDays: 30,
+    riskLevel: "low",
+    features: ["Daily ROI 2.5%–3.0%", "30-day term", "Auto-compounding available", "Instant activation", "24/7 support"],
+    isActive: true,
+    isFeatured: false,
+    category: "DeFi",
+    status: "active",
+    colorTheme: "blue",
+    autoCompoundAvailable: true,
+    sortOrder: 1,
+  },
+  {
+    name: "AI Infrastructure",
+    description: "Capitalise on the AI revolution by investing in infrastructure-backed crypto assets powering next-generation artificial intelligence networks.",
+    minAmount: "5000.00000000",
+    maxAmount: "49999.00000000",
+    dailyReturnRate: "0.028500",
+    minRoiRate: "0.027000",
+    maxRoiRate: "0.032000",
+    durationDays: 45,
+    riskLevel: "medium",
+    features: ["Daily ROI 2.7%–3.2%", "45-day term", "Auto-compounding available", "Priority support", "Referral bonus eligible"],
+    isActive: true,
+    isFeatured: true,
+    category: "Technology",
+    status: "featured",
+    colorTheme: "purple",
+    autoCompoundAvailable: true,
+    sortOrder: 2,
+  },
+  {
+    name: "Technology Expansion",
+    description: "High-growth opportunity targeting emerging blockchain technologies and Layer-2 scaling solutions driving the next wave of crypto adoption.",
+    minAmount: "10000.00000000",
+    maxAmount: "99999.00000000",
+    dailyReturnRate: "0.030000",
+    minRoiRate: "0.028000",
+    maxRoiRate: "0.035000",
+    durationDays: 60,
+    riskLevel: "medium",
+    features: ["Daily ROI 2.8%–3.5%", "60-day term", "Auto-compounding available", "Dedicated support", "Performance reports"],
+    isActive: true,
+    isFeatured: false,
+    category: "Growth",
+    status: "trending",
+    colorTheme: "green",
+    autoCompoundAvailable: true,
+    sortOrder: 3,
+  },
+  {
+    name: "Market Liquidity Program",
+    description: "Earn consistent returns by providing liquidity to top-tier decentralised exchanges and market-making protocols with institutional-grade strategies.",
+    minAmount: "1000.00000000",
+    maxAmount: "24999.00000000",
+    dailyReturnRate: "0.026500",
+    minRoiRate: "0.025000",
+    maxRoiRate: "0.028000",
+    durationDays: 30,
+    riskLevel: "low",
+    features: ["Daily ROI 2.5%–2.8%", "30-day term", "Auto-compounding available", "Flexible entry", "Liquidity rewards"],
+    isActive: true,
+    isFeatured: false,
+    category: "Liquidity",
+    status: "funding",
+    colorTheme: "cyan",
+    autoCompoundAvailable: true,
+    sortOrder: 4,
+  },
+  {
+    name: "Strategic Growth Allocation",
+    description: "For serious investors seeking maximum returns. Our flagship high-yield strategy combines quant trading with on-chain yield generation.",
+    minAmount: "25000.00000000",
+    maxAmount: "500000.00000000",
+    dailyReturnRate: "0.031500",
+    minRoiRate: "0.030000",
+    maxRoiRate: "0.035000",
+    durationDays: 90,
+    riskLevel: "high",
+    features: ["Daily ROI 3.0%–3.5%", "90-day term", "Auto-compounding available", "Dedicated account manager", "VIP withdrawals", "Weekly performance reports"],
+    isActive: true,
+    isFeatured: false,
+    category: "Premium",
+    status: "active",
+    colorTheme: "gold",
+    autoCompoundAvailable: true,
+    sortOrder: 5,
+  },
+];
+
+const OLD_PLAN_NAMES = ["Starter Plan", "Growth Plan", "Elite Plan"];
+
 async function seedInvestmentPlans(db: ReturnType<typeof drizzle<typeof schema>>) {
   const existing = await db.select({ c: count() }).from(investmentPlansTable);
   if ((existing[0]?.c ?? 0) > 0) {
@@ -31,52 +131,43 @@ async function seedInvestmentPlans(db: ReturnType<typeof drizzle<typeof schema>>
     return;
   }
 
-  await db.insert(investmentPlansTable).values([
-    {
-      name: "Starter Plan",
-      description: "Perfect for beginners. Low risk, steady daily returns to build your portfolio.",
-      minAmount: "100.00000000",
-      maxAmount: "4999.00000000",
-      dailyReturnRate: "0.027500",
-      minRoiRate: "0.025000",
-      maxRoiRate: "0.030000",
-      durationDays: 30,
-      riskLevel: "low",
-      features: ["Daily ROI 2.5%–3.0%", "30-day term", "Auto-compounding available", "24/7 support", "Instant activation"],
-      isActive: true,
-      isFeatured: false,
-    },
-    {
-      name: "Growth Plan",
-      description: "Our most popular plan. Balanced risk and reward for consistent portfolio growth.",
-      minAmount: "5000.00000000",
-      maxAmount: "24999.00000000",
-      dailyReturnRate: "0.028500",
-      minRoiRate: "0.027000",
-      maxRoiRate: "0.030000",
-      durationDays: 60,
-      riskLevel: "medium",
-      features: ["Daily ROI 2.7%–3.0%", "60-day term", "Auto-compounding available", "Priority support", "Referral bonus eligible"],
-      isActive: true,
-      isFeatured: true,
-    },
-    {
-      name: "Elite Plan",
-      description: "For serious investors. Maximum returns with our highest-performing strategy.",
-      minAmount: "25000.00000000",
-      maxAmount: "500000.00000000",
-      dailyReturnRate: "0.030000",
-      minRoiRate: "0.028000",
-      maxRoiRate: "0.035000",
-      durationDays: 90,
-      riskLevel: "high",
-      features: ["Daily ROI 2.8%–3.5%", "90-day term", "Auto-compounding available", "Dedicated account manager", "Weekly performance reports", "VIP withdrawals"],
-      isActive: true,
-      isFeatured: false,
-    },
-  ]);
-
+  await db.insert(investmentPlansTable).values(OPPORTUNITIES as any[]);
   console.log("[seed] Investment plans seeded ✓");
+}
+
+/**
+ * Always runs. Migrates old Starter/Growth/Elite plans to new opportunity names
+ * and inserts any missing new plans.
+ */
+async function ensureOpportunities(db: ReturnType<typeof drizzle<typeof schema>>) {
+  const allPlans = await db.select({ id: investmentPlansTable.id, name: investmentPlansTable.name }).from(investmentPlansTable);
+  const nameToId = Object.fromEntries(allPlans.map((p) => [p.name, p.id]));
+
+  const oldPlanMapping: Record<string, typeof OPPORTUNITIES[number]> = {
+    "Starter Plan": OPPORTUNITIES[0],
+    "Growth Plan": OPPORTUNITIES[1],
+    "Elite Plan": OPPORTUNITIES[2],
+  };
+
+  for (const [oldName, newPlanData] of Object.entries(oldPlanMapping)) {
+    if (nameToId[oldName] !== undefined && nameToId[newPlanData.name] === undefined) {
+      const planId = nameToId[oldName];
+      await db.update(investmentPlansTable).set(newPlanData as any).where(eq(investmentPlansTable.id, planId));
+      console.log(`[seed] Migrated plan "${oldName}" → "${newPlanData.name}" ✓`);
+    }
+  }
+
+  const refreshedPlans = await db.select({ name: investmentPlansTable.name }).from(investmentPlansTable);
+  const existingNames = new Set(refreshedPlans.map((p) => p.name));
+
+  for (const plan of OPPORTUNITIES) {
+    if (!existingNames.has(plan.name)) {
+      await db.insert(investmentPlansTable).values(plan as any);
+      console.log(`[seed] Inserted missing plan "${plan.name}" ✓`);
+    }
+  }
+
+  console.log("[seed] Opportunities verified ✓");
 }
 
 async function seedDepositNetworks(db: ReturnType<typeof drizzle<typeof schema>>) {
@@ -141,6 +232,12 @@ async function seedPlatformSettings(db: ReturnType<typeof drizzle<typeof schema>
   const existing = await db.select({ c: count() }).from(platformSettingsTable);
   if ((existing[0]?.c ?? 0) > 0) {
     console.log("[seed] Platform settings already seeded, skipping");
+
+    await db
+      .insert(platformSettingsTable)
+      .values({ key: "kyc_enabled", value: "true" })
+      .onConflictDoNothing();
+
     return;
   }
 
@@ -159,6 +256,7 @@ async function seedPlatformSettings(db: ReturnType<typeof drizzle<typeof schema>
     { key: "maintenance_mode", value: "false" },
     { key: "registration_enabled", value: "true" },
     { key: "kyc_required_for_withdrawal", value: "false" },
+    { key: "kyc_enabled", value: "true" },
     { key: "max_withdrawal_per_day", value: "50000" },
     { key: "admin_email", value: "admin@vaultx.io" },
     { key: "site_url", value: "https://vaultx.replit.app" },
@@ -190,7 +288,7 @@ VaultX is a secure, transparent crypto investment platform that delivers consist
 
 **Why choose VaultX?**
 - **Daily ROI**: Earn 2.5%–3.5% every single day on your invested capital
-- **Multiple Plans**: Choose from Starter, Growth, and Elite investment plans
+- **Multiple Opportunities**: Choose from five curated investment opportunities
 - **Instant Deposits**: Multiple crypto networks accepted (USDT TRC20, ERC20, BTC, ETH, BNB)
 - **Fast Withdrawals**: Processed within 24–48 hours
 - **Referral Program**: Earn 5% commission on your referrals' profits
@@ -200,45 +298,49 @@ VaultX is a secure, transparent crypto investment platform that delivers consist
 1. Create your free account
 2. Complete identity verification (KYC)
 3. Make your first deposit
-4. Choose an investment plan
+4. Choose an investment opportunity
 5. Watch your earnings grow daily!
 
 Start your journey to financial freedom with VaultX today.`,
-      excerpt: "Welcome to VaultX — the secure crypto investment platform delivering 2.5%–3.5% daily ROI. Learn about our plans, features, and how to get started.",
+      excerpt: "Welcome to VaultX — the secure crypto investment platform delivering 2.5%–3.5% daily ROI. Learn about our opportunities, features, and how to get started.",
       category: "announcement",
       isFeatured: true,
       isPublished: true,
       publishedAt: now,
     },
     {
-      title: "New Investment Plans Launched — Up to 3.5% Daily ROI",
-      content: `We're excited to announce the launch of our updated investment plans, now offering even higher daily returns for our valued investors.
+      title: "Five New Investment Opportunities Launched — Up to 3.5% Daily ROI",
+      content: `We're excited to announce five curated investment opportunities, each designed for a different investor profile.
 
-**Updated Plan Structure:**
+**Investment Opportunities:**
 
-🟢 **Starter Plan** (Low Risk)
-- Minimum: $100 | Maximum: $4,999
+🔵 **Digital Asset Allocation** (Low Risk)
+- Minimum: $500 | Maximum: $9,999
 - Daily ROI: 2.5%–3.0%
 - Duration: 30 days
-- Best for: New investors building their portfolio
 
-🔵 **Growth Plan** (Medium Risk) — MOST POPULAR
-- Minimum: $5,000 | Maximum: $24,999
-- Daily ROI: 2.7%–3.0%
-- Duration: 60 days
-- Best for: Experienced investors seeking steady growth
+🟣 **AI Infrastructure** (Medium Risk) — FEATURED
+- Minimum: $5,000 | Maximum: $49,999
+- Daily ROI: 2.7%–3.2%
+- Duration: 45 days
 
-🔴 **Elite Plan** (Higher Returns)
-- Minimum: $25,000 | Maximum: $500,000
+🟢 **Technology Expansion** (Medium Risk) — TRENDING
+- Minimum: $10,000 | Maximum: $99,999
 - Daily ROI: 2.8%–3.5%
-- Duration: 90 days
-- Best for: Serious investors maximizing returns
+- Duration: 60 days
 
-**Auto-Compound Feature**
-All plans now support auto-compounding! Enable it to automatically reinvest your daily earnings and maximize your returns through the power of compound interest.
+🩵 **Market Liquidity Program** (Low Risk) — FUNDING
+- Minimum: $1,000 | Maximum: $24,999
+- Daily ROI: 2.5%–2.8%
+- Duration: 30 days
+
+🏆 **Strategic Growth Allocation** (High Returns)
+- Minimum: $25,000 | Maximum: $500,000
+- Daily ROI: 3.0%–3.5%
+- Duration: 90 days
 
 Invest wisely, invest with VaultX.`,
-      excerpt: "VaultX launches updated investment plans with up to 3.5% daily ROI. Starter, Growth, and Elite plans now available with auto-compounding.",
+      excerpt: "VaultX launches five curated investment opportunities with up to 3.5% daily ROI and auto-compounding support.",
       category: "investment",
       isFeatured: false,
       isPublished: true,
@@ -256,12 +358,6 @@ Invest wisely, invest with VaultX.`,
 
 **What This Means for VaultX Investors**
 Our trading algorithms are designed to profit from market volatility in both directions. Whether markets are rising or falling, our strategies continue to generate the consistent returns our investors expect.
-
-**VaultX Platform Stats:**
-- Total Users: Growing daily
-- Average Daily ROI Delivered: 2.8%
-- Total Withdrawals Processed: $0 delays
-- Uptime: 99.99%
 
 Stay informed, stay invested. The VaultX team is working around the clock to ensure your investments continue to perform.`,
       excerpt: "Bitcoin surges 8.3% this week as institutional demand grows. See how market movements affect VaultX's investment strategies.",
@@ -285,15 +381,11 @@ An additional verification step for large withdrawals to prevent unauthorized ac
 🌐 **IP Monitoring**
 We track and log all login attempts and flag suspicious activity automatically.
 
-📧 **Email Alerts**
-Real-time email notifications for logins, deposits, withdrawals, and account changes.
-
 **Best Practices to Keep Your Account Safe:**
 1. Enable 2FA immediately
 2. Use a strong, unique password (12+ characters)
 3. Never share your login credentials
 4. Always log out on shared devices
-5. Check your login history regularly
 
 If you notice any suspicious activity, contact our support team immediately at support@vaultx.io.`,
       excerpt: "VaultX launches enhanced security features including improved 2FA, withdrawal locks, IP monitoring, and real-time email alerts.",
@@ -307,18 +399,12 @@ If you notice any suspicious activity, contact our support team immediately at s
   console.log("[seed] News posts seeded ✓");
 }
 
-/**
- * ALWAYS runs on every startup.
- * Guarantees admin@vaultx.com exists with the correct password and isAdmin=true.
- * Safe to run on fresh DBs, existing DBs, or after credential changes.
- */
 async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>) {
   const ADMIN_EMAIL = "admin@vaultx.com";
   const ADMIN_PASSWORD = "Admin123@";
 
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
 
-  // Check if the canonical admin account already exists
   const [existing] = await db
     .select()
     .from(usersTable)
@@ -326,7 +412,6 @@ async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>)
     .limit(1);
 
   if (existing) {
-    // Always refresh the password and role so they can never drift
     await db
       .update(usersTable)
       .set({
@@ -338,7 +423,6 @@ async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>)
       })
       .where(eq(usersTable.email, ADMIN_EMAIL));
 
-    // Ensure wallet row exists
     await db
       .insert(walletsTable)
       .values({ userId: existing.id })
@@ -348,7 +432,6 @@ async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>)
     return;
   }
 
-  // Account doesn't exist yet — pick a username that isn't already taken
   const candidateUsernames = ["admin", "vaultxadmin", "superadmin", "admin_vx"];
   let chosenUsername = "admin_vx";
   for (const candidate of candidateUsernames) {
@@ -363,7 +446,6 @@ async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>)
     }
   }
 
-  // Pick a displayId that isn't taken
   let displayId = "000100";
   for (let n = 100; n < 200; n++) {
     const candidate = String(n).padStart(6, "0");
@@ -375,7 +457,6 @@ async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>)
     if (!taken) { displayId = candidate; break; }
   }
 
-  // Pick a referral code that isn't taken
   let referralCode = "VXADMIN01";
   const [refTaken] = await db
     .select({ id: usersTable.id })
@@ -463,13 +544,13 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
   const [plan1] = await db
     .select()
     .from(investmentPlansTable)
-    .where(eq(investmentPlansTable.name, "Starter Plan"))
+    .where(eq(investmentPlansTable.name, "Digital Asset Allocation"))
     .limit(1);
 
   const [plan2] = await db
     .select()
     .from(investmentPlansTable)
-    .where(eq(investmentPlansTable.name, "Growth Plan"))
+    .where(eq(investmentPlansTable.name, "AI Infrastructure"))
     .limit(1);
 
   if (plan1 && plan2) {
@@ -532,7 +613,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       type: "investment",
       amount: "2000.00000000",
       status: "completed",
-      note: `Invested 2000 USDT in Starter Plan`,
+      note: `Invested 2000 USDT in Digital Asset Allocation`,
       createdAt: new Date(thirtyDaysAgo.getTime() + 3 * 24 * 60 * 60 * 1000),
     } as any,
     {
@@ -540,7 +621,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       type: "investment",
       amount: "5000.00000000",
       status: "completed",
-      note: `Invested 5000 USDT in Growth Plan`,
+      note: `Invested 5000 USDT in AI Infrastructure`,
       createdAt: new Date(thirtyDaysAgo.getTime() + 3 * 24 * 60 * 60 * 1000),
     } as any,
     {
@@ -548,7 +629,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       type: "earning",
       amount: "55.00000000",
       status: "completed",
-      note: "Daily ROI 2.75% from Starter Plan",
+      note: "Daily ROI 2.75% from Digital Asset Allocation",
       createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
     } as any,
     {
@@ -556,7 +637,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       type: "earning",
       amount: "142.50000000",
       status: "completed",
-      note: "Daily ROI 2.85% from Growth Plan",
+      note: "Daily ROI 2.85% from AI Infrastructure",
       createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
     } as any,
     {
@@ -584,14 +665,14 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       userId: demo.id,
       type: "investment",
       title: "Investment Started",
-      message: "Your 2000 USDT investment in Starter Plan has started. Expected daily ROI: 2.75%",
+      message: "Your 2000 USDT investment in Digital Asset Allocation has started. Expected daily ROI: 2.75%",
       isRead: true,
     },
     {
       userId: demo.id,
       type: "earning",
       title: "Daily ROI Credited",
-      message: "+197.50 USDT (2.85% ROI) credited to your Growth Plan investment.",
+      message: "+197.50 USDT (2.85% ROI) credited to your AI Infrastructure investment.",
       isRead: false,
     },
     {
@@ -615,6 +696,7 @@ export async function runSeed(): Promise<void> {
 
   try {
     await seedInvestmentPlans(db);
+    await ensureOpportunities(db);
     await seedDepositNetworks(db);
     await seedPlatformSettings(db);
     await seedNews(db);

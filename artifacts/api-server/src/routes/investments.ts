@@ -13,6 +13,37 @@ import { generateTxId } from "../lib/generate-tx-id";
 
 const router: IRouter = Router();
 
+const BOOKABLE_STATUSES = ["active", "funding", "featured", "trending"];
+const VISIBLE_STATUSES = ["active", "funding", "featured", "trending", "fully_allocated"];
+
+function serializePlan(p: typeof investmentPlansTable.$inferSelect) {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    minAmount: parseFloat(p.minAmount),
+    maxAmount: parseFloat(p.maxAmount),
+    dailyReturnRate: parseFloat(p.dailyReturnRate),
+    minRoiRate: parseFloat(p.minRoiRate ?? "0.025"),
+    maxRoiRate: parseFloat(p.maxRoiRate ?? "0.030"),
+    durationDays: p.durationDays,
+    riskLevel: p.riskLevel,
+    features: p.features ?? [],
+    isFeatured: p.isFeatured,
+    isActive: p.isActive,
+    category: (p as any).category ?? "General",
+    bannerImageUrl: (p as any).bannerImageUrl ?? null,
+    fundingGoal: (p as any).fundingGoal ? parseFloat((p as any).fundingGoal) : null,
+    currentFunding: parseFloat((p as any).currentFunding ?? "0"),
+    status: (p as any).status ?? "active",
+    colorTheme: (p as any).colorTheme ?? "blue",
+    autoCompoundAvailable: (p as any).autoCompoundAvailable ?? true,
+    startDate: (p as any).startDate ?? null,
+    endDate: (p as any).endDate ?? null,
+    sortOrder: (p as any).sortOrder ?? 0,
+  };
+}
+
 function computeInvestmentView(
   inv: typeof userInvestmentsTable.$inferSelect,
   planName: string,
@@ -68,26 +99,15 @@ router.get("/investments/plans", async (_req, res): Promise<void> => {
   const plans = await db
     .select()
     .from(investmentPlansTable)
-    .where(eq(investmentPlansTable.isActive, true))
-    .orderBy(investmentPlansTable.id);
+    .where(
+      and(
+        eq(investmentPlansTable.isActive, true),
+        inArray(investmentPlansTable.status as any, VISIBLE_STATUSES),
+      ),
+    )
+    .orderBy((investmentPlansTable as any).sortOrder, investmentPlansTable.id);
 
-  res.json(
-    plans.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      minAmount: parseFloat(p.minAmount),
-      maxAmount: parseFloat(p.maxAmount),
-      dailyReturnRate: parseFloat(p.dailyReturnRate),
-      minRoiRate: parseFloat(p.minRoiRate ?? "0.025"),
-      maxRoiRate: parseFloat(p.maxRoiRate ?? "0.030"),
-      durationDays: p.durationDays,
-      riskLevel: p.riskLevel,
-      features: p.features ?? [],
-      isFeatured: p.isFeatured,
-      isActive: p.isActive,
-    })),
-  );
+  res.json(plans.map(serializePlan));
 });
 
 router.get("/investments", requireAuth, async (req, res): Promise<void> => {
@@ -131,6 +151,17 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
 
   if (!plan) {
     res.status(404).json({ error: "Plan not found", message: "Investment plan not found" });
+    return;
+  }
+
+  if (!BOOKABLE_STATUSES.includes((plan as any).status ?? "active")) {
+    res.status(400).json({ error: "Plan unavailable", message: "This investment opportunity is not currently accepting new investments" });
+    return;
+  }
+
+  const now = new Date();
+  if ((plan as any).endDate && new Date((plan as any).endDate) < now) {
+    res.status(400).json({ error: "Plan expired", message: "This investment opportunity has expired" });
     return;
   }
 
