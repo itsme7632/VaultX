@@ -43,6 +43,7 @@ import DownloadAppPage from "@/pages/download-app";
 import MorePage from "@/pages/more";
 import PrivacyPolicyPage from "@/pages/privacy";
 import TermsPage from "@/pages/terms";
+import FaqPage from "@/pages/faq";
 
 setBaseUrl(null);
 
@@ -208,6 +209,9 @@ function Router() {
       </Route>
       <Route path="/terms">
         <ProtectedRoute><TermsPage /></ProtectedRoute>
+      </Route>
+      <Route path="/faq">
+        <ProtectedRoute><FaqPage /></ProtectedRoute>
       </Route>
 
       <Route component={NotFound} />

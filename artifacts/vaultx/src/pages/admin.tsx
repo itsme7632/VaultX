@@ -42,7 +42,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -310,6 +310,7 @@ export default function AdminPage() {
     { id: "content", label: "Platform Content", icon: FileText },
     { id: "settings", label: "Settings", icon: Settings },
     { id: "logs", label: "Logs", icon: FileText },
+    { id: "faq" as Tab, label: "FAQ", icon: MessageSquare },
   ];
 
   const STAT_CARDS = analytics ? [
@@ -1111,6 +1112,11 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* FAQ */}
+          {tab === "faq" && (
+            <FaqTab toast={toast} />
           )}
 
           {/* PERFORMANCE ADMIN */}
@@ -2708,5 +2714,354 @@ async function adminApiTicket(url: string, method = "GET", body?: any) {
   });
   if (!res.ok) throw new Error((await res.json()).message ?? "Request failed");
   return res.json();
+}
+
+const FAQ_CATEGORIES = ["General", "Account", "Deposits", "Withdrawals", "Opportunities", "Referrals", "Security", "Other"];
+
+interface FaqItem {
+  id: number;
+  question: string;
+  answer: string;
+  category: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+const BLANK_FAQ = { question: "", answer: "", category: "General", isActive: true, sortOrder: 0 };
+
+function FaqTab({ toast }: { toast: any }) {
+  const queryClient = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<FaqItem | null>(null);
+  const [form, setForm] = useState({ ...BLANK_FAQ });
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [previewId, setPreviewId] = useState<number | null>(null);
+
+  const { data: faqs = [], isLoading, refetch } = useQuery<FaqItem[]>({
+    queryKey: ["admin-faqs"],
+    queryFn: () => adminApi("/admin/faqs"),
+    staleTime: 15000,
+  });
+
+  const save = useMutation({
+    mutationFn: (data: typeof form) =>
+      editing
+        ? adminApi(`/admin/faqs/${editing.id}`, "PUT", data)
+        : adminApi("/admin/faqs", "POST", data),
+    onSuccess: () => {
+      toast({ title: editing ? "FAQ updated" : "FAQ created" });
+      setDialogOpen(false);
+      setEditing(null);
+      setForm({ ...BLANK_FAQ });
+      queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+      queryClient.invalidateQueries({ queryKey: ["faqs"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
+
+  const toggle = useMutation({
+    mutationFn: (id: number) => adminApi(`/admin/faqs/${id}/toggle`, "PATCH"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+      queryClient.invalidateQueries({ queryKey: ["faqs"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: number) => adminApi(`/admin/faqs/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast({ title: "FAQ deleted" });
+      setDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+      queryClient.invalidateQueries({ queryKey: ["faqs"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
+
+  const reorder = useMutation({
+    mutationFn: (orders: { id: number; sortOrder: number }[]) =>
+      adminApi("/admin/faqs/reorder", "PATCH", { orders }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-faqs"] });
+      queryClient.invalidateQueries({ queryKey: ["faqs"] });
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
+
+  function openNew() {
+    setEditing(null);
+    setForm({ ...BLANK_FAQ, sortOrder: faqs.length });
+    setDialogOpen(true);
+  }
+
+  function openEdit(faq: FaqItem) {
+    setEditing(faq);
+    setForm({ question: faq.question, answer: faq.answer, category: faq.category, isActive: faq.isActive, sortOrder: faq.sortOrder });
+    setDialogOpen(true);
+  }
+
+  function moveItem(faq: FaqItem, dir: -1 | 1) {
+    const sorted = [...faqs].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
+    const idx = sorted.findIndex((f) => f.id === faq.id);
+    const swapIdx = idx + dir;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const orders = sorted.map((f, i) => {
+      if (i === idx) return { id: f.id, sortOrder: sorted[swapIdx].sortOrder };
+      if (i === swapIdx) return { id: f.id, sortOrder: sorted[idx].sortOrder };
+      return { id: f.id, sortOrder: f.sortOrder };
+    });
+    reorder.mutate(orders);
+  }
+
+  const searchLower = search.toLowerCase();
+  const filtered = [...faqs]
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+    .filter((f) => {
+      if (categoryFilter !== "all" && f.category !== categoryFilter) return false;
+      if (search && !f.question.toLowerCase().includes(searchLower) && !f.answer.toLowerCase().includes(searchLower)) return false;
+      return true;
+    });
+
+  const allCategories = Array.from(new Set(faqs.map((f) => f.category)));
+  const previewFaq = faqs.find((f) => f.id === previewId);
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="font-bold text-sm text-foreground">FAQ Management</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{faqs.length} total · {faqs.filter(f => f.isActive).length} active</p>
+        </div>
+        <Button size="sm" onClick={openNew} className="h-8 text-xs gap-1.5">
+          <Plus size={13} /> Add FAQ
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search FAQs…"
+            className="pl-7 h-8 text-xs"
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="h-8 text-xs w-32">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {allCategories.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* FAQ List */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="py-12 text-center bg-card border border-border rounded-2xl">
+          <p className="text-sm font-medium text-foreground">No FAQs found</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {search || categoryFilter !== "all" ? "Try clearing filters" : "Click \"Add FAQ\" to create the first one"}
+          </p>
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-2xl divide-y divide-border shadow-sm overflow-hidden">
+          {filtered.map((faq, idx) => (
+            <div key={faq.id} className="px-4 py-3 space-y-1">
+              <div className="flex items-start gap-2">
+                {/* Sort arrows */}
+                <div className="flex flex-col gap-0.5 shrink-0 mt-0.5">
+                  <button
+                    onClick={() => moveItem(faq, -1)}
+                    disabled={idx === 0 || reorder.isPending}
+                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30 transition-colors"
+                  >
+                    <ChevronRight size={11} className="-rotate-90 text-muted-foreground" />
+                  </button>
+                  <button
+                    onClick={() => moveItem(faq, 1)}
+                    disabled={idx === filtered.length - 1 || reorder.isPending}
+                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30 transition-colors"
+                  >
+                    <ChevronRight size={11} className="rotate-90 text-muted-foreground" />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full border", faq.isActive ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800" : "bg-zinc-100 text-zinc-500 border-zinc-200 dark:bg-zinc-800 dark:text-zinc-400")}>
+                      {faq.isActive ? "Active" : "Inactive"}
+                    </span>
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                      {faq.category}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground">#{faq.sortOrder}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-foreground mt-1 leading-snug line-clamp-1">{faq.question}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{faq.answer}</p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => setPreviewId(previewId === faq.id ? null : faq.id)}
+                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title="Preview"
+                  >
+                    <Search size={12} />
+                  </button>
+                  <button
+                    onClick={() => toggle.mutate(faq.id)}
+                    disabled={toggle.isPending}
+                    className={cn("p-1.5 rounded-lg hover:bg-muted transition-colors", faq.isActive ? "text-emerald-500" : "text-zinc-400")}
+                    title={faq.isActive ? "Disable" : "Enable"}
+                  >
+                    {faq.isActive ? <Check size={12} /> : <X size={12} />}
+                  </button>
+                  <button
+                    onClick={() => openEdit(faq)}
+                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title="Edit"
+                  >
+                    <Edit2 size={12} />
+                  </button>
+                  <button
+                    onClick={() => setDeleteId(faq.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Inline preview */}
+              {previewId === faq.id && (
+                <div className="ml-6 mt-2 p-3 bg-muted/40 rounded-xl border border-border">
+                  <p className="text-xs font-semibold text-foreground mb-1">{faq.question}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">{faq.answer}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(o) => { setDialogOpen(o); if (!o) { setEditing(null); setForm({ ...BLANK_FAQ }); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit FAQ" : "Add New FAQ"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-1">
+            <div>
+              <Label className="text-xs">Question *</Label>
+              <Input
+                value={form.question}
+                onChange={(e) => setForm(f => ({ ...f, question: e.target.value }))}
+                placeholder="What is your question?"
+                className="mt-1 h-9 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Answer *</Label>
+              <Textarea
+                value={form.answer}
+                onChange={(e) => setForm(f => ({ ...f, answer: e.target.value }))}
+                placeholder="Provide a detailed answer…"
+                className="mt-1 text-sm min-h-[100px] resize-none"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Category</Label>
+                <Select value={form.category} onValueChange={(v) => setForm(f => ({ ...f, category: v }))}>
+                  <SelectTrigger className="mt-1 h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FAQ_CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Sort Order</Label>
+                <Input
+                  type="number"
+                  value={form.sortOrder}
+                  onChange={(e) => setForm(f => ({ ...f, sortOrder: parseInt(e.target.value, 10) || 0 }))}
+                  className="mt-1 h-9 text-sm"
+                  min={0}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={form.isActive}
+                onCheckedChange={(v) => setForm(f => ({ ...f, isActive: v }))}
+                id="faq-active"
+              />
+              <Label htmlFor="faq-active" className="text-xs cursor-pointer">
+                {form.isActive ? "Active (visible to users)" : "Inactive (hidden from users)"}
+              </Label>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 h-9 text-sm"
+                onClick={() => { setDialogOpen(false); setEditing(null); setForm({ ...BLANK_FAQ }); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 h-9 text-sm"
+                onClick={() => save.mutate(form)}
+                disabled={save.isPending || !form.question.trim() || !form.answer.trim()}
+              >
+                {save.isPending ? "Saving…" : editing ? "Save Changes" : "Create FAQ"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Delete FAQ?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">This action cannot be undone. The FAQ will be permanently removed.</p>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1 h-9 text-sm" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              className="flex-1 h-9 text-sm"
+              onClick={() => deleteId !== null && remove.mutate(deleteId)}
+              disabled={remove.isPending}
+            >
+              {remove.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }
 

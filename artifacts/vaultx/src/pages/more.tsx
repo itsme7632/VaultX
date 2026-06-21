@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Info, Lock, FileText, Download, Headphones,
-  ChevronRight, Shield, Smartphone, PieChart, TrendingUp, BarChart3,
+  ChevronRight, Shield, Smartphone, PieChart, TrendingUp, BarChart3, HelpCircle,
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,13 @@ export default function MorePage() {
   ];
 
   const navItems = [
+    {
+      icon: HelpCircle,
+      label: "FAQ",
+      description: "Frequently asked questions answered by our team",
+      href: "/faq",
+      gradient: "from-amber-500 to-orange-600",
+    },
     {
       icon: Info,
       label: "About Wexora",

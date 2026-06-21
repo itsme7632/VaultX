@@ -18,6 +18,7 @@ import publicSettingsRouter from "./public-settings";
 import storageRouter from "./storage";
 import appInfoRouter from "./app-info";
 import aboutRouter from "./about";
+import faqRouter from "./faq";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(depositNetworksRouter);
 router.use(storageRouter);
 router.use(appInfoRouter);
 router.use(aboutRouter);
+router.use(faqRouter);
 
 export default router;

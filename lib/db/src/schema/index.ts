@@ -14,3 +14,4 @@ export * from "./deposit_networks";
 export * from "./platform_settings";
 export * from "./admin-action-logs";
 export * from "./app_releases";
+export * from "./faqs";
