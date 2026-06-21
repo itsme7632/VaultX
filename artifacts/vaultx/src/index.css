@@ -183,6 +183,22 @@
   --shadow-2xl: 0px 32px 64px rgba(0,0,0,0.7);
 }
 
+/* ─── Dark mode overrides for auth page gradient backgrounds ─────────────── */
+/* from-slate-50 / via-blue-50 / to-white used on login/signup/forgot pages */
+.dark .from-slate-50 {
+  --tw-gradient-from: hsl(222 47% 9%) var(--tw-gradient-from-position);
+}
+.dark .via-blue-50\/30 {
+  --tw-gradient-via: hsl(222 40% 11%) var(--tw-gradient-via-position);
+}
+.dark .to-white {
+  --tw-gradient-to: hsl(222 47% 11%) var(--tw-gradient-to-position);
+}
+/* Fix country dropdown in signup (uses explicit bg-white) */
+.dark .from-slate-50.min-h-screen {
+  background: hsl(222 47% 9%) !important;
+}
+
 /* ─── Dark mode overrides for hardcoded light utility classes ─────────────── */
 /* These handle bg-white/bg-slate-* used throughout page components         */
 .dark .bg-white {

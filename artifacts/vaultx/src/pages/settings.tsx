@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { isNotificationMuted, setNotificationMuted } from "@/lib/notificationSound";
+import { isNotificationMuted, setNotificationMuted, playNotificationSound } from "@/lib/notificationSound";
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
@@ -120,7 +120,11 @@ export default function SettingsPage() {
     const next = !notifMuted;
     setNotifMuted(next);
     setNotificationMuted(next);
-    toast({ title: next ? "Notification sound muted" : "Notification sound enabled" });
+    if (!next) {
+      // Play a preview sound to confirm sound is now ON
+      setTimeout(() => playNotificationSound("preview"), 80);
+    }
+    toast({ title: next ? "Notification sound muted" : "Notification sound enabled", description: next ? "You won't hear notification alerts." : "You'll hear sounds for new alerts." });
   };
 
   return (

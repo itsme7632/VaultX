@@ -50,7 +50,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-white flex flex-col items-center justify-center px-5">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-5">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <img src="/wx-logo.png" alt="Wexora" className="w-14 h-14 rounded-2xl mx-auto mb-4 shadow-lg object-cover" />
@@ -58,7 +58,7 @@ export default function LoginPage() {
           <p className="text-muted-foreground mt-1 text-sm">Sign in to your Wexora account</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
+        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField

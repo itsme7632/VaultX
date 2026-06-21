@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, User, Mail, Phone, Lock, Hash, ArrowRight, ChevronDown, Globe } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Phone, Lock, Hash, ArrowRight, ChevronDown, Globe, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { useSignup, getGetMeQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,6 @@ const COUNTRIES = [
   { code: "CZ", name: "Czech Republic", dial: "+420" },
   { code: "DK", name: "Denmark", dial: "+45" },
   { code: "DJ", name: "Djibouti", dial: "+253" },
-  { code: "DM", name: "Dominica", dial: "+1767" },
   { code: "DO", name: "Dominican Republic", dial: "+1809" },
   { code: "EC", name: "Ecuador", dial: "+593" },
   { code: "EG", name: "Egypt", dial: "+20" },
@@ -79,7 +78,6 @@ const COUNTRIES = [
   { code: "DE", name: "Germany", dial: "+49" },
   { code: "GH", name: "Ghana", dial: "+233" },
   { code: "GR", name: "Greece", dial: "+30" },
-  { code: "GD", name: "Grenada", dial: "+1473" },
   { code: "GT", name: "Guatemala", dial: "+502" },
   { code: "GN", name: "Guinea", dial: "+224" },
   { code: "GW", name: "Guinea-Bissau", dial: "+245" },
@@ -100,7 +98,6 @@ const COUNTRIES = [
   { code: "JO", name: "Jordan", dial: "+962" },
   { code: "KZ", name: "Kazakhstan", dial: "+7" },
   { code: "KE", name: "Kenya", dial: "+254" },
-  { code: "KI", name: "Kiribati", dial: "+686" },
   { code: "KW", name: "Kuwait", dial: "+965" },
   { code: "KG", name: "Kyrgyzstan", dial: "+996" },
   { code: "LA", name: "Laos", dial: "+856" },
@@ -118,20 +115,16 @@ const COUNTRIES = [
   { code: "MV", name: "Maldives", dial: "+960" },
   { code: "ML", name: "Mali", dial: "+223" },
   { code: "MT", name: "Malta", dial: "+356" },
-  { code: "MH", name: "Marshall Islands", dial: "+692" },
   { code: "MR", name: "Mauritania", dial: "+222" },
   { code: "MU", name: "Mauritius", dial: "+230" },
   { code: "MX", name: "Mexico", dial: "+52" },
-  { code: "FM", name: "Micronesia", dial: "+691" },
   { code: "MD", name: "Moldova", dial: "+373" },
-  { code: "MC", name: "Monaco", dial: "+377" },
   { code: "MN", name: "Mongolia", dial: "+976" },
   { code: "ME", name: "Montenegro", dial: "+382" },
   { code: "MA", name: "Morocco", dial: "+212" },
   { code: "MZ", name: "Mozambique", dial: "+258" },
   { code: "MM", name: "Myanmar", dial: "+95" },
   { code: "NA", name: "Namibia", dial: "+264" },
-  { code: "NR", name: "Nauru", dial: "+674" },
   { code: "NP", name: "Nepal", dial: "+977" },
   { code: "NL", name: "Netherlands", dial: "+31" },
   { code: "NZ", name: "New Zealand", dial: "+64" },
@@ -141,7 +134,6 @@ const COUNTRIES = [
   { code: "NO", name: "Norway", dial: "+47" },
   { code: "OM", name: "Oman", dial: "+968" },
   { code: "PK", name: "Pakistan", dial: "+92" },
-  { code: "PW", name: "Palau", dial: "+680" },
   { code: "PA", name: "Panama", dial: "+507" },
   { code: "PG", name: "Papua New Guinea", dial: "+675" },
   { code: "PY", name: "Paraguay", dial: "+595" },
@@ -153,21 +145,13 @@ const COUNTRIES = [
   { code: "RO", name: "Romania", dial: "+40" },
   { code: "RU", name: "Russia", dial: "+7" },
   { code: "RW", name: "Rwanda", dial: "+250" },
-  { code: "KN", name: "Saint Kitts & Nevis", dial: "+1869" },
-  { code: "LC", name: "Saint Lucia", dial: "+1758" },
-  { code: "VC", name: "Saint Vincent", dial: "+1784" },
-  { code: "WS", name: "Samoa", dial: "+685" },
-  { code: "SM", name: "San Marino", dial: "+378" },
-  { code: "ST", name: "São Tomé & Príncipe", dial: "+239" },
   { code: "SA", name: "Saudi Arabia", dial: "+966" },
   { code: "SN", name: "Senegal", dial: "+221" },
   { code: "RS", name: "Serbia", dial: "+381" },
-  { code: "SC", name: "Seychelles", dial: "+248" },
   { code: "SL", name: "Sierra Leone", dial: "+232" },
   { code: "SG", name: "Singapore", dial: "+65" },
   { code: "SK", name: "Slovakia", dial: "+421" },
   { code: "SI", name: "Slovenia", dial: "+386" },
-  { code: "SB", name: "Solomon Islands", dial: "+677" },
   { code: "SO", name: "Somalia", dial: "+252" },
   { code: "ZA", name: "South Africa", dial: "+27" },
   { code: "SS", name: "South Sudan", dial: "+211" },
@@ -182,14 +166,11 @@ const COUNTRIES = [
   { code: "TJ", name: "Tajikistan", dial: "+992" },
   { code: "TZ", name: "Tanzania", dial: "+255" },
   { code: "TH", name: "Thailand", dial: "+66" },
-  { code: "TL", name: "Timor-Leste", dial: "+670" },
   { code: "TG", name: "Togo", dial: "+228" },
-  { code: "TO", name: "Tonga", dial: "+676" },
   { code: "TT", name: "Trinidad & Tobago", dial: "+1868" },
   { code: "TN", name: "Tunisia", dial: "+216" },
   { code: "TR", name: "Turkey", dial: "+90" },
   { code: "TM", name: "Turkmenistan", dial: "+993" },
-  { code: "TV", name: "Tuvalu", dial: "+688" },
   { code: "UG", name: "Uganda", dial: "+256" },
   { code: "UA", name: "Ukraine", dial: "+380" },
   { code: "AE", name: "United Arab Emirates", dial: "+971" },
@@ -212,7 +193,7 @@ const schema = z
     email: z.string().email("Invalid email"),
     country: z.string().min(1, "Select your country"),
     dialCode: z.string().optional(),
-    whatsapp: z.string().optional(),
+    whatsapp: z.string().min(5, "WhatsApp number is required"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string(),
     referralCode: z.string().optional(),
@@ -223,6 +204,7 @@ const schema = z
   });
 
 type FormData = z.infer<typeof schema>;
+type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
 function PasswordStrength({ password }: { password: string }) {
   const checks = [
@@ -249,11 +231,36 @@ function PasswordStrength({ password }: { password: string }) {
   );
 }
 
+function UsernameIndicator({ status }: { status: UsernameStatus }) {
+  if (status === "idle") return null;
+  if (status === "checking") return (
+    <div className="flex items-center gap-1.5 mt-1.5">
+      <Loader2 size={12} className="animate-spin text-muted-foreground" />
+      <span className="text-xs text-muted-foreground">Checking availability…</span>
+    </div>
+  );
+  if (status === "available") return (
+    <div className="flex items-center gap-1.5 mt-1.5">
+      <CheckCircle2 size={13} className="text-emerald-500" />
+      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Username available</span>
+    </div>
+  );
+  if (status === "taken") return (
+    <div className="flex items-center gap-1.5 mt-1.5">
+      <XCircle size={13} className="text-destructive" />
+      <span className="text-xs text-destructive font-medium">Username already taken</span>
+    </div>
+  );
+  return null;
+}
+
 export default function SignupPage() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [countrySearch, setCountrySearch] = useState("");
   const [showCountryDrop, setShowCountryDrop] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
+  const usernameDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const signup = useSignup();
@@ -278,6 +285,30 @@ export default function SignupPage() {
   const password = form.watch("password");
   const selectedCountry = form.watch("country");
   const dialCode = form.watch("dialCode");
+  const usernameValue = form.watch("username");
+
+  // Real-time username availability check
+  useEffect(() => {
+    const username = usernameValue?.trim();
+    if (!username || username.length < 3 || !/^[a-z0-9_]+$/i.test(username)) {
+      setUsernameStatus("idle");
+      if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+      return;
+    }
+    setUsernameStatus("checking");
+    if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current);
+    usernameDebounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(username)}`, { credentials: "include" });
+        if (!res.ok) { setUsernameStatus("idle"); return; }
+        const data = await res.json();
+        setUsernameStatus(data.available ? "available" : "taken");
+      } catch {
+        setUsernameStatus("idle");
+      }
+    }, 450);
+    return () => { if (usernameDebounceRef.current) clearTimeout(usernameDebounceRef.current); };
+  }, [usernameValue]);
 
   const filteredCountries = COUNTRIES.filter(
     (c) =>
@@ -286,6 +317,10 @@ export default function SignupPage() {
   );
 
   const onSubmit = (data: FormData) => {
+    if (usernameStatus === "taken") {
+      toast({ title: "Username taken", description: "Please choose a different username.", variant: "destructive" });
+      return;
+    }
     const whatsappFull = data.whatsapp ? `${data.dialCode ?? ""}${data.whatsapp.replace(/^0+/, "")}` : undefined;
     signup.mutate(
       { data: { ...data, whatsapp: whatsappFull } },
@@ -301,8 +336,10 @@ export default function SignupPage() {
     );
   };
 
+  const isSubmitDisabled = signup.isPending || usernameStatus === "taken" || usernameStatus === "checking";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-white flex flex-col items-center justify-center px-5 py-8">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-5 py-8">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
           <img src="/wx-logo.png" alt="Wexora" className="w-12 h-12 rounded-2xl mx-auto mb-3 shadow-lg object-cover" />
@@ -310,7 +347,7 @@ export default function SignupPage() {
           <p className="text-muted-foreground mt-1 text-sm">Join Wexora today</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-border p-6">
+        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
 
@@ -336,9 +373,18 @@ export default function SignupPage() {
                     <FormControl>
                       <div className="relative">
                         <Hash size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input {...field} placeholder="johndoe" className="pl-9 h-10 bg-muted/40" />
+                        <Input
+                          {...field}
+                          placeholder="johndoe"
+                          className={cn(
+                            "pl-9 h-10 bg-muted/40",
+                            usernameStatus === "available" && "border-emerald-500 focus-visible:ring-emerald-500",
+                            usernameStatus === "taken" && "border-destructive focus-visible:ring-destructive",
+                          )}
+                        />
                       </div>
                     </FormControl>
+                    <UsernameIndicator status={usernameStatus} />
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -376,7 +422,7 @@ export default function SignupPage() {
                         <ChevronDown size={13} className="text-muted-foreground shrink-0" />
                       </button>
                       {showCountryDrop && (
-                        <div className="absolute top-full left-0 right-0 z-50 bg-white border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
+                        <div className="absolute top-full left-0 right-0 z-50 bg-card border border-border rounded-xl shadow-lg mt-1 overflow-hidden">
                           <div className="p-2 border-b border-border">
                             <Input
                               autoFocus
@@ -400,7 +446,7 @@ export default function SignupPage() {
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/60 text-left"
                               >
                                 <span className="text-muted-foreground text-xs w-10 shrink-0">{c.dial}</span>
-                                <span className="truncate">{c.name}</span>
+                                <span className="truncate text-foreground">{c.name}</span>
                               </button>
                             ))}
                             {!filteredCountries.length && (
@@ -415,10 +461,12 @@ export default function SignupPage() {
                 </FormItem>
               )} />
 
-              {/* WhatsApp with dial code */}
+              {/* WhatsApp with dial code — REQUIRED */}
               <FormField control={form.control} name="whatsapp" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium">WhatsApp <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                  <FormLabel className="text-sm font-medium">
+                    WhatsApp Number <span className="text-destructive">*</span>
+                  </FormLabel>
                   <FormControl>
                     <div className="flex gap-1.5">
                       <div className="h-10 bg-muted/40 border border-input rounded-md flex items-center px-2.5 text-sm font-mono text-muted-foreground shrink-0 min-w-[60px]">
@@ -430,6 +478,7 @@ export default function SignupPage() {
                       </div>
                     </div>
                   </FormControl>
+                  <p className="text-[11px] text-muted-foreground mt-1">Required for account support and verification</p>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -482,12 +531,22 @@ export default function SignupPage() {
                 </FormItem>
               )} />
 
+              {/* Username taken warning banner */}
+              {usernameStatus === "taken" && (
+                <div className="flex items-center gap-2 bg-destructive/10 border border-destructive/20 rounded-xl px-3 py-2.5">
+                  <XCircle size={14} className="text-destructive shrink-0" />
+                  <p className="text-xs text-destructive font-medium">Choose a different username to continue</p>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 className="w-full h-11 bg-primary hover:bg-primary/90 font-semibold text-sm mt-2"
-                disabled={signup.isPending}
+                disabled={isSubmitDisabled}
               >
-                {signup.isPending ? "Creating account..." : (
+                {signup.isPending ? "Creating account..." : usernameStatus === "checking" ? (
+                  <span className="flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Checking…</span>
+                ) : (
                   <span className="flex items-center gap-2">Create account <ArrowRight size={16} /></span>
                 )}
               </Button>

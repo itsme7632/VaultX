@@ -26,6 +26,7 @@ export function TopBar({ title }: { title?: string }) {
   const queryClient = useQueryClient();
   const logout = useLogout();
   const prevUnreadRef = useRef<number | null>(null);
+  const prevNotifIdsRef = useRef<Set<number>>(new Set());
 
   const { data: notifications } = useGetNotifications({
     query: {
@@ -36,17 +37,40 @@ export function TopBar({ title }: { title?: string }) {
   });
 
   const unreadCount = notifications?.unreadCount ?? 0;
+  const notifList: any[] = (notifications as any)?.notifications ?? [];
 
   useEffect(() => {
     if (prevUnreadRef.current === null) {
       prevUnreadRef.current = unreadCount;
+      prevNotifIdsRef.current = new Set(notifList.map((n: any) => n.id));
       return;
     }
-    if (unreadCount > prevUnreadRef.current) {
-      playNotificationSound();
+
+    if (unreadCount > (prevUnreadRef.current ?? 0)) {
+      // Find newly arrived notifications
+      const currentIds = new Set(notifList.map((n: any) => n.id));
+      const newNotifs = notifList.filter((n: any) => !prevNotifIdsRef.current.has(n.id));
+      prevNotifIdsRef.current = currentIds;
+
+      // Determine sound type from the newest notification
+      const newest = newNotifs[0];
+      const type = newest?.type as string | undefined;
+
+      if (type === "deposit_approved" || type === "deposit") {
+        playNotificationSound("deposit");
+      } else if (type === "withdrawal_approved" || type === "withdrawal") {
+        playNotificationSound("withdrawal");
+      } else if (type === "support_reply" || type === "support") {
+        playNotificationSound("support");
+      } else if (type === "announcement") {
+        playNotificationSound("announcement");
+      } else {
+        playNotificationSound("notification");
+      }
     }
+
     prevUnreadRef.current = unreadCount;
-  }, [unreadCount]);
+  }, [unreadCount, notifList]);
 
   const handleLogout = () => {
     logout.mutate(undefined, {

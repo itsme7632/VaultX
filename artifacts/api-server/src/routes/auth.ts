@@ -283,4 +283,23 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
   res.json({ success: true, message: "Password reset successfully" });
 });
 
+// ── Username availability check ────────────────────────────────────────────
+router.get("/auth/check-username", async (req, res): Promise<void> => {
+  const username = (req.query.username as string ?? "").trim().toLowerCase();
+  if (!username || username.length < 3) {
+    res.json({ available: false, reason: "too_short" });
+    return;
+  }
+  if (!/^[a-z0-9_]+$/.test(username)) {
+    res.json({ available: false, reason: "invalid_chars" });
+    return;
+  }
+  const existing = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(eq(usersTable.username, username))
+    .limit(1);
+  res.json({ available: existing.length === 0 });
+});
+
 export default router;

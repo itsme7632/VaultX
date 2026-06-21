@@ -261,9 +261,7 @@ export default function DownloadAppPage() {
             <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white -translate-x-8 translate-y-8" />
           </div>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg border border-white/20">
-              <span className="text-2xl font-black text-white">V</span>
-            </div>
+            <img src="/wx-logo.png" alt="Wexora" className="w-16 h-16 rounded-2xl shadow-lg object-cover border border-white/20" />
             <div className="flex-1 min-w-0">
               <h1 className="text-xl font-black text-white">{appInfo?.appName ?? "Wexora"}</h1>
               <p className="text-blue-200 text-sm mt-0.5">Crypto Investment Platform</p>

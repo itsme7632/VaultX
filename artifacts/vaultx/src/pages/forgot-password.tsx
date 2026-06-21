@@ -7,7 +7,7 @@ export default function ForgotPasswordPage() {
   const whatsapp = "https://wa.me/WexoraGlobal";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-white flex flex-col items-center justify-center px-5">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-5">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <img src="/wx-logo.png" alt="Wexora" className="w-14 h-14 rounded-2xl mx-auto mb-4 shadow-lg object-cover" />
@@ -15,8 +15,8 @@ export default function ForgotPasswordPage() {
           <p className="text-muted-foreground mt-1 text-sm">Contact our support team to reset your password</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-border p-6 space-y-4">
-          <div className="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
+          <div className="flex items-start gap-3 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
             <HeadphonesIcon className="w-5 h-5 text-primary mt-0.5 shrink-0" />
             <p className="text-sm text-foreground leading-relaxed">
               For security reasons, password resets are handled by our support team. Please reach out via the channels below and we'll help you regain access to your account.
