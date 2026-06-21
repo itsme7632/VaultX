@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TrendingUp, Newspaper, BarChart3, Globe, Zap, ArrowRight, Calendar, Tag } from "lucide-react";
+import { TrendingUp, Newspaper, BarChart3, Globe, Zap, ArrowRight, Calendar, Tag, ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
@@ -60,6 +60,15 @@ export default function MarketInsightsPage() {
   return (
     <AppLayout title="Market Insights">
       <div className="px-4 pt-5 pb-24 space-y-5">
+
+        {/* Back button */}
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span>Back</span>
+        </button>
 
         {/* Hero */}
         <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-purple-900/60 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden">

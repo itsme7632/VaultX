@@ -1,18 +1,16 @@
 import { useEffect, useState, useRef } from "react";
-import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, ArrowRight, Users, Copy, Check, BarChart3, Target } from "lucide-react";
+import { TrendingUp, DollarSign, Activity, Zap, Clock, ArrowRight, Users, Copy, Check, BarChart3 } from "lucide-react";
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetMarketPrices, getGetMarketPricesQueryKey,
-  useGetDashboardActivity, getGetDashboardActivityQueryKey,
   useGetReferralStats, getGetReferralStatsQueryKey,
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
 } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatUSDT, formatDateTime } from "@/lib/format";
+import { formatUSDT } from "@/lib/format";
 import { Link } from "wouter";
 import { LiveActivityFeed } from "@/components/LiveActivityFeed";
 import { useAuth } from "@/lib/auth";
@@ -62,25 +60,6 @@ function MarketTicker({ data }: { data: any[] }) {
   );
 }
 
-const activityTypeColor: Record<string, string> = {
-  deposit: "text-emerald-500",
-  withdrawal: "text-destructive",
-  earning: "text-amber-500",
-  reinvest: "text-primary",
-  investment: "text-primary",
-  transfer: "text-blue-400",
-  referral: "text-purple-500",
-};
-
-const activityTypeBg: Record<string, string> = {
-  deposit: "bg-emerald-500/10",
-  withdrawal: "bg-destructive/10",
-  earning: "bg-amber-500/10",
-  reinvest: "bg-primary/10",
-  investment: "bg-primary/10",
-  transfer: "bg-blue-500/10",
-  referral: "bg-purple-500/10",
-};
 
 function ReferralWidget() {
   const [copied, setCopied] = useState(false);
@@ -231,36 +210,15 @@ export default function DashboardPage() {
   const { data: market } = useGetMarketPrices({
     query: { queryKey: getGetMarketPricesQueryKey(), staleTime: 60000 },
   });
-  const { data: activity } = useGetDashboardActivity({
-    query: { queryKey: getGetDashboardActivityQueryKey(), staleTime: 30000 },
-  });
   const { data: plans } = useGetInvestmentPlans({
     query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
   });
-  const { data: newsData } = useQuery({
-    queryKey: ["news", "dashboard"],
-    queryFn: async () => {
-      const res = await fetch("/api/news?limit=3", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    staleTime: 120000,
-  });
-
   const stats = [
     { label: "Total Balance", value: summary ? formatUSDT(summary.totalBalance) : null, icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },
     { label: "Active Opportunities", value: summary ? `${summary.activeInvestmentsCount}` : null, sub: summary ? formatUSDT(summary.activeInvestmentsValue) : null, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Today's Distribution", value: summary ? formatUSDT(summary.dailyEarnings) : null, icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
     { label: "Total Distributions", value: summary ? formatUSDT(summary.totalEarnings) : null, icon: Zap, color: "text-purple-500", bg: "bg-purple-500/10" },
   ];
-
-  const categoryLabel: Record<string, string> = {
-    announcement: "Announcement", investment: "Investment", security: "Security", market: "Market",
-  };
-  const categoryColor: Record<string, string> = {
-    announcement: "bg-primary/10 text-primary", investment: "bg-emerald-500/10 text-emerald-600",
-    security: "bg-amber-500/10 text-amber-600", market: "bg-purple-500/10 text-purple-600",
-  };
 
   return (
     <AppLayout>
@@ -377,59 +335,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* News section */}
-        {newsData && newsData.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <h3 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
-                <Newspaper size={14} className="text-primary" />
-                Market Insights
-              </h3>
-              <Link href="/market-insights" className="text-xs text-primary font-medium flex items-center gap-0.5">
-                View all <ArrowRight size={11} />
-              </Link>
-            </div>
-            <div className="space-y-2.5">
-              {newsData.map((post: any) => (
-                <Link key={post.id} href={`/news/${post.id}`}>
-                  <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <p className="font-semibold text-sm text-foreground leading-tight line-clamp-1">{post.title}</p>
-                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0", categoryColor[post.category] ?? "bg-muted text-muted-foreground")}>
-                        {categoryLabel[post.category] ?? post.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{post.excerpt}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1.5">{formatDateTime(post.publishedAt ?? post.createdAt)}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent activity */}
-        {activity && activity.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-sm text-foreground mb-2.5">Recent Activity</h3>
-            <div className="bg-card border border-border rounded-xl divide-y divide-border shadow-sm overflow-hidden">
-              {activity.slice(0, 6).map((item: any) => (
-                <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", activityTypeBg[item.type] ?? "bg-muted")}>
-                    <ArrowUpRight size={14} className={activityTypeColor[item.type] ?? "text-foreground"} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
-                    <p className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</p>
-                  </div>
-                  <p className={cn("text-sm font-semibold flex-shrink-0", ["withdrawal", "investment", "transfer"].includes(item.type) ? "text-destructive" : "text-emerald-500")}>
-                    {["withdrawal", "investment", "transfer"].includes(item.type) ? "-" : "+"}{formatUSDT(item.amount)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </AppLayout>
   );

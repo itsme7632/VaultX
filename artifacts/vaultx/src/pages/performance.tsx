@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { BarChart3, TrendingUp, Users, DollarSign, Activity, Zap, ChevronDown, ChevronUp } from "lucide-react";
+import { BarChart3, TrendingUp, Users, DollarSign, Activity, Zap, ChevronDown, ChevronUp, ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { useGetInvestmentPlans, getGetInvestmentPlansQueryKey } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -25,53 +27,45 @@ function MiniBarChart({ values, color }: { values: number[]; color: string }) {
 }
 
 export default function PerformancePage() {
+  const [, navigate] = useLocation();
   const [showMonthly, setShowMonthly] = useState(false);
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
-    queryKey: ["performance-analytics"],
+    queryKey: ["platform-performance"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/analytics", { credentials: "include" });
+      const res = await fetch("/api/platform/performance", { credentials: "include" });
       if (!res.ok) return null;
       return res.json();
     },
     staleTime: 30000,
   });
 
-  const { data: statsData } = useQuery({
-    queryKey: ["admin-statistics"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/statistics", { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
-    staleTime: 60000,
-  });
-
-  const { data: plans } = useQuery({
-    queryKey: ["admin-plans"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/plans", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    staleTime: 60000,
+  const { data: plans } = useGetInvestmentPlans({
+    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
   });
 
   const activeOpportunities = (plans ?? []).filter((p: any) => p.isActive).length;
 
-  const monthlyData: number[] = statsData?.monthlyDeposits ?? [
-    12000, 18500, 22000, 31000, 28000, 42000, 38000, 51000, 47000, 62000, 58000, 75000,
-  ].slice(0, new Date().getMonth() + 1);
-
-  const monthlyEarnings: number[] = statsData?.monthlyEarnings ?? [
-    800, 1200, 1600, 2400, 2100, 3200, 2800, 4100, 3700, 5200, 4800, 6400,
-  ].slice(0, new Date().getMonth() + 1);
-
   const currentMonth = new Date().getMonth();
+
+  const FALLBACK_DEPOSITS = [12000, 18500, 22000, 31000, 28000, 42000, 38000, 51000, 47000, 62000, 58000, 75000];
+  const FALLBACK_EARNINGS = [800, 1200, 1600, 2400, 2100, 3200, 2800, 4100, 3700, 5200, 4800, 6400];
+
+  const monthlyData: number[] = analytics?.monthlyDeposits ?? FALLBACK_DEPOSITS.slice(0, currentMonth + 1);
+  const monthlyEarnings: number[] = analytics?.monthlyEarnings ?? FALLBACK_EARNINGS.slice(0, currentMonth + 1);
 
   return (
     <AppLayout title="Performance Center">
       <div className="px-4 pt-5 pb-24 space-y-5">
+
+        {/* Back button */}
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span>Back</span>
+        </button>
 
         {/* Hero */}
         <div className="bg-gradient-to-br from-primary via-blue-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
@@ -89,7 +83,7 @@ export default function PerformancePage() {
               {analyticsLoading ? (
                 <Skeleton className="h-6 w-20 bg-white/20 mb-1" />
               ) : (
-                <p className="text-xl font-bold">{formatUSDTCompact(analytics?.totalInvestments ?? 0)}</p>
+                <p className="text-xl font-bold">{formatUSDTCompact(analytics?.totalDeposits ?? 0)}</p>
               )}
               <p className="text-[10px] text-blue-100 mt-0.5">Platform Capital</p>
             </div>
@@ -107,10 +101,10 @@ export default function PerformancePage() {
         {/* Key metrics */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Total Participants", value: analyticsLoading ? null : (analytics?.totalUsers ?? 0).toLocaleString(), icon: Users, color: "text-primary", bg: "bg-primary/10" },
-            { label: "Capital Deployed", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalDeposits ?? 0), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50" },
-            { label: "Distributions Paid", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalEarningsPaid ?? 0), icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50" },
-            { label: "Active Investments", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalInvestments ?? 0), icon: Activity, color: "text-amber-600", bg: "bg-amber-50" },
+            { label: "Total Participants", value: analyticsLoading ? null : (analytics?.totalParticipants ?? 0).toLocaleString(), icon: Users, color: "text-primary", bg: "bg-primary/10" },
+            { label: "Capital Deployed", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalDeposits ?? 0), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
+            { label: "Distributions Paid", value: analyticsLoading ? null : formatUSDTCompact(analytics?.totalEarningsPaid ?? 0), icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-950/30" },
+            { label: "Active Investments", value: analyticsLoading ? null : formatUSDTCompact(analytics?.activeInvestmentsValue ?? 0), icon: Activity, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/30" },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} className="bg-card border border-border rounded-xl p-3.5 shadow-sm">
               <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-2.5", bg)}>
@@ -192,7 +186,7 @@ export default function PerformancePage() {
                     <span className="text-foreground font-medium">{month}</span>
                     <span className="text-right text-foreground font-semibold">{formatUSDTCompact(monthlyData[i] ?? 0)}</span>
                     <span className="text-right text-emerald-600 font-semibold">{formatUSDTCompact(monthlyEarnings[i] ?? 0)}</span>
-                    <span className="text-right text-muted-foreground">{10 + i * 8 + (analytics?.totalUsers ? Math.floor(analytics.totalUsers / 12) : 5)}</span>
+                    <span className="text-right text-muted-foreground">{10 + i * 8 + (analytics?.totalParticipants ? Math.floor(analytics.totalParticipants / 12) : 5)}</span>
                   </div>
                 ))}
               </div>

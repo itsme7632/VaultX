@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lte, inArray, sum, count, or, sql } from "drizzle-orm";
 import {
   db,
   walletsTable,
@@ -157,6 +157,83 @@ router.get("/dashboard/activity", requireAuth, async (req, res): Promise<void> =
       createdAt: t.createdAt,
     }))
   );
+});
+
+router.get("/platform/performance", requireAuth, async (req, res): Promise<void> => {
+  const year = new Date().getFullYear();
+  const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
+  const yearEnd = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+
+  const [
+    depositsRes,
+    earningsRes,
+    activeInvRes,
+    participantsRes,
+    monthlyDepositsRes,
+    monthlyEarningsRes,
+  ] = await Promise.all([
+    db.select({ s: sum(transactionsTable.amount) })
+      .from(transactionsTable)
+      .where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "completed"))),
+
+    db.select({ s: sum(transactionsTable.amount) })
+      .from(transactionsTable)
+      .where(and(
+        or(eq(transactionsTable.type, "earning"), eq(transactionsTable.type, "reinvest")),
+        eq(transactionsTable.status, "completed")
+      )),
+
+    db.select({ s: sum(userInvestmentsTable.amount) })
+      .from(userInvestmentsTable)
+      .where(eq(userInvestmentsTable.status, "active")),
+
+    db.select({ c: sql<number>`count(distinct ${userInvestmentsTable.userId})` })
+      .from(userInvestmentsTable),
+
+    db.select({
+      month: sql<number>`extract(month from ${transactionsTable.createdAt})`,
+      total: sum(transactionsTable.amount),
+    })
+      .from(transactionsTable)
+      .where(and(
+        eq(transactionsTable.type, "deposit"),
+        eq(transactionsTable.status, "completed"),
+        gte(transactionsTable.createdAt, yearStart),
+        lte(transactionsTable.createdAt, yearEnd),
+      ))
+      .groupBy(sql`extract(month from ${transactionsTable.createdAt})`),
+
+    db.select({
+      month: sql<number>`extract(month from ${transactionsTable.createdAt})`,
+      total: sum(transactionsTable.amount),
+    })
+      .from(transactionsTable)
+      .where(and(
+        or(eq(transactionsTable.type, "earning"), eq(transactionsTable.type, "reinvest")),
+        eq(transactionsTable.status, "completed"),
+        gte(transactionsTable.createdAt, yearStart),
+        lte(transactionsTable.createdAt, yearEnd),
+      ))
+      .groupBy(sql`extract(month from ${transactionsTable.createdAt})`),
+  ]);
+
+  const toMonthlyArray = (rows: { month: number; total: string | null }[]) => {
+    const arr = new Array(12).fill(0);
+    for (const r of rows) {
+      const idx = Math.round(Number(r.month)) - 1;
+      if (idx >= 0 && idx < 12) arr[idx] = parseFloat(r.total ?? "0");
+    }
+    return arr;
+  };
+
+  res.json({
+    totalDeposits: parseFloat(depositsRes[0]?.s ?? "0"),
+    totalEarningsPaid: parseFloat(earningsRes[0]?.s ?? "0"),
+    activeInvestmentsValue: parseFloat(activeInvRes[0]?.s ?? "0"),
+    totalParticipants: Number(participantsRes[0]?.c ?? 0),
+    monthlyDeposits: toMonthlyArray(monthlyDepositsRes as any),
+    monthlyEarnings: toMonthlyArray(monthlyEarningsRes as any),
+  });
 });
 
 export default router;

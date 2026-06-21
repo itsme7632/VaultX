@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { PieChart, Edit2, Save, X } from "lucide-react";
+import { PieChart, Edit2, Save, X, ArrowLeft } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,7 @@ function AllocationBar({ pct, color }: { pct: number; color: string }) {
 }
 
 export default function CapitalAllocationPage() {
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   const isAdmin = (user as any)?.isAdmin;
   const qc = useQueryClient();
@@ -80,6 +82,15 @@ export default function CapitalAllocationPage() {
   return (
     <AppLayout title="Capital Allocation">
       <div className="px-4 pt-5 pb-24 space-y-5">
+
+        {/* Back button */}
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span>Back</span>
+        </button>
 
         {/* Header */}
         <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-primary/80 rounded-2xl p-5 text-white shadow-lg">
