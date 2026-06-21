@@ -14,7 +14,7 @@ import {
   newsPostsTable,
   notificationsTable,
 } from "./schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, or } from "drizzle-orm";
 
 const { Pool } = pg;
 
@@ -521,7 +521,14 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
   const existing = await db
     .select({ c: count() })
     .from(usersTable)
-    .where(eq(usersTable.email, "demo@wexoraglobal.com"));
+    .where(
+      or(
+        eq(usersTable.email, "demo@wexoraglobal.com"),
+        eq(usersTable.username, "alexj"),
+        eq(usersTable.displayId, "100042"),
+        eq(usersTable.referralCode, "ALEXJ42"),
+      )
+    );
 
   if ((existing[0]?.c ?? 0) > 0) {
     console.log("[seed] Demo user already exists, skipping");
@@ -530,7 +537,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
 
   const passwordHash = await bcrypt.hash("Demo@12345", 12);
 
-  const [demo] = await db
+  const inserted = await db
     .insert(usersTable)
     .values({
       displayId: "100042",
@@ -547,7 +554,14 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       whatsapp: "+1 555 010 0000",
       whatsappLocked: true,
     })
+    .onConflictDoNothing()
     .returning();
+
+  const demo = inserted[0];
+  if (!demo) {
+    console.log("[seed] Demo user already exists (conflict), skipping");
+    return;
+  }
 
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
