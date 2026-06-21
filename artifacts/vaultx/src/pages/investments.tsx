@@ -382,7 +382,7 @@ export default function InvestmentsPage() {
                             { label: "Capital Raised", value: formatUSDT(s.capitalRaised), icon: TrendingUp },
                             { label: "Funding %", value: `${s.raisedPct}%`, icon: BarChart3 },
                             { label: "Min. Entry", value: formatUSDT(plan.minAmount), icon: Target },
-                            { label: "Status", value: statusLabel, icon: Zap },
+                            { label: "Status", value: sb.label, icon: Zap },
                           ].map(({ label, value, icon: Icon }) => (
                             <div key={label} className="bg-muted/40 border border-border rounded-xl p-2.5 text-center">
                               <Icon size={12} className="text-primary mx-auto mb-1" />

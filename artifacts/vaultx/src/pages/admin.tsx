@@ -248,10 +248,18 @@ export default function AdminPage() {
     }
   };
 
+  const kycEnabledInAdmin = (() => {
+    if (!settingsData) return true;
+    const s = Array.isArray(settingsData)
+      ? settingsData.find((x: any) => x.key === "kyc_enabled")?.value
+      : (settingsData as any)?.kyc_enabled;
+    return s !== "false";
+  })();
+
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: "analytics", label: "Analytics", icon: TrendingUp },
     { id: "users", label: "Users", icon: Users },
-    { id: "kyc", label: "KYC", icon: FileCheck },
+    ...(kycEnabledInAdmin ? [{ id: "kyc" as Tab, label: "KYC", icon: FileCheck }] : []),
     { id: "withdrawals", label: "Withdrawals", icon: ArrowUpRight },
     { id: "deposits", label: "Deposits", icon: ArrowDownLeft },
     { id: "plans", label: "Opportunities", icon: TrendingUp },

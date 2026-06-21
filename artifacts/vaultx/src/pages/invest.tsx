@@ -54,10 +54,21 @@ export default function InvestPage() {
   const totalMin = plan ? dailyMin * plan.durationDays : 0;
   const totalMax = plan ? dailyMax * plan.durationDays : 0;
 
+  const BLOCKED_STATUSES = ["paused", "expired", "closed", "fully_allocated"];
+  const isBlocked = plan && (
+    BLOCKED_STATUSES.includes(plan.status ?? "") ||
+    (plan.endDate && new Date(plan.endDate).getTime() < Date.now())
+  );
+  const blockedReason = plan?.status === "paused" ? "This opportunity is currently paused."
+    : plan?.status === "expired" || (plan?.endDate && new Date(plan.endDate).getTime() < Date.now()) ? "This opportunity has expired."
+    : plan?.status === "closed" ? "This opportunity is closed."
+    : plan?.status === "fully_allocated" ? "This opportunity is fully allocated."
+    : null;
+
   const hasError = amountNum > balance && amountNum > 0;
   const belowMin = plan && amountNum > 0 && amountNum < plan.minAmount;
   const aboveMax = plan && amountNum > plan.maxAmount;
-  const canInvest = plan && amountNum >= plan.minAmount && amountNum <= plan.maxAmount && !hasError && amountNum > 0;
+  const canInvest = !isBlocked && plan && amountNum >= plan.minAmount && amountNum <= plan.maxAmount && !hasError && amountNum > 0;
 
   const handleInvest = () => {
     if (!plan) return;
@@ -191,6 +202,16 @@ export default function InvestPage() {
                 <span className={cn("font-semibold", color)}>{val}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Blocked status banner */}
+        {isBlocked && blockedReason && (
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-700 rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+              <Info size={15} className="text-amber-600" />
+            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">{blockedReason}</p>
           </div>
         )}
 

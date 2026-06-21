@@ -247,14 +247,33 @@ export default function OpportunityDetailPage() {
 
       {/* Sticky CTA */}
       <div className="fixed bottom-0 left-0 right-0 z-30 max-w-screen-sm mx-auto px-4 pb-6 pt-3 bg-gradient-to-t from-background via-background to-transparent">
-        <Button
-          className="w-full font-bold rounded-2xl shadow-lg text-base"
-          style={{ height: 56 }}
-          onClick={() => navigate(`/invest/${plan.id}`)}
-        >
-          Participate Now <ArrowRight size={16} className="ml-1.5" />
-        </Button>
-        <p className="text-center text-xs text-muted-foreground mt-2">Daily returns begin immediately after participation</p>
+        {(() => {
+          const BLOCKED = ["paused", "expired", "closed", "fully_allocated"];
+          const ended = plan.endDate && new Date(plan.endDate).getTime() < Date.now();
+          const blocked = BLOCKED.includes(plan.status ?? "") || ended;
+          const reason = plan.status === "fully_allocated" ? "Fully Allocated — no slots remaining"
+            : plan.status === "paused" ? "Opportunity paused — check back soon"
+            : plan.status === "closed" || plan.status === "expired" || ended ? "Funding period has ended"
+            : null;
+          if (blocked) {
+            return (
+              <>
+                <Button className="w-full font-bold rounded-2xl shadow-lg text-base opacity-50 cursor-not-allowed" style={{ height: 56 }} disabled>
+                  Participation Unavailable
+                </Button>
+                {reason && <p className="text-center text-xs text-muted-foreground mt-2">{reason}</p>}
+              </>
+            );
+          }
+          return (
+            <>
+              <Button className="w-full font-bold rounded-2xl shadow-lg text-base" style={{ height: 56 }} onClick={() => navigate(`/invest/${plan.id}`)}>
+                Participate Now <ArrowRight size={16} className="ml-1.5" />
+              </Button>
+              <p className="text-center text-xs text-muted-foreground mt-2">Daily returns begin immediately after participation</p>
+            </>
+          );
+        })()}
       </div>
     </SubPageLayout>
   );
