@@ -25,6 +25,24 @@ async function getSetting(key: string, fallback: string): Promise<string> {
 export async function processAllInvestments(force = false): Promise<{ processed: number; matured: number; skipped: number }> {
   const now = new Date();
 
+  // Bulk auto-expire plans whose end_date has passed
+  await db.execute(
+    sql`UPDATE investment_plans
+        SET status = 'expired', is_active = false
+        WHERE end_date IS NOT NULL
+          AND end_date < ${now.toISOString()}
+          AND status NOT IN ('expired', 'closed')`
+  );
+
+  // Bulk auto fully_allocated when current_funding >= funding_goal
+  await db.execute(
+    sql`UPDATE investment_plans
+        SET status = 'fully_allocated'
+        WHERE funding_goal IS NOT NULL
+          AND CAST(current_funding AS numeric) >= CAST(funding_goal AS numeric)
+          AND status NOT IN ('expired', 'closed', 'fully_allocated')`
+  );
+
   const activeInvestments = await db
     .select({
       inv: userInvestmentsTable,

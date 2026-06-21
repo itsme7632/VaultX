@@ -154,7 +154,12 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  if (!BOOKABLE_STATUSES.includes((plan as any).status ?? "active")) {
+  const planStatus = (plan as any).status ?? "active";
+  if (planStatus === "fully_allocated") {
+    res.status(400).json({ error: "Fully allocated", message: "This investment opportunity has reached its funding capacity and is no longer accepting new investments" });
+    return;
+  }
+  if (!BOOKABLE_STATUSES.includes(planStatus)) {
     res.status(400).json({ error: "Plan unavailable", message: "This investment opportunity is not currently accepting new investments" });
     return;
   }

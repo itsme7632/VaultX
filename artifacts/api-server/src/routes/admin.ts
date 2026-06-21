@@ -743,6 +743,8 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
     withdrawalsTodayRes,
     plansRes,
     planStats,
+    [participantsRes],
+    [totalCapitalRow],
   ] = await Promise.all([
     db.select({ c: count() }).from(usersTable),
     db.select({ c: count() }).from(usersTable).where(eq(usersTable.isActive, true)),
@@ -766,10 +768,14 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
       .from(userInvestmentsTable)
       .where(eq(userInvestmentsTable.status, "active"))
       .groupBy(userInvestmentsTable.planId),
+    db.select({ c: sql<number>`count(distinct ${userInvestmentsTable.userId})` })
+      .from(userInvestmentsTable)
+      .where(eq(userInvestmentsTable.status, "active")),
+    db.select({ s: sum(userInvestmentsTable.amount) }).from(userInvestmentsTable),
   ]);
 
   const planStatsMap = Object.fromEntries(
-    planStats.map((s) => [s.planId, { activeCount: s.activeCount, totalValue: parseFloat(s.totalValue ?? "0") }])
+    planStats.map((s: any) => [s.planId, { activeCount: s.activeCount, totalValue: parseFloat(s.totalValue ?? "0") }])
   );
 
   const opportunityStats = plansRes.map((p) => ({
@@ -807,6 +813,10 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
     totalInvestments: parseFloat(invValueRes[0]?.s ?? "0"),
     totalOpportunities: plansRes.length,
     activeOpportunities: plansRes.filter((p) => (p as any).isActive).length,
+    expiredOpportunities: plansByStatus["expired"] ?? 0,
+    fullyAllocatedOpportunities: plansByStatus["fully_allocated"] ?? 0,
+    totalParticipants: Number(participantsRes?.c ?? 0),
+    totalCapitalAllocated: parseFloat(totalCapitalRow?.s ?? "0"),
     opportunityStats,
     plansByStatus,
   });
@@ -941,7 +951,18 @@ router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => 
 router.delete("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
-  await db.update(investmentPlansTable).set({ isActive: false, status: "closed" } as any).where(eq(investmentPlansTable.id, id));
+
+  const [refCount] = await db
+    .select({ c: count() })
+    .from(userInvestmentsTable)
+    .where(eq(userInvestmentsTable.planId, id));
+
+  if ((refCount?.c ?? 0) === 0) {
+    await db.delete(investmentPlansTable).where(eq(investmentPlansTable.id, id));
+  } else {
+    await db.update(investmentPlansTable).set({ isActive: false, status: "closed" } as any).where(eq(investmentPlansTable.id, id));
+  }
+
   res.json({ success: true });
 });
 
@@ -990,15 +1011,15 @@ router.post("/admin/plans/:id/duplicate", requireAdmin, async (req, res): Promis
   res.status(201).json(serializeAdminPlan(copy));
 });
 
-router.post("/admin/plans/reorder", requireAdmin, async (req, res): Promise<void> => {
-  const { order } = req.body as { order: Array<{ id: number; sortOrder: number }> };
+router.put("/admin/plans/reorder", requireAdmin, async (req, res): Promise<void> => {
+  const { items } = req.body as { items: Array<{ id: number; sortOrder: number }> };
 
-  if (!Array.isArray(order)) {
-    res.status(400).json({ error: "order must be an array of { id, sortOrder }" });
+  if (!Array.isArray(items)) {
+    res.status(400).json({ error: "items must be an array of { id, sortOrder }" });
     return;
   }
 
-  for (const item of order) {
+  for (const item of items) {
     await db
       .update(investmentPlansTable)
       .set({ sortOrder: item.sortOrder } as any)

@@ -24,103 +24,129 @@ async function getDb() {
   return { db, pool };
 }
 
-const OPPORTUNITIES = [
-  {
-    name: "Digital Asset Allocation",
-    description: "A diversified approach to digital asset investment, allocating capital across top-tier crypto assets for steady, low-risk daily returns.",
-    minAmount: "500.00000000",
-    maxAmount: "9999.00000000",
-    dailyReturnRate: "0.027500",
-    minRoiRate: "0.025000",
-    maxRoiRate: "0.030000",
-    durationDays: 30,
-    riskLevel: "low",
-    features: ["Daily ROI 2.5%–3.0%", "30-day term", "Auto-compounding available", "Instant activation", "24/7 support"],
-    isActive: true,
-    isFeatured: false,
-    category: "DeFi",
-    status: "active",
-    colorTheme: "blue",
-    autoCompoundAvailable: true,
-    sortOrder: 1,
-  },
-  {
-    name: "AI Infrastructure",
-    description: "Capitalise on the AI revolution by investing in infrastructure-backed crypto assets powering next-generation artificial intelligence networks.",
-    minAmount: "5000.00000000",
-    maxAmount: "49999.00000000",
-    dailyReturnRate: "0.028500",
-    minRoiRate: "0.027000",
-    maxRoiRate: "0.032000",
-    durationDays: 45,
-    riskLevel: "medium",
-    features: ["Daily ROI 2.7%–3.2%", "45-day term", "Auto-compounding available", "Priority support", "Referral bonus eligible"],
-    isActive: true,
-    isFeatured: true,
-    category: "Technology",
-    status: "featured",
-    colorTheme: "purple",
-    autoCompoundAvailable: true,
-    sortOrder: 2,
-  },
-  {
-    name: "Technology Expansion",
-    description: "High-growth opportunity targeting emerging blockchain technologies and Layer-2 scaling solutions driving the next wave of crypto adoption.",
-    minAmount: "10000.00000000",
-    maxAmount: "99999.00000000",
-    dailyReturnRate: "0.030000",
-    minRoiRate: "0.028000",
-    maxRoiRate: "0.035000",
-    durationDays: 60,
-    riskLevel: "medium",
-    features: ["Daily ROI 2.8%–3.5%", "60-day term", "Auto-compounding available", "Dedicated support", "Performance reports"],
-    isActive: true,
-    isFeatured: false,
-    category: "Growth",
-    status: "trending",
-    colorTheme: "green",
-    autoCompoundAvailable: true,
-    sortOrder: 3,
-  },
-  {
-    name: "Market Liquidity Program",
-    description: "Earn consistent returns by providing liquidity to top-tier decentralised exchanges and market-making protocols with institutional-grade strategies.",
-    minAmount: "1000.00000000",
-    maxAmount: "24999.00000000",
-    dailyReturnRate: "0.026500",
-    minRoiRate: "0.025000",
-    maxRoiRate: "0.028000",
-    durationDays: 30,
-    riskLevel: "low",
-    features: ["Daily ROI 2.5%–2.8%", "30-day term", "Auto-compounding available", "Flexible entry", "Liquidity rewards"],
-    isActive: true,
-    isFeatured: false,
-    category: "Liquidity",
-    status: "funding",
-    colorTheme: "cyan",
-    autoCompoundAvailable: true,
-    sortOrder: 4,
-  },
-  {
-    name: "Strategic Growth Allocation",
-    description: "For serious investors seeking maximum returns. Our flagship high-yield strategy combines quant trading with on-chain yield generation.",
-    minAmount: "25000.00000000",
-    maxAmount: "500000.00000000",
-    dailyReturnRate: "0.031500",
-    minRoiRate: "0.030000",
-    maxRoiRate: "0.035000",
-    durationDays: 90,
-    riskLevel: "high",
-    features: ["Daily ROI 3.0%–3.5%", "90-day term", "Auto-compounding available", "Dedicated account manager", "VIP withdrawals", "Weekly performance reports"],
-    isActive: true,
-    isFeatured: false,
-    category: "Premium",
-    status: "active",
-    colorTheme: "gold",
-    autoCompoundAvailable: true,
-    sortOrder: 5,
-  },
-];
+function getOpportunities() {
+  const now = new Date();
+  const daysAgo = (d: number) => new Date(now.getTime() - d * 86400000);
+  const daysFromNow = (d: number) => new Date(now.getTime() + d * 86400000);
+
+  return [
+    {
+      name: "Digital Asset Allocation",
+      description: "A diversified approach to digital asset investment, allocating capital across top-tier crypto assets for steady, low-risk daily returns.",
+      minAmount: "500.00000000",
+      maxAmount: "9999.00000000",
+      dailyReturnRate: "0.027500",
+      minRoiRate: "0.025000",
+      maxRoiRate: "0.030000",
+      durationDays: 30,
+      riskLevel: "low",
+      features: ["Daily ROI 2.5%–3.0%", "30-day term", "Auto-compounding available", "Instant activation", "24/7 support"],
+      isActive: true,
+      isFeatured: false,
+      category: "DeFi",
+      fundingGoal: "500000.00000000",
+      currentFunding: "342150.00000000",
+      status: "active",
+      colorTheme: "blue",
+      autoCompoundAvailable: true,
+      startDate: daysAgo(30),
+      endDate: daysFromNow(90),
+      sortOrder: 1,
+    },
+    {
+      name: "AI Infrastructure",
+      description: "Capitalise on the AI revolution by investing in infrastructure-backed crypto assets powering next-generation artificial intelligence networks.",
+      minAmount: "5000.00000000",
+      maxAmount: "49999.00000000",
+      dailyReturnRate: "0.028500",
+      minRoiRate: "0.027000",
+      maxRoiRate: "0.032000",
+      durationDays: 45,
+      riskLevel: "medium",
+      features: ["Daily ROI 2.7%–3.2%", "45-day term", "Auto-compounding available", "Priority support", "Referral bonus eligible"],
+      isActive: true,
+      isFeatured: true,
+      category: "Technology",
+      fundingGoal: "2000000.00000000",
+      currentFunding: "1245000.00000000",
+      status: "featured",
+      colorTheme: "purple",
+      autoCompoundAvailable: true,
+      startDate: daysAgo(14),
+      endDate: daysFromNow(75),
+      sortOrder: 2,
+    },
+    {
+      name: "Technology Expansion",
+      description: "High-growth opportunity targeting emerging blockchain technologies and Layer-2 scaling solutions driving the next wave of crypto adoption.",
+      minAmount: "10000.00000000",
+      maxAmount: "99999.00000000",
+      dailyReturnRate: "0.030000",
+      minRoiRate: "0.028000",
+      maxRoiRate: "0.035000",
+      durationDays: 60,
+      riskLevel: "medium",
+      features: ["Daily ROI 2.8%–3.5%", "60-day term", "Auto-compounding available", "Dedicated support", "Performance reports"],
+      isActive: true,
+      isFeatured: false,
+      category: "Growth",
+      fundingGoal: null,
+      currentFunding: "0.00000000",
+      status: "trending",
+      colorTheme: "green",
+      autoCompoundAvailable: true,
+      startDate: null,
+      endDate: null,
+      sortOrder: 3,
+    },
+    {
+      name: "Market Liquidity Program",
+      description: "Earn consistent returns by providing liquidity to top-tier decentralised exchanges and market-making protocols with institutional-grade strategies.",
+      minAmount: "1000.00000000",
+      maxAmount: "24999.00000000",
+      dailyReturnRate: "0.026500",
+      minRoiRate: "0.025000",
+      maxRoiRate: "0.028000",
+      durationDays: 30,
+      riskLevel: "low",
+      features: ["Daily ROI 2.5%–2.8%", "30-day term", "Auto-compounding available", "Flexible entry", "Liquidity rewards"],
+      isActive: true,
+      isFeatured: false,
+      category: "Liquidity",
+      fundingGoal: "1000000.00000000",
+      currentFunding: "678000.00000000",
+      status: "funding",
+      colorTheme: "cyan",
+      autoCompoundAvailable: true,
+      startDate: daysAgo(7),
+      endDate: daysFromNow(53),
+      sortOrder: 4,
+    },
+    {
+      name: "Strategic Growth Allocation",
+      description: "For serious investors seeking maximum returns. Our flagship high-yield strategy combines quant trading with on-chain yield generation.",
+      minAmount: "25000.00000000",
+      maxAmount: "500000.00000000",
+      dailyReturnRate: "0.031500",
+      minRoiRate: "0.030000",
+      maxRoiRate: "0.035000",
+      durationDays: 90,
+      riskLevel: "high",
+      features: ["Daily ROI 3.0%–3.5%", "90-day term", "Auto-compounding available", "Dedicated account manager", "VIP withdrawals", "Weekly performance reports"],
+      isActive: true,
+      isFeatured: false,
+      category: "Premium",
+      fundingGoal: "5000000.00000000",
+      currentFunding: "2100000.00000000",
+      status: "active",
+      colorTheme: "gold",
+      autoCompoundAvailable: true,
+      startDate: daysAgo(60),
+      endDate: daysFromNow(120),
+      sortOrder: 5,
+    },
+  ];
+}
 
 const OLD_PLAN_NAMES = ["Starter Plan", "Growth Plan", "Elite Plan"];
 
@@ -131,7 +157,7 @@ async function seedInvestmentPlans(db: ReturnType<typeof drizzle<typeof schema>>
     return;
   }
 
-  await db.insert(investmentPlansTable).values(OPPORTUNITIES as any[]);
+  await db.insert(investmentPlansTable).values(getOpportunities() as any[]);
   console.log("[seed] Investment plans seeded ✓");
 }
 
@@ -140,13 +166,14 @@ async function seedInvestmentPlans(db: ReturnType<typeof drizzle<typeof schema>>
  * and inserts any missing new plans.
  */
 async function ensureOpportunities(db: ReturnType<typeof drizzle<typeof schema>>) {
+  const opportunities = getOpportunities();
   const allPlans = await db.select({ id: investmentPlansTable.id, name: investmentPlansTable.name }).from(investmentPlansTable);
   const nameToId = Object.fromEntries(allPlans.map((p) => [p.name, p.id]));
 
-  const oldPlanMapping: Record<string, typeof OPPORTUNITIES[number]> = {
-    "Starter Plan": OPPORTUNITIES[0],
-    "Growth Plan": OPPORTUNITIES[1],
-    "Elite Plan": OPPORTUNITIES[2],
+  const oldPlanMapping: Record<string, ReturnType<typeof getOpportunities>[number]> = {
+    "Starter Plan": opportunities[0],
+    "Growth Plan": opportunities[1],
+    "Elite Plan": opportunities[2],
   };
 
   for (const [oldName, newPlanData] of Object.entries(oldPlanMapping)) {
@@ -160,7 +187,7 @@ async function ensureOpportunities(db: ReturnType<typeof drizzle<typeof schema>>
   const refreshedPlans = await db.select({ name: investmentPlansTable.name }).from(investmentPlansTable);
   const existingNames = new Set(refreshedPlans.map((p) => p.name));
 
-  for (const plan of OPPORTUNITIES) {
+  for (const plan of opportunities) {
     if (!existingNames.has(plan.name)) {
       await db.insert(investmentPlansTable).values(plan as any);
       console.log(`[seed] Inserted missing plan "${plan.name}" ✓`);
