@@ -334,6 +334,8 @@ const COLUMN_MIGRATIONS_SQL = [
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "start_date" timestamp with time zone`,
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "end_date" timestamp with time zone`,
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "sort_order" integer DEFAULT 0 NOT NULL`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "total_participant_limit" integer`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "is_popular" boolean DEFAULT false NOT NULL`,
 ];
 
 const sslConfig =

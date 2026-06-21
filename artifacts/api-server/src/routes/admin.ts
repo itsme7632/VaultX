@@ -821,7 +821,11 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
   });
 });
 
-function serializeAdminPlan(p: typeof investmentPlansTable.$inferSelect) {
+function serializeAdminPlan(p: typeof investmentPlansTable.$inferSelect, stats?: { totalParticipants: number; capitalRaised: number; averageAllocation: number }) {
+  const fundingGoal = (p as any).fundingGoal ? parseFloat((p as any).fundingGoal) : null;
+  const capitalRaised = stats?.capitalRaised ?? parseFloat((p as any).currentFunding ?? "0");
+  const remainingCapacity = fundingGoal !== null ? Math.max(0, fundingGoal - capitalRaised) : null;
+  const fundingPercent = fundingGoal && fundingGoal > 0 ? Math.min(100, Math.round((capitalRaised / fundingGoal) * 100)) : null;
   return {
     id: p.id,
     name: p.name,
@@ -836,10 +840,16 @@ function serializeAdminPlan(p: typeof investmentPlansTable.$inferSelect) {
     features: p.features ?? [],
     isActive: p.isActive,
     isFeatured: p.isFeatured,
+    isPopular: (p as any).isPopular ?? false,
     category: (p as any).category ?? "General",
     bannerImageUrl: (p as any).bannerImageUrl ?? null,
-    fundingGoal: (p as any).fundingGoal ? parseFloat((p as any).fundingGoal) : null,
-    currentFunding: parseFloat((p as any).currentFunding ?? "0"),
+    fundingGoal,
+    currentFunding: capitalRaised,
+    remainingCapacity,
+    fundingPercent,
+    totalParticipants: stats?.totalParticipants ?? 0,
+    averageAllocation: stats?.averageAllocation ?? 0,
+    totalParticipantLimit: (p as any).totalParticipantLimit ?? null,
     status: (p as any).status ?? "active",
     colorTheme: (p as any).colorTheme ?? "blue",
     autoCompoundAvailable: (p as any).autoCompoundAvailable ?? true,
@@ -855,15 +865,43 @@ router.get("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     .select()
     .from(investmentPlansTable)
     .orderBy((investmentPlansTable as any).sortOrder, investmentPlansTable.id);
-  res.json(plans.map(serializeAdminPlan));
+
+  if (plans.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const planStats = await db
+    .select({
+      planId: userInvestmentsTable.planId,
+      totalParticipants: count(),
+      capitalRaised: sum(userInvestmentsTable.amount),
+    })
+    .from(userInvestmentsTable)
+    .where(eq(userInvestmentsTable.status, "active"))
+    .groupBy(userInvestmentsTable.planId);
+
+  const statsMap = Object.fromEntries(
+    planStats.map((s) => {
+      const participants = Number(s.totalParticipants ?? 0);
+      const raised = parseFloat(s.capitalRaised ?? "0");
+      return [s.planId, {
+        totalParticipants: participants,
+        capitalRaised: raised,
+        averageAllocation: participants > 0 ? raised / participants : 0,
+      }];
+    })
+  );
+
+  res.json(plans.map((p) => serializeAdminPlan(p, statsMap[p.id])));
 });
 
 router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
   const {
     name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
-    durationDays, riskLevel, features, isActive, isFeatured,
+    durationDays, riskLevel, features, isActive, isFeatured, isPopular,
     category, bannerImageUrl, fundingGoal, status, colorTheme, autoCompoundAvailable,
-    startDate, endDate, sortOrder,
+    startDate, endDate, sortOrder, totalParticipantLimit,
   } = req.body;
 
   if (!name || !description || !minAmount || !maxAmount || !durationDays) {
@@ -886,9 +924,10 @@ router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     features: features ?? [],
     isActive: isActive ?? true,
     isFeatured: isFeatured ?? false,
+    isPopular: isPopular ?? false,
     category: category ?? "General",
     bannerImageUrl: bannerImageUrl ?? null,
-    fundingGoal: fundingGoal !== undefined ? fundingGoal.toString() : null,
+    fundingGoal: fundingGoal !== undefined && fundingGoal !== null ? fundingGoal.toString() : null,
     currentFunding: "0",
     status: status ?? "active",
     colorTheme: colorTheme ?? "blue",
@@ -896,24 +935,31 @@ router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     startDate: startDate ? new Date(startDate) : null,
     endDate: endDate ? new Date(endDate) : null,
     sortOrder: sortOrder ?? 0,
+    totalParticipantLimit: totalParticipantLimit !== undefined && totalParticipantLimit !== null ? parseInt(totalParticipantLimit, 10) : null,
   } as any).returning();
 
   res.status(201).json(serializeAdminPlan(plan));
 });
 
 router.put("/admin/plans/reorder", requireAdmin, async (req, res): Promise<void> => {
-  const { items } = req.body as { items: Array<{ id: number; sortOrder: number }> };
+  const body = req.body as { items?: Array<{ id: number; sortOrder: number }>; ids?: number[] };
 
-  if (!Array.isArray(items)) {
-    res.status(400).json({ error: "items must be an array of { id, sortOrder }" });
+  let pairs: Array<{ id: number; sortOrder: number }> = [];
+
+  if (Array.isArray(body.items)) {
+    pairs = body.items;
+  } else if (Array.isArray(body.ids)) {
+    pairs = body.ids.map((id, idx) => ({ id, sortOrder: idx }));
+  } else {
+    res.status(400).json({ error: "Provide items [{id, sortOrder}] or ids [...]" });
     return;
   }
 
-  for (const item of items) {
+  for (const pair of pairs) {
     await db
       .update(investmentPlansTable)
-      .set({ sortOrder: item.sortOrder } as any)
-      .where(eq(investmentPlansTable.id, item.id));
+      .set({ sortOrder: pair.sortOrder } as any)
+      .where(eq(investmentPlansTable.id, pair.id));
   }
 
   res.json({ success: true });
@@ -924,9 +970,9 @@ router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => 
   const id = parseInt(raw, 10);
   const {
     name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
-    durationDays, riskLevel, features, isActive, isFeatured,
+    durationDays, riskLevel, features, isActive, isFeatured, isPopular,
     category, bannerImageUrl, fundingGoal, currentFunding, status, colorTheme,
-    autoCompoundAvailable, startDate, endDate, sortOrder,
+    autoCompoundAvailable, startDate, endDate, sortOrder, totalParticipantLimit,
   } = req.body;
 
   const [existing] = await db.select().from(investmentPlansTable).where(eq(investmentPlansTable.id, id)).limit(1);
@@ -950,6 +996,7 @@ router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => 
     features: features !== undefined ? features : existing.features,
     isActive: isActive !== undefined ? isActive : existing.isActive,
     isFeatured: isFeatured !== undefined ? isFeatured : existing.isFeatured,
+    isPopular: isPopular !== undefined ? isPopular : (ex.isPopular ?? false),
     category: category !== undefined ? category : (ex.category ?? "General"),
     bannerImageUrl: bannerImageUrl !== undefined ? bannerImageUrl : (ex.bannerImageUrl ?? null),
     fundingGoal: fundingGoal !== undefined ? (fundingGoal !== null ? fundingGoal.toString() : null) : (ex.fundingGoal ?? null),
@@ -960,6 +1007,7 @@ router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => 
     startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : (ex.startDate ?? null),
     endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : (ex.endDate ?? null),
     sortOrder: sortOrder !== undefined ? sortOrder : (ex.sortOrder ?? 0),
+    totalParticipantLimit: totalParticipantLimit !== undefined ? (totalParticipantLimit !== null ? parseInt(totalParticipantLimit, 10) : null) : (ex.totalParticipantLimit ?? null),
   } as any).where(eq(investmentPlansTable.id, id)).returning();
 
   res.json(serializeAdminPlan(updated));
@@ -1013,16 +1061,18 @@ router.post("/admin/plans/:id/duplicate", requireAdmin, async (req, res): Promis
     features: existing.features,
     isActive: false,
     isFeatured: false,
+    isPopular: false,
     category: ex.category ?? "General",
     bannerImageUrl: ex.bannerImageUrl ?? null,
     fundingGoal: ex.fundingGoal ?? null,
     currentFunding: "0",
-    status: "paused",
+    status: "draft",
     colorTheme: ex.colorTheme ?? "blue",
     autoCompoundAvailable: ex.autoCompoundAvailable ?? true,
     startDate: null,
     endDate: null,
     sortOrder: maxSortOrder + 1,
+    totalParticipantLimit: ex.totalParticipantLimit ?? null,
   } as any).returning();
 
   res.status(201).json(serializeAdminPlan(copy));

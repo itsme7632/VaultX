@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, count, sum, sql } from "drizzle-orm";
 import {
   db,
   investmentPlansTable,
@@ -16,7 +16,12 @@ const router: IRouter = Router();
 const BOOKABLE_STATUSES = ["active", "funding", "featured", "trending"];
 const VISIBLE_STATUSES = ["active", "funding", "featured", "trending", "fully_allocated"];
 
-function serializePlan(p: typeof investmentPlansTable.$inferSelect) {
+function serializePlan(p: typeof investmentPlansTable.$inferSelect, stats?: { totalParticipants: number; capitalRaised: number; averageAllocation: number }) {
+  const fundingGoal = (p as any).fundingGoal ? parseFloat((p as any).fundingGoal) : null;
+  const currentFunding = parseFloat((p as any).currentFunding ?? "0");
+  const capitalRaised = stats?.capitalRaised ?? currentFunding;
+  const remainingCapacity = fundingGoal !== null ? Math.max(0, fundingGoal - capitalRaised) : null;
+  const fundingPercent = fundingGoal && fundingGoal > 0 ? Math.min(100, Math.round((capitalRaised / fundingGoal) * 100)) : null;
   return {
     id: p.id,
     name: p.name,
@@ -30,11 +35,17 @@ function serializePlan(p: typeof investmentPlansTable.$inferSelect) {
     riskLevel: p.riskLevel,
     features: p.features ?? [],
     isFeatured: p.isFeatured,
+    isPopular: (p as any).isPopular ?? false,
     isActive: p.isActive,
     category: (p as any).category ?? "General",
     bannerImageUrl: (p as any).bannerImageUrl ?? null,
-    fundingGoal: (p as any).fundingGoal ? parseFloat((p as any).fundingGoal) : null,
-    currentFunding: parseFloat((p as any).currentFunding ?? "0"),
+    fundingGoal,
+    currentFunding: capitalRaised,
+    remainingCapacity,
+    fundingPercent,
+    totalParticipants: stats?.totalParticipants ?? 0,
+    averageAllocation: stats?.averageAllocation ?? 0,
+    totalParticipantLimit: (p as any).totalParticipantLimit ?? null,
     status: (p as any).status ?? "active",
     colorTheme: (p as any).colorTheme ?? "blue",
     autoCompoundAvailable: (p as any).autoCompoundAvailable ?? true,
@@ -107,7 +118,34 @@ router.get("/investments/plans", async (_req, res): Promise<void> => {
     )
     .orderBy((investmentPlansTable as any).sortOrder, investmentPlansTable.id);
 
-  res.json(plans.map(serializePlan));
+  if (plans.length === 0) {
+    res.json([]);
+    return;
+  }
+
+  const planStats = await db
+    .select({
+      planId: userInvestmentsTable.planId,
+      totalParticipants: count(),
+      capitalRaised: sum(userInvestmentsTable.amount),
+    })
+    .from(userInvestmentsTable)
+    .where(eq(userInvestmentsTable.status, "active"))
+    .groupBy(userInvestmentsTable.planId);
+
+  const statsMap = Object.fromEntries(
+    planStats.map((s) => {
+      const participants = Number(s.totalParticipants ?? 0);
+      const raised = parseFloat(s.capitalRaised ?? "0");
+      return [s.planId, {
+        totalParticipants: participants,
+        capitalRaised: raised,
+        averageAllocation: participants > 0 ? raised / participants : 0,
+      }];
+    })
+  );
+
+  res.json(plans.map((p) => serializePlan(p, statsMap[p.id])));
 });
 
 router.get("/investments", requireAuth, async (req, res): Promise<void> => {
@@ -170,6 +208,18 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
+  const totalParticipantLimit = (plan as any).totalParticipantLimit as number | null;
+  if (totalParticipantLimit !== null && totalParticipantLimit > 0) {
+    const [participantCount] = await db
+      .select({ c: count() })
+      .from(userInvestmentsTable)
+      .where(and(eq(userInvestmentsTable.planId, planId), eq(userInvestmentsTable.status, "active")));
+    if (Number(participantCount?.c ?? 0) >= totalParticipantLimit) {
+      res.status(400).json({ error: "Participant limit reached", message: "This opportunity has reached its maximum participant limit" });
+      return;
+    }
+  }
+
   const minAmount = parseFloat(plan.minAmount);
   const maxAmount = parseFloat(plan.maxAmount);
 
@@ -214,6 +264,11 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
     .update(walletsTable)
     .set({ balance: (parseFloat(wallet.balance) - amount).toFixed(8) })
     .where(eq(walletsTable.userId, req.session.userId!));
+
+  await db
+    .update(investmentPlansTable)
+    .set({ currentFunding: sql`current_funding + ${amount.toFixed(8)}` } as any)
+    .where(eq(investmentPlansTable.id, plan.id));
 
   await db.insert(transactionsTable).values({
     userId: req.session.userId!,

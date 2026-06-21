@@ -45,6 +45,8 @@ export const investmentPlansTable = pgTable("investment_plans", {
   startDate: timestamp("start_date", { withTimezone: true }),
   endDate: timestamp("end_date", { withTimezone: true }),
   sortOrder: integer("sort_order").notNull().default(0),
+  totalParticipantLimit: integer("total_participant_limit"),
+  isPopular: boolean("is_popular").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

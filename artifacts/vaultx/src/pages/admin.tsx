@@ -3,6 +3,7 @@ import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search
 
 function opportunityStatusBadge(status: string) {
   switch (status) {
+    case "draft":          return { label: "Draft",          cls: "bg-zinc-50 text-zinc-500 border-zinc-200 dark:bg-zinc-900 dark:text-zinc-400" };
     case "active":         return { label: "Active",         cls: "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400" };
     case "funding":        return { label: "Funding",        cls: "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400" };
     case "featured":       return { label: "⭐ Featured",    cls: "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400" };
@@ -76,6 +77,10 @@ export default function AdminPage() {
   const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", type: "announcement" as AdminBroadcastBodyType });
   const [roiRunning, setRoiRunning] = useState(false);
   const [roiResult, setRoiResult] = useState<{ processed: number; matured: number; skipped: number } | null>(null);
+  const [planSearch, setPlanSearch] = useState("");
+  const [planStatusFilter, setPlanStatusFilter] = useState<string>("all");
+  const [planCategoryFilter, setPlanCategoryFilter] = useState<string>("all");
+  const [planSortBy, setPlanSortBy] = useState<string>("sortOrder");
   const [wdTxHash, setWdTxHash] = useState("");
   const [userDetail, setUserDetail] = useState<any>(null);
   const [userDetailLoading, setUserDetailLoading] = useState(false);
@@ -703,8 +708,51 @@ export default function AdminPage() {
                 )}
               </div>
 
+              {/* Search / Filter / Sort bar */}
+              <div className="bg-white dark:bg-card border border-border rounded-2xl p-3 space-y-2">
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={planSearch}
+                    onChange={(e) => setPlanSearch(e.target.value)}
+                    placeholder="Search opportunities…"
+                    className="w-full pl-8 pr-3 h-9 text-sm rounded-xl border border-border bg-muted/30 focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Select value={planStatusFilter} onValueChange={setPlanStatusFilter}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent>
+                      {["all","draft","active","funding","featured","trending","paused","fully_allocated","expired","closed"].map(s => (
+                        <SelectItem key={s} value={s} className="text-xs capitalize">{s === "all" ? "All Statuses" : s.replace("_", " ")}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={planCategoryFilter} onValueChange={setPlanCategoryFilter}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Category" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all" className="text-xs">All Categories</SelectItem>
+                      {[...new Set((plans ?? []).map((p: any) => p.category).filter(Boolean))].map((cat: any) => (
+                        <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={planSortBy} onValueChange={setPlanSortBy}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="sortOrder" className="text-xs">Sort Order</SelectItem>
+                      <SelectItem value="name" className="text-xs">Name A→Z</SelectItem>
+                      <SelectItem value="capitalRaised" className="text-xs">Capital Raised ↓</SelectItem>
+                      <SelectItem value="participants" className="text-xs">Participants ↓</SelectItem>
+                      <SelectItem value="endDate" className="text-xs">Expiry Date ↑</SelectItem>
+                      <SelectItem value="createdAt" className="text-xs">Newest First</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="flex gap-2">
-                <Button className="flex-1 h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, features: [], isActive: true, isFeatured: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompoundAvailable: false, fundingGoal: null, currentFunding: 0 })}>
+                <Button className="flex-1 h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, features: [], isActive: true, isFeatured: false, isPopular: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompoundAvailable: false, fundingGoal: null, currentFunding: 0, totalParticipantLimit: null })}>
                   <Plus size={15} className="mr-1.5" />Add Opportunity
                 </Button>
                 {plans?.length > 0 && (
@@ -737,7 +785,36 @@ export default function AdminPage() {
               )}
 
               <div className="space-y-3">
-                {plans?.map((plan: any) => {
+                {(() => {
+                  let filtered: any[] = plans ?? [];
+                  if (planSearch.trim()) {
+                    const q = planSearch.toLowerCase();
+                    filtered = filtered.filter((p: any) =>
+                      p.name?.toLowerCase().includes(q) ||
+                      p.description?.toLowerCase().includes(q) ||
+                      p.category?.toLowerCase().includes(q)
+                    );
+                  }
+                  if (planStatusFilter !== "all") {
+                    filtered = filtered.filter((p: any) => (p.status ?? "active") === planStatusFilter);
+                  }
+                  if (planCategoryFilter !== "all") {
+                    filtered = filtered.filter((p: any) => p.category === planCategoryFilter);
+                  }
+                  filtered = [...filtered].sort((a: any, b: any) => {
+                    switch (planSortBy) {
+                      case "name": return (a.name ?? "").localeCompare(b.name ?? "");
+                      case "capitalRaised": return (b.currentFunding ?? 0) - (a.currentFunding ?? 0);
+                      case "participants": return (b.totalParticipants ?? 0) - (a.totalParticipants ?? 0);
+                      case "endDate": return (a.endDate ? new Date(a.endDate).getTime() : Infinity) - (b.endDate ? new Date(b.endDate).getTime() : Infinity);
+                      case "createdAt": return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
+                      default: return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+                    }
+                  });
+                  if (filtered.length === 0) {
+                    return <p className="text-center text-sm text-muted-foreground py-8">No opportunities match your filters.</p>;
+                  }
+                  return filtered.map((plan: any) => {
                   const sb = opportunityStatusBadge(plan.status ?? (plan.isActive ? "active" : "paused"));
                   const isSelected = selectedPlanIds.has(plan.id);
                   return (
@@ -757,10 +834,11 @@ export default function AdminPage() {
                             {(plan.minRoiRate * 100).toFixed(1)}%–{(plan.maxRoiRate * 100).toFixed(1)}% daily · {plan.durationDays}d · {formatUSDT(plan.minAmount)}–{formatUSDT(plan.maxAmount)}
                           </p>
                           <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
-                            {(plan.totalParticipants ?? 0) > 0 && <span>👥 {(plan.totalParticipants as number).toLocaleString()} participants</span>}
-                            {plan.fundingGoal && plan.currentFunding !== undefined && (
-                              <span>📊 {Math.min(100, Math.round((plan.currentFunding / plan.fundingGoal) * 100))}% funded</span>
-                            )}
+                            {(plan.totalParticipants ?? 0) > 0 && <span>👥 {Number(plan.totalParticipants).toLocaleString()} participants</span>}
+                            {plan.totalParticipantLimit && <span>/ {Number(plan.totalParticipantLimit).toLocaleString()} max</span>}
+                            {(plan.currentFunding ?? 0) > 0 && <span>💰 {plan.currentFunding >= 1000 ? `$${(plan.currentFunding/1000).toFixed(0)}K` : `$${Number(plan.currentFunding).toFixed(0)}`} raised</span>}
+                            {plan.fundingPercent !== null && plan.fundingPercent !== undefined && <span>📊 {plan.fundingPercent}% funded</span>}
+                            {plan.remainingCapacity !== null && plan.remainingCapacity !== undefined && <span>🎯 {plan.remainingCapacity >= 1000 ? `$${(plan.remainingCapacity/1000).toFixed(0)}K` : `$${Number(plan.remainingCapacity).toFixed(0)}`} remaining</span>}
                             {plan.endDate && <span>⏰ Ends {new Date(plan.endDate).toLocaleDateString()}</span>}
                           </div>
                         </div>
@@ -800,7 +878,8 @@ export default function AdminPage() {
                       </div>
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
             </div>
           )}
@@ -1251,6 +1330,7 @@ export default function AdminPage() {
                 { label: "Banner URL (optional)", field: "bannerImageUrl", type: "text", placeholder: "https://..." },
                 { label: "Funding Goal (USDT)", field: "fundingGoal", type: "number", placeholder: "1000000" },
                 { label: "Current Funding (USDT)", field: "currentFunding", type: "number", placeholder: "0" },
+                { label: "Max Participants (optional)", field: "totalParticipantLimit", type: "number", placeholder: "Leave blank for unlimited" },
               ].map(({ label, field, type, placeholder }) => (
                 <div key={field}>
                   <Label className="text-xs">{label}</Label>
@@ -1264,6 +1344,7 @@ export default function AdminPage() {
                   <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[
+                      { val: "draft", label: "Draft" },
                       { val: "active", label: "Active" },
                       { val: "funding", label: "Funding" },
                       { val: "featured", label: "⭐ Featured" },
@@ -1311,8 +1392,9 @@ export default function AdminPage() {
 
               <div className="space-y-2 pt-1">
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isActive} onChange={(e) => setPlanModal((p: any) => ({ ...p, isActive: e.target.checked }))} />Active</label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isFeatured} onChange={(e) => setPlanModal((p: any) => ({ ...p, isFeatured: e.target.checked }))} />⭐ Featured badge</label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={planModal.status === "trending"} onChange={(e) => setPlanModal((p: any) => ({ ...p, status: e.target.checked ? "trending" : (p.status === "trending" ? "active" : p.status) }))} />🔥 Trending badge</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isFeatured} onChange={(e) => setPlanModal((p: any) => ({ ...p, isFeatured: e.target.checked }))} />⭐ Featured</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isPopular} onChange={(e) => setPlanModal((p: any) => ({ ...p, isPopular: e.target.checked }))} />🔥 Popular</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={planModal.status === "trending"} onChange={(e) => setPlanModal((p: any) => ({ ...p, status: e.target.checked ? "trending" : (p.status === "trending" ? "active" : p.status) }))} />📈 Trending badge</label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.autoCompoundAvailable} onChange={(e) => setPlanModal((p: any) => ({ ...p, autoCompoundAvailable: e.target.checked }))} />Auto Compound</label>
               </div>
 
