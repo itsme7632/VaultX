@@ -66,28 +66,53 @@ app.use(
   }),
 );
 
-async function maintenanceMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
-  const EXEMPT_PATHS = ["/api/health", "/api/auth/login", "/api/auth/register", "/api/auth/logout"];
-  const isAdminRoute = req.path.startsWith("/api/admin");
-  const isExempt = EXEMPT_PATHS.some((p) => req.path === p);
+// Paths that are always accessible regardless of maintenance mode.
+// IMPORTANT: /api/settings/public and /api/auth/me must be exempt so the
+// frontend can detect maintenance status and know if the user is an admin.
+const MAINTENANCE_EXEMPT = new Set([
+  "/api/health",
+  "/api/settings/public",
+  "/api/auth/me",
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/logout",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+]);
 
+async function maintenanceMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const isAdminRoute = req.path.startsWith("/api/admin");
+  const isExempt    = MAINTENANCE_EXEMPT.has(req.path);
+
+  // Admin routes and always-exempt paths bypass maintenance entirely
   if (isAdminRoute || isExempt) {
     next();
     return;
   }
 
+  // Session-verified admins bypass maintenance
   if (req.session?.isAdmin) {
     next();
     return;
   }
 
   try {
-    const [setting] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, "maintenance_mode")).limit(1);
+    const [setting] = await db
+      .select()
+      .from(platformSettingsTable)
+      .where(eq(platformSettingsTable.key, "maintenance_mode"))
+      .limit(1);
+
     if (setting?.value === "true") {
-      res.status(503).json({ error: "Maintenance", message: "The platform is currently under maintenance. Please try again later." });
+      res.status(503).json({
+        maintenance: true,
+        error: "Service Unavailable",
+        message: "Wexora Global is currently undergoing scheduled maintenance. Your account, investments, and balances remain safe. Please try again shortly.",
+      });
       return;
     }
   } catch {
+    // DB error — fail open so the platform stays accessible
   }
 
   next();

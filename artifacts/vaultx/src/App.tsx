@@ -9,7 +9,7 @@ import { SplashScreen } from "@/components/SplashScreen";
 import { setBaseUrl } from "@workspace/api-client-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { Wrench } from "lucide-react";
+import { Wrench, RefreshCw, MessageCircle, Phone } from "lucide-react";
 
 import LoginPage from "@/pages/login";
 import SignupPage from "@/pages/signup";
@@ -219,34 +219,138 @@ function Router() {
   );
 }
 
-function MaintenanceBanner() {
+// ─── Maintenance page ─────────────────────────────────────────────────────────
+function MaintenancePage({ settings }: { settings: Record<string, string> | undefined }) {
+  const platformName   = settings?.platform_name       ?? "Wexora Global";
+  const telegramLink   = settings?.support_telegram_group ?? settings?.support_telegram ?? "";
+  const whatsappLink   = settings?.support_whatsapp_community ?? settings?.support_whatsapp ?? "";
+  const supportEmail   = settings?.support_email       ?? "";
+
+  const handleRefresh = () => window.location.reload();
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center px-6 text-center"
+      style={{ background: "#060d1a" }}
+    >
+      {/* Logo */}
+      <div className="mb-8">
+        <img
+          src="/wx-icon.png"
+          alt="Wexora Global"
+          className="w-16 h-16 rounded-2xl mx-auto mb-3 shadow-lg"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+        />
+        <p className="text-blue-300 text-xs font-semibold tracking-widest uppercase">
+          {platformName}
+        </p>
+      </div>
+
+      {/* Icon */}
+      <div className="w-20 h-20 rounded-3xl bg-amber-400/10 border border-amber-400/25 flex items-center justify-center mb-6">
+        <Wrench size={36} className="text-amber-400" />
+      </div>
+
+      {/* Heading */}
+      <h1 className="text-2xl font-bold text-white mb-3 leading-tight">
+        Platform Under Maintenance
+      </h1>
+
+      {/* Message */}
+      <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-3">
+        Thank you for your patience. Wexora Global is currently undergoing scheduled
+        maintenance to improve platform performance and security.
+      </p>
+      <p className="text-slate-500 text-xs leading-relaxed max-w-sm mb-8">
+        Your account, investments, and balances remain safe and will be fully
+        accessible once maintenance is complete.
+      </p>
+
+      {/* Action buttons */}
+      <div className="flex flex-col gap-3 w-full max-w-xs">
+        <button
+          onClick={handleRefresh}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm text-white border border-white/20 bg-white/10 hover:bg-white/15 transition-colors"
+        >
+          <RefreshCw size={15} />
+          Refresh Page
+        </button>
+
+        {telegramLink && (
+          <a
+            href={telegramLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm text-white bg-sky-600/80 hover:bg-sky-600 transition-colors"
+          >
+            <MessageCircle size={15} />
+            Telegram Community
+          </a>
+        )}
+
+        {whatsappLink && (
+          <a
+            href={whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm text-white bg-green-600/80 hover:bg-green-600 transition-colors"
+          >
+            <Phone size={15} />
+            WhatsApp Support
+          </a>
+        )}
+
+        {supportEmail && !whatsappLink && (
+          <a
+            href={`mailto:${supportEmail}`}
+            className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm text-white bg-blue-600/80 hover:bg-blue-600 transition-colors"
+          >
+            <Phone size={15} />
+            Contact Support
+          </a>
+        )}
+      </div>
+
+      {/* Footer */}
+      <p className="mt-8 text-xs text-slate-600">
+        © {new Date().getFullYear()} {platformName}. All rights reserved.
+      </p>
+    </div>
+  );
+}
+
+// ─── Maintenance gate — wraps the entire router ────────────────────────────────
+// Renders MaintenancePage INSTEAD of the router for non-admin users when
+// maintenance mode is enabled. Routes never mount, so no page can be accessed.
+function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
+
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["public-settings"],
-    queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
+    queryFn: () =>
+      fetch("/api/settings/public", { credentials: "include" }).then((r) => r.json()),
     staleTime: 30000,
     refetchInterval: 60000,
   });
 
-  if (authLoading || settingsLoading) return null;
-
-  const isAdmin = (user as any)?.isAdmin;
   const inMaintenance = settings?.maintenance_mode === "true";
+  const isAdmin       = (user as any)?.isAdmin === true;
 
-  if (!inMaintenance || isAdmin) return null;
+  // While settings not yet fetched → render normally (fail-open so platform is accessible)
+  if (settingsLoading) return <>{children}</>;
 
-  return (
-    <div className="fixed inset-0 z-[9999] bg-slate-900 flex flex-col items-center justify-center px-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center mb-6">
-        <Wrench size={28} className="text-amber-400" />
-      </div>
-      <h1 className="text-2xl font-bold text-white mb-2">Under Maintenance</h1>
-      <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
-        We're currently performing scheduled maintenance. Please check back shortly.
-      </p>
-      <p className="mt-6 text-xs text-slate-500">{settings?.platform_name ?? "Wexora"} Team</p>
-    </div>
-  );
+  // Not in maintenance → always render normally
+  if (!inMaintenance) return <>{children}</>;
+
+  // In maintenance:
+  // – While auth is still loading, show maintenance page (safe conservative default)
+  // – Once auth resolves, admins bypass, everyone else sees maintenance
+  if (authLoading || !isAdmin) {
+    return <MaintenancePage settings={settings} />;
+  }
+
+  // Admin — full access during maintenance
+  return <>{children}</>;
 }
 
 // ─── Main App ──────────────────────────────────────────────────────────────────
@@ -256,8 +360,9 @@ function AppContent() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AuthProvider>
-            <Router />
-            <MaintenanceBanner />
+            <MaintenanceGate>
+              <Router />
+            </MaintenanceGate>
           </AuthProvider>
         </WouterRouter>
         <Toaster />
