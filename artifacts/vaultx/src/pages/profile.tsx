@@ -68,7 +68,7 @@ export default function ProfilePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const initials = user?.fullName?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "V";
+  const initials = user?.fullName?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "W";
   const kyc = kycBadge(user?.kycStatus ?? "none");
 
   const fields = kycEnabled ? [
@@ -83,7 +83,7 @@ export default function ProfilePage() {
     <AppLayout title="Profile">
       <div className="px-4 pt-5 pb-6 space-y-5">
         {/* Avatar & name */}
-        <div className="bg-white border border-border rounded-2xl p-6 text-center shadow-sm">
+        <div className="bg-card border border-border rounded-2xl p-6 text-center shadow-sm">
           <div className="relative inline-block mb-3">
             <Avatar className="w-20 h-20 ring-4 ring-primary/10">
               <AvatarFallback className="bg-gradient-to-br from-primary to-blue-600 text-white text-2xl font-bold">
@@ -114,7 +114,7 @@ export default function ProfilePage() {
 
         {/* Referral code — only shown with KYC enabled */}
         {kycEnabled && (
-          <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+          <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Referral Code</p>
@@ -129,7 +129,7 @@ export default function ProfilePage() {
         )}
 
         {/* Info fields */}
-        <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <h3 className="font-semibold text-sm text-foreground">Personal Information</h3>
             {!editing ? (
@@ -178,8 +178,10 @@ export default function ProfilePage() {
               </div>
             )}
             <div className="px-4 py-3">
-              <p className="text-xs text-muted-foreground mb-1">User ID</p>
-              <p className="text-sm font-medium text-foreground font-mono">#{user?.id}</p>
+              <p className="text-xs text-muted-foreground mb-1">Member ID</p>
+              <p className="text-sm font-bold text-foreground font-mono tracking-wider">
+                WX{user?.displayId ?? String(user?.id ?? "").padStart(6, "0")}
+              </p>
             </div>
           </div>
         </div>

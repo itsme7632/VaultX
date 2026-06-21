@@ -16,18 +16,21 @@ import { isNotificationMuted, setNotificationMuted, playNotificationSound } from
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <button
-      onClick={onChange}
-      className={cn(
-        "w-10 h-5.5 rounded-full relative transition-colors focus:outline-none shrink-0",
-        checked ? "bg-primary" : "bg-muted"
-      )}
+      type="button"
       role="switch"
       aria-checked={checked}
+      onClick={onChange}
+      className="relative inline-flex shrink-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-full"
+      style={{ width: 44, height: 24 }}
     >
-      <span className={cn(
-        "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform",
-        checked ? "translate-x-5" : "translate-x-0.5"
-      )} />
+      <span
+        className="absolute inset-0 rounded-full transition-colors duration-200"
+        style={{ backgroundColor: checked ? 'hsl(var(--primary))' : 'hsl(220 13% 69% / 0.35)' }}
+      />
+      <span
+        className="absolute rounded-full bg-white shadow-md transition-all duration-200"
+        style={{ top: 2, left: checked ? 22 : 2, width: 20, height: 20 }}
+      />
     </button>
   );
 }
