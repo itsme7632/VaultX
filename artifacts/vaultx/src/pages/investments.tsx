@@ -189,20 +189,16 @@ function computeAutoBadges(plans: any[], metricsMap: Record<number, PlanMetricsI
 /* ─── Animated progress bar ─────────────────────────────────────────────── */
 
 function AnimatedBar({ pct, gradient, className }: { pct: number; gradient: string; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.width = "0%";
-    const t = setTimeout(() => { el.style.width = `${pct}%`; }, 80);
+    const t = setTimeout(() => { setWidth(pct); }, 80);
     return () => clearTimeout(t);
   }, [pct]);
   return (
     <div className={cn("rounded-full overflow-hidden bg-muted", className ?? "h-2.5")}>
       <div
-        ref={ref}
         className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-1000 ease-out", gradient)}
-        style={{ width: "0%" }}
+        style={{ width: `${width}%`, willChange: "width" }}
       />
     </div>
   );
@@ -434,18 +430,18 @@ export default function InvestmentsPage() {
                     )}
 
                     {/* Gradient header */}
-                    <div className={cn("bg-gradient-to-br p-5 text-white", gradient)}>
+                    <div className={cn("bg-gradient-to-br p-5 text-white isolate", gradient)}>
                       <div className="flex items-center justify-between mb-2">
-                        <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold">
+                        <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold no-default-hover-elevate">
                           {category}
                         </Badge>
                         <div className="flex items-center gap-1.5">
                           {badge && badge !== "none" && (
-                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", BADGE_DISPLAY[badge].cls, "bg-white/20 text-white border-white/30")}>
+                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border bg-white/20 text-white border-white/30")}>
                               {BADGE_DISPLAY[badge].label}
                             </span>
                           )}
-                          <Badge className={cn("text-[10px] border", sb.cls)}>
+                          <Badge className={cn("text-[10px] border no-default-hover-elevate", sb.cls)}>
                             {sb.label}
                           </Badge>
                         </div>
