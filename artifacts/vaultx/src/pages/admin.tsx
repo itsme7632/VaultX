@@ -311,6 +311,8 @@ export default function AdminPage() {
     { label: "Fully Allocated", value: (analytics as any).fullyAllocatedOpportunities ?? 0, color: "text-purple-600", bg: "bg-purple-50" },
     { label: "Total Participants", value: ((analytics as any).totalParticipants ?? 0).toLocaleString(), color: "text-teal-600", bg: "bg-teal-50" },
     { label: "Capital Allocated", value: formatUSDTCompact((analytics as any).totalCapitalAllocated ?? 0), color: "text-indigo-500", bg: "bg-indigo-50" },
+    { label: "Total Opportunities", value: (analytics as any).totalOpportunities ?? (plans?.length ?? 0), color: "text-blue-600", bg: "bg-blue-50" },
+    { label: "Active Opportunities", value: (analytics as any).activeOpportunities ?? (plans?.filter((p: any) => p.status === "active" || p.status === "funding" || p.status === "featured" || p.status === "trending").length ?? 0), color: "text-emerald-600", bg: "bg-emerald-50" },
   ] : [];
 
   return (
@@ -754,9 +756,13 @@ export default function AdminPage() {
                           <p className="text-xs text-primary font-semibold mt-1">
                             {(plan.minRoiRate * 100).toFixed(1)}%–{(plan.maxRoiRate * 100).toFixed(1)}% daily · {plan.durationDays}d · {formatUSDT(plan.minAmount)}–{formatUSDT(plan.maxAmount)}
                           </p>
-                          {plan.endDate && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5">Ends: {new Date(plan.endDate).toLocaleDateString()}</p>
-                          )}
+                          <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
+                            {(plan.totalParticipants ?? 0) > 0 && <span>👥 {(plan.totalParticipants as number).toLocaleString()} participants</span>}
+                            {plan.fundingGoal && plan.currentFunding !== undefined && (
+                              <span>📊 {Math.min(100, Math.round((plan.currentFunding / plan.fundingGoal) * 100))}% funded</span>
+                            )}
+                            {plan.endDate && <span>⏰ Ends {new Date(plan.endDate).toLocaleDateString()}</span>}
+                          </div>
                         </div>
                         <div className="flex items-center gap-1 ml-2 shrink-0">
                           {(() => {
@@ -1277,12 +1283,11 @@ export default function AdminPage() {
                   <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[
-                      { val: "blue",   label: "Blue" },
-                      { val: "purple", label: "Purple" },
-                      { val: "green",  label: "Green" },
-                      { val: "gold",   label: "Gold" },
-                      { val: "cyan",   label: "Cyan" },
-                      { val: "rose",   label: "Rose" },
+                      { val: "blue",    label: "Blue" },
+                      { val: "emerald", label: "Emerald" },
+                      { val: "purple",  label: "Purple" },
+                      { val: "amber",   label: "Amber" },
+                      { val: "rose",    label: "Rose" },
                     ].map(({ val, label }) => <SelectItem key={val} value={val}>{label}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -1306,7 +1311,8 @@ export default function AdminPage() {
 
               <div className="space-y-2 pt-1">
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isActive} onChange={(e) => setPlanModal((p: any) => ({ ...p, isActive: e.target.checked }))} />Active</label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isFeatured} onChange={(e) => setPlanModal((p: any) => ({ ...p, isFeatured: e.target.checked }))} />Featured</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isFeatured} onChange={(e) => setPlanModal((p: any) => ({ ...p, isFeatured: e.target.checked }))} />⭐ Featured badge</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={planModal.status === "trending"} onChange={(e) => setPlanModal((p: any) => ({ ...p, status: e.target.checked ? "trending" : (p.status === "trending" ? "active" : p.status) }))} />🔥 Trending badge</label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.autoCompoundAvailable} onChange={(e) => setPlanModal((p: any) => ({ ...p, autoCompoundAvailable: e.target.checked }))} />Auto Compound</label>
               </div>
 

@@ -245,6 +245,8 @@ export default function InvestPage() {
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               Processing…
             </span>
+          ) : isBlocked ? (
+            blockedReason ?? "Participation Unavailable"
           ) : canInvest ? (
             <span className="flex items-center gap-2">
               Participate Now — {formatUSDT(amountNum)} <ArrowRight size={16} />
