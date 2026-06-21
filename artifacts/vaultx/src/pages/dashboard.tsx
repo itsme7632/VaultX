@@ -132,9 +132,24 @@ function ReferralWidget() {
   );
 }
 
-function seededIntD(planId: number, salt: number, min: number, max: number) {
-  const seed = (planId * 31 + salt * 17) % 97;
-  return min + Math.floor((seed / 97) * (max - min));
+function autoParticipantsFromRaisedD(raised: number, planId: number): number {
+  if (raised <= 0) return 1;
+  const frac = ((planId * 31 + 7) % 97) / 97;
+  const points = [
+    { r: 0,       min: 1,   max: 2 },
+    { r: 2000,    min: 1,   max: 5 },
+    { r: 100000,  min: 15,  max: 60 },
+    { r: 500000,  min: 50,  max: 250 },
+    { r: 2000000, min: 150, max: 1000 },
+  ];
+  for (let i = 1; i < points.length; i++) {
+    if (raised <= points[i].r || i === points.length - 1) {
+      const prev = points[i - 1], curr = points[i];
+      const t = prev.r === curr.r ? 1 : Math.min(1, Math.max(0, (raised - prev.r) / (curr.r - prev.r)));
+      return Math.max(1, Math.floor((prev.min + t * (curr.min - prev.min)) + frac * ((prev.max + t * (curr.max - prev.max)) - (prev.min + t * (curr.min - prev.min)))));
+    }
+  }
+  return Math.floor(150 + frac * 850);
 }
 
 function OpportunityInsightsWidget({ plans }: { plans: any[] }) {
@@ -145,23 +160,27 @@ function OpportunityInsightsWidget({ plans }: { plans: any[] }) {
   let totalRaised = 0;
   let mostPopular = activePlans[0];
   let fastestGrowing = activePlans[0];
-  let maxPart = 0, maxGrowth = 0;
+  let maxPart = 0, maxFunding = 0;
 
   activePlans.forEach((p: any) => {
-    const participants  = seededIntD(p.id, 3, 120, 520);
-    const joinedToday   = seededIntD(p.id, 5, 3, 25);
-    const raisedPct     = seededIntD(p.id, 2, 48, 82);
-    const capitalTarget = seededIntD(p.id, 1, 80, 200) * 1000;
+    // Use real DB values first
+    const capitalRaised: number = p.currentFunding != null ? Number(p.currentFunding) : 0;
+    const dbParts = p.totalParticipants != null ? Number(p.totalParticipants) : 0;
+    const participants = dbParts > 0 ? dbParts : autoParticipantsFromRaisedD(capitalRaised, p.id);
+    const fundingGoal = p.fundingGoal != null ? Number(p.fundingGoal) : 0;
+    const fundingPct = fundingGoal > 0 ? Math.min(100, Math.round((capitalRaised / fundingGoal) * 100)) : 0;
+
     totalParticipants += participants;
-    totalRaised += Math.floor(capitalTarget * (raisedPct / 100));
+    totalRaised += capitalRaised;
     if (participants > maxPart) { maxPart = participants; mostPopular = p; }
-    const rate = joinedToday / participants;
-    if (rate > maxGrowth) { maxGrowth = rate; fastestGrowing = p; }
+    if (fundingPct > maxFunding) { maxFunding = fundingPct; fastestGrowing = p; }
   });
 
   const fmtRaised = totalRaised >= 1_000_000
     ? `$${(totalRaised / 1_000_000).toFixed(1)}M`
-    : `$${(totalRaised / 1_000).toFixed(0)}K`;
+    : totalRaised >= 1_000
+      ? `$${(totalRaised / 1_000).toFixed(0)}K`
+      : `$${totalRaised}`;
 
   return (
     <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
@@ -211,7 +230,7 @@ export default function DashboardPage() {
     query: { queryKey: getGetMarketPricesQueryKey(), staleTime: 60000 },
   });
   const { data: plans } = useGetInvestmentPlans({
-    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
+    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 30000, refetchInterval: 60000 },
   });
   const stats = [
     { label: "Total Balance", value: summary ? formatUSDT(summary.totalBalance) : null, icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },

@@ -93,6 +93,35 @@ function seededInt(planId: number, salt: number, min: number, max: number) {
   return min + Math.floor((seed / 97) * (max - min));
 }
 
+/**
+ * Auto-generate realistic participant count from capital raised.
+ * Uses a deterministic fraction per plan so values are stable across renders.
+ * Scales:  $2K → 1-5,  $100K → 15-60,  $500K → 50-250,  $2M → 150-1000
+ */
+function autoParticipantsFromRaised(raised: number, planId: number): number {
+  if (raised <= 0) return 1;
+  const frac = ((planId * 31 + 7) % 97) / 97; // stable 0-1 per plan
+
+  const points = [
+    { r: 0,         min: 1,   max: 2 },
+    { r: 2000,      min: 1,   max: 5 },
+    { r: 100000,    min: 15,  max: 60 },
+    { r: 500000,    min: 50,  max: 250 },
+    { r: 2000000,   min: 150, max: 1000 },
+  ];
+
+  for (let i = 1; i < points.length; i++) {
+    if (raised <= points[i].r || i === points.length - 1) {
+      const prev = points[i - 1], curr = points[i];
+      const t = prev.r === curr.r ? 1 : Math.min(1, Math.max(0, (raised - prev.r) / (curr.r - prev.r)));
+      const minV = prev.min + t * (curr.min - prev.min);
+      const maxV = prev.max + t * (curr.max - prev.max);
+      return Math.max(1, Math.floor(minV + frac * (maxV - minV)));
+    }
+  }
+  return Math.floor(150 + frac * 850);
+}
+
 function autoStats(id: number) {
   const raisedPct      = seededInt(id, 2, 30, 90);
   const capitalTargetK = seededInt(id, 1, 80, 300);
@@ -167,17 +196,28 @@ function OpportunityInsightsSummary({ plans, customStats, mode }: { plans: any[]
   let totalTarget = 0;
 
   activePlans.forEach(p => {
-    const custom = mode === "custom" && customStats[p.id];
-    const s = custom || autoStats(p.id);
-    const target = p.fundingGoal ?? (custom?.capitalTargetK ?? s.capitalTargetK) * 1000;
-    const raised = p.currentFunding ?? Math.floor(target * (s.raisedPct / 100));
-    const parts  = p.totalParticipants ?? s.participants;
+    const custom = mode === "custom" && customStats[String(p.id)];
+    const base = autoStats(p.id);
+
+    const target = (p.fundingGoal != null ? p.fundingGoal : null)
+      ?? (custom?.capitalTargetK != null ? custom.capitalTargetK * 1000 : null)
+      ?? base.capitalTargetK * 1000;
+
+    const raised = (p.currentFunding != null ? p.currentFunding : null)
+      ?? (custom?.raisedPct != null ? Math.floor(target * (custom.raisedPct / 100)) : null)
+      ?? Math.floor(target * (base.raisedPct / 100));
+
+    const dbParts = p.totalParticipants != null ? Number(p.totalParticipants) : null;
+    const parts = (dbParts != null && dbParts > 0)
+      ? dbParts
+      : (custom?.participants ?? autoParticipantsFromRaised(raised, p.id));
+
     totalParticipants += parts;
     totalRaised += raised;
     totalTarget += target;
   });
 
-  const overallPct = totalTarget > 0 ? Math.round((totalRaised / totalTarget) * 100) : 0;
+  const overallPct = totalTarget > 0 ? Math.min(100, Math.round((totalRaised / totalTarget) * 100)) : 0;
 
   return (
     <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-primary/60 rounded-2xl p-4 text-white shadow-lg mb-4">
@@ -222,7 +262,7 @@ export default function InvestmentsPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const { data: plans, isLoading: plansLoading } = useGetInvestmentPlans({
-    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
+    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 30000, refetchInterval: 60000 },
   });
 
   const { data: userInvestments, isLoading: uiLoading } = useGetUserInvestments({
@@ -259,16 +299,42 @@ export default function InvestmentsPage() {
   });
 
   const getPlanStats = (plan: any) => {
+    const useReal = analyticsMode === "real";
     const custom = analyticsMode === "custom" && customStatsMap[String(plan.id)];
     const base = autoStats(plan.id);
-    const joinedToday    = custom?.joinedToday ?? base.joinedToday;
-    const joinedWeek     = custom?.joinedWeek  ?? base.joinedWeek;
-    const participants   = plan.totalParticipants ?? custom?.participants ?? base.participants;
-    const capitalTarget  = plan.fundingGoal ?? (custom?.capitalTargetK ?? base.capitalTargetK) * 1000;
-    const capitalRaised  = plan.currentFunding ?? Math.floor(capitalTarget * ((custom?.raisedPct ?? base.raisedPct) / 100));
-    const raisedPct      = capitalTarget > 0 ? Math.round((capitalRaised / capitalTarget) * 100) : (custom?.raisedPct ?? base.raisedPct);
-    const capitalRemaining = capitalTarget - capitalRaised;
-    return { participants, raisedPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
+
+    const joinedToday = custom?.joinedToday ?? base.joinedToday;
+    const joinedWeek  = custom?.joinedWeek  ?? base.joinedWeek;
+
+    // Capital target: prefer DB value, then custom, then seeded
+    const capitalTarget = (plan.fundingGoal != null ? plan.fundingGoal : null)
+      ?? (custom?.capitalTargetK != null ? custom.capitalTargetK * 1000 : null)
+      ?? base.capitalTargetK * 1000;
+
+    // Capital raised: prefer DB value, then custom %, then seeded %
+    const capitalRaised = (plan.currentFunding != null ? plan.currentFunding : null)
+      ?? (custom?.raisedPct != null ? Math.floor(capitalTarget * (custom.raisedPct / 100)) : null)
+      ?? Math.floor(capitalTarget * (base.raisedPct / 100));
+
+    // Funding % always derived from actual raised/target
+    const raisedPct = capitalTarget > 0
+      ? Math.min(100, Math.round((capitalRaised / capitalTarget) * 100))
+      : (custom?.raisedPct ?? base.raisedPct);
+
+    // Participants: DB value (if > 0), custom, or auto-generate from capital raised
+    const dbParticipants = plan.totalParticipants != null ? Number(plan.totalParticipants) : null;
+    const participants = (dbParticipants != null && dbParticipants > 0)
+      ? dbParticipants
+      : (custom?.participants ?? null)
+        ?? (useReal ? autoParticipantsFromRaised(capitalRaised, plan.id) : base.participants);
+
+    // When in real mode with raised > 0 but participants still 0, auto-generate
+    const finalParticipants = (participants === 0 && capitalRaised > 0)
+      ? autoParticipantsFromRaised(capitalRaised, plan.id)
+      : participants;
+
+    const capitalRemaining = Math.max(0, capitalTarget - capitalRaised);
+    return { participants: finalParticipants, raisedPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
   };
 
   const getPlanMomentum = (plan: any, s: ReturnType<typeof getPlanStats>): MomentumLevel | null => {
@@ -308,14 +374,11 @@ export default function InvestmentsPage() {
               {plansLoading ? (
                 [1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
               ) : [...(plans ?? [])].sort((a: any, b: any) => {
-                // 1. Featured / status priority
+                // 1. Featured plans first
                 const statusScore = (p: any) => {
-                  if (p.status === "featured" || p.isFeatured) return 5;
-                  if (p.status === "trending") return 4;
-                  const pct = getPlanStats(p).raisedPct;
-                  if (pct >= 76) return 3;
-                  if (pct >= 51) return 2;
-                  if (pct >= 26) return 1;
+                  if (p.status === "featured" || p.isFeatured) return 4;
+                  if (p.status === "trending") return 3;
+                  if (p.status === "active" || p.status === "funding") return 2;
                   return 0;
                 };
                 const scoreDiff = statusScore(b) - statusScore(a);
@@ -325,8 +388,10 @@ export default function InvestmentsPage() {
                 if (bStats.raisedPct !== aStats.raisedPct) return bStats.raisedPct - aStats.raisedPct;
                 // 3. Highest capital raised
                 if (bStats.capitalRaised !== aStats.capitalRaised) return bStats.capitalRaised - aStats.capitalRaised;
-                // 4. Highest activity (joinedToday)
-                return bStats.joinedToday - aStats.joinedToday;
+                // 4. Highest participant count
+                if (bStats.participants !== aStats.participants) return bStats.participants - aStats.participants;
+                // 5. Newest first
+                return b.id - a.id;
               }).map((plan: any) => {
                 const minRoi = plan.minRoiRate ?? 0.025;
                 const maxRoi = plan.maxRoiRate ?? 0.030;

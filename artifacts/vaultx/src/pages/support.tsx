@@ -310,27 +310,28 @@ export default function SupportPage() {
       onClick: () => setShowNew(true),
       color: "bg-primary/10 text-primary border-primary/20",
     },
-    {
+    // Only show Telegram buttons when a valid URL is configured
+    ...(tgSupport ? [{
       icon: Headphones,
       label: "Live Chat",
       sub: "Telegram support",
-      href: tgSupport ?? "https://t.me/",
+      href: tgSupport,
       color: "bg-[#0088cc]/10 text-[#0088cc] border-[#0088cc]/20",
-    },
-    {
+    }] : []),
+    ...(waNumber ? [{
       icon: MessageCircle,
       label: "WhatsApp",
       sub: "Direct support",
-      href: waNumber ? `https://wa.me/${waNumber}` : "https://wa.me/",
+      href: `https://wa.me/${waNumber}`,
       color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-    },
-    {
+    }] : []),
+    ...(tgSupport ? [{
       icon: MessageCircle,
       label: "Telegram",
       sub: "Support channel",
-      href: tgSupport ?? "https://t.me/",
+      href: tgSupport,
       color: "bg-[#0088cc]/10 text-[#0088cc] border-[#0088cc]/20",
-    },
+    }] : []),
     ...(waCommunity ? [{
       icon: Users,
       label: "WA Community",

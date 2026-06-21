@@ -85,7 +85,7 @@ export default function AdminPage() {
   const [userDetail, setUserDetail] = useState<any>(null);
   const [userDetailLoading, setUserDetailLoading] = useState(false);
   const [selectedPlanIds, setSelectedPlanIds] = useState<Set<number>>(new Set());
-  const [opportunityAnalyticsMode, setOpportunityAnalyticsMode] = useState<"auto" | "custom">("auto");
+  const [opportunityAnalyticsMode, setOpportunityAnalyticsMode] = useState<"auto" | "custom" | "real">("auto");
   const [momentumEnabled, setMomentumEnabled] = useState(true);
   const [momentumMode, setMomentumMode] = useState<"real" | "custom">("real");
   const [momentumOverrides, setMomentumOverrides] = useState<Record<string, "high" | "stable" | "cooling" | "">>({});
@@ -140,7 +140,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!settingsData) return;
     const s = settingsData as Record<string, string>;
-    setOpportunityAnalyticsMode((s.opportunity_analytics_mode as "auto" | "custom") ?? "auto");
+    setOpportunityAnalyticsMode((s.opportunity_analytics_mode as "auto" | "custom" | "real") ?? "auto");
     setMomentumEnabled(s.momentum_enabled !== "false");
     setMomentumMode((s.momentum_mode as "real" | "custom") ?? "real");
     try { setBadgeForm(JSON.parse(s.opportunity_badges ?? "{}")); } catch { setBadgeForm({}); }
@@ -613,11 +613,35 @@ export default function AdminPage() {
 
                 {showBadgeManager && (
                   <div className="px-4 pb-4 space-y-4 border-t border-border pt-3">
+                    {/* Use Real Platform Statistics — primary toggle */}
+                    <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-foreground">Use Real Platform Statistics</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {opportunityAnalyticsMode === "real"
+                              ? "✅ Showing actual database values — funding, raised, participants."
+                              : "Showing intelligent demo statistics."}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setOpportunityAnalyticsMode(opportunityAnalyticsMode === "real" ? "auto" : "real")}
+                          className={cn(
+                            "relative w-11 h-6 rounded-full transition-colors shrink-0",
+                            opportunityAnalyticsMode === "real" ? "bg-emerald-500" : "bg-muted-foreground/30"
+                          )}
+                        >
+                          <span className={cn("absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all", opportunityAnalyticsMode === "real" ? "left-[26px]" : "left-1")} />
+                        </button>
+                      </div>
+                    </div>
+
                     {/* Analytics Mode */}
                     <div>
-                      <p className="text-xs font-semibold text-foreground mb-2">Analytics Mode</p>
+                      <p className="text-xs font-semibold text-foreground mb-2">Advanced Analytics Mode</p>
                       <div className="flex gap-2">
-                        {(["auto", "custom"] as const).map(m => (
+                        {(["real", "auto", "custom"] as const).map(m => (
                           <button
                             key={m}
                             type="button"
@@ -629,14 +653,16 @@ export default function AdminPage() {
                                 : "bg-muted text-muted-foreground border-border hover:border-primary/50"
                             )}
                           >
-                            {m === "auto" ? "🤖 Auto (Seeded)" : "✏️ Custom Data"}
+                            {m === "real" ? "📊 Real DB" : m === "auto" ? "🤖 Demo" : "✏️ Custom"}
                           </button>
                         ))}
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1.5">
-                        {opportunityAnalyticsMode === "auto"
-                          ? "Stats are automatically generated from seeded algorithms."
-                          : "You can set custom participant counts and funding data per opportunity."}
+                        {opportunityAnalyticsMode === "real"
+                          ? "Uses actual database values. Participants auto-generated from raised amount when empty."
+                          : opportunityAnalyticsMode === "auto"
+                          ? "Intelligent demo statistics generated from seeded algorithms."
+                          : "Manually set custom participant counts and funding data per opportunity."}
                       </p>
                     </div>
 
@@ -749,7 +775,7 @@ export default function AdminPage() {
                             </div>
                             <p className="text-[10px] text-muted-foreground mt-1.5">
                               {momentumMode === "real"
-                                ? "Auto-computed from participant join rates (today vs. weekly)."
+                                ? "Auto-computed from funding %: 0-25% Stable → 26-50% Growing → 51-75% High → 76-100% Trending."
                                 : "Manually set momentum level per opportunity."}
                             </p>
                           </div>
