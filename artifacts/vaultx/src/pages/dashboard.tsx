@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import { TrendingUp, DollarSign, Activity, Zap, Clock, ArrowRight, Users, Copy, Check, BarChart3 } from "lucide-react";
+import { TrendingUp, DollarSign, Activity, Zap, Clock, ArrowRight, Users, Copy, Check, BarChart3, Trophy, Star } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetMarketPrices, getGetMarketPricesQueryKey,
@@ -62,16 +63,67 @@ function MarketTicker({ data }: { data: any[] }) {
 }
 
 
+async function fetchCommunity() {
+  const res = await fetch("/api/referrals/community", { credentials: "include" });
+  if (!res.ok) return null;
+  return res.json() as Promise<{
+    communityReferrals: number;
+    activeReferrers: number;
+    rewardsDistributed: number;
+    leaderboard: { rank: number; username: string; totalReferrals: number; isReal: boolean }[];
+  }>;
+}
+
+function computeRank(userReferrals: number, community: NonNullable<Awaited<ReturnType<typeof fetchCommunity>>>) {
+  const lb = community.leaderboard;
+  // Check if user is on the leaderboard
+  const lbMin = lb[lb.length - 1]?.totalReferrals ?? 0;
+  if (userReferrals >= lbMin && lb.length > 0) {
+    // Count how many leaderboard entries beat the user
+    const above = lb.filter((e) => e.totalReferrals > userReferrals).length;
+    return above + 1;
+  }
+  // Estimate position beyond leaderboard
+  // Leaderboard has `lb.length` people; `activeReferrers` total active
+  const totalActive = community.activeReferrers;
+  const belowLb = Math.max(0, totalActive - lb.length);
+  if (lbMin <= 0 || userReferrals <= 0) return totalActive;
+  // Linear estimate: rank proportional to where userReferrals sits between 1 and lbMin
+  const ratio = Math.min(userReferrals / lbMin, 1);
+  return Math.round(lb.length + belowLb * (1 - ratio));
+}
+
 function ReferralWidget() {
   const [copied, setCopied] = useState(false);
+
   const { data: stats, isLoading } = useGetReferralStats({
     query: { queryKey: getGetReferralStatsQueryKey(), staleTime: 30000 },
   });
 
+  const { data: community } = useQuery({
+    queryKey: ["referrals-community"],
+    queryFn: fetchCommunity,
+    staleTime: 120000,
+  });
+
   const pendingEarnings = (stats as any)?.pendingEarnings ?? 0;
-  const referralLink = stats?.code
-    ? `${window.location.origin}/signup?ref=${stats.code}`
+  const userReferrals   = (stats as any)?.totalReferrals ?? 0;
+  const referralLink    = stats?.code ? `${window.location.origin}/signup?ref=${stats.code}` : null;
+
+  const rank       = community && userReferrals >= 0 ? computeRank(userReferrals, community) : null;
+  const totalPool  = community?.activeReferrers ?? null;
+  const hasReferred = userReferrals > 0;
+
+  const rankLabel = rank && totalPool
+    ? `#${rank.toLocaleString()} of ${totalPool.toLocaleString()} referrers`
     : null;
+
+  // Trophy colour based on rank
+  const rankColor = !rank ? "text-purple-200"
+    : rank === 1           ? "text-amber-300"
+    : rank <= 3            ? "text-slate-300"
+    : rank <= 10           ? "text-amber-600"
+    : "text-purple-200";
 
   const handleCopy = () => {
     if (!referralLink) return;
@@ -81,7 +133,9 @@ function ReferralWidget() {
   };
 
   return (
-    <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md">
+    <div className="bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 rounded-2xl p-4 text-white shadow-md">
+
+      {/* Header row */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
@@ -104,6 +158,43 @@ function ReferralWidget() {
           </Button>
         </Link>
       </div>
+
+      {/* Rank badge */}
+      <Link href="/referrals">
+        <div className="bg-white/10 hover:bg-white/15 transition-colors rounded-xl px-3 py-2 mb-3 flex items-center gap-2.5 cursor-pointer">
+          <Trophy size={16} className={cn("flex-shrink-0", rankColor)} />
+          <div className="flex-1 min-w-0">
+            {isLoading || !community ? (
+              <Skeleton className="h-3.5 w-36 bg-white/20" />
+            ) : hasReferred && rankLabel ? (
+              <>
+                <p className="text-xs font-bold text-white leading-tight">
+                  You're ranked <span className={rankColor}>{rankLabel}</span>
+                </p>
+                <p className="text-[10px] text-purple-200 mt-0.5">
+                  {userReferrals} referral{userReferrals !== 1 ? "s" : ""} · Tap to see leaderboard
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-bold text-white leading-tight">
+                  Join{" "}
+                  <span className="text-purple-200">
+                    {totalPool ? `${totalPool.toLocaleString()} referrers` : "the community"}
+                  </span>{" "}
+                  on the leaderboard
+                </p>
+                <p className="text-[10px] text-purple-200 mt-0.5">
+                  Share your link to earn your rank
+                </p>
+              </>
+            )}
+          </div>
+          <Star size={12} className="text-purple-300 flex-shrink-0" />
+        </div>
+      </Link>
+
+      {/* Copy link row */}
       <div className="flex items-center gap-2">
         <div className="flex-1 bg-white/10 rounded-lg px-3 py-1.5 min-w-0">
           {isLoading ? (
@@ -122,6 +213,7 @@ function ReferralWidget() {
           <span className="text-xs">{copied ? "Copied!" : "Copy"}</span>
         </Button>
       </div>
+
       {pendingEarnings > 0 && (
         <Link href="/referrals">
           <p className="text-[10px] text-emerald-300 mt-2 font-medium text-center animate-pulse">
