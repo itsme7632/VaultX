@@ -177,6 +177,12 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const reorderPlans = useMutation({
+    mutationFn: (ids: number[]) => adminApi("/admin/plans/reorder", "PUT", { ids }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-plans"] }),
+    onError: (e: any) => toast({ title: "Reorder failed", description: e?.message, variant: "destructive" }),
+  });
+
   const quickStatusPlan = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       adminApi(`/admin/plans/${id}`, "PUT", { status, isActive: status === "active" }),
@@ -711,6 +717,18 @@ export default function AdminPage() {
                           )}
                         </div>
                         <div className="flex items-center gap-1 ml-2 shrink-0">
+                          {(() => {
+                            const allIds: number[] = (plans ?? []).map((p: any) => p.id);
+                            const idx = allIds.indexOf(plan.id);
+                            const moveUp = () => { const ids = [...allIds]; [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]]; reorderPlans.mutate(ids); };
+                            const moveDown = () => { const ids = [...allIds]; [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]]; reorderPlans.mutate(ids); };
+                            return (
+                              <>
+                                <button onClick={moveUp} disabled={idx === 0} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30" title="Move up">▲</button>
+                                <button onClick={moveDown} disabled={idx === allIds.length - 1} className="p-1.5 rounded-lg hover:bg-muted disabled:opacity-30" title="Move down">▼</button>
+                              </>
+                            );
+                          })()}
                           <button onClick={() => duplicatePlan.mutate(plan.id)} className="p-1.5 rounded-lg hover:bg-muted" title="Duplicate"><Copy size={13} className="text-blue-500" /></button>
                           <button onClick={() => setPlanModal({ ...plan })} className="p-1.5 rounded-lg hover:bg-muted" title="Edit"><Edit2 size={13} className="text-muted-foreground" /></button>
                           <button onClick={() => { if (confirm(`Delete "${plan.name}"? This cannot be undone.`)) deletePlan.mutate(plan.id); }} className="p-1.5 rounded-lg hover:bg-red-50" title="Delete"><Trash2 size={13} className="text-red-500" /></button>
@@ -1009,10 +1027,36 @@ export default function AdminPage() {
                 {userModal.country && <div className="flex justify-between"><span className="text-muted-foreground">Country</span><span className="font-medium">{userModal.country}</span></div>}
                 <div className="flex justify-between"><span className="text-muted-foreground">Member ID</span><span className="font-mono font-medium">#{userModal.displayId}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Joined</span><span className="font-medium">{formatDate(userModal.createdAt)}</span></div>
-                <div className="flex justify-between items-center"><span className="text-muted-foreground">KYC</span>
-                  <Badge variant="outline" className={cn("text-[9px] capitalize", userModal.kycStatus === "approved" ? "bg-emerald-50 text-emerald-600" : userModal.kycStatus === "rejected" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{userModal.kycStatus}</Badge>
-                </div>
+                {kycEnabledInAdmin && (
+                  <div className="flex justify-between items-center"><span className="text-muted-foreground">KYC</span>
+                    <Badge variant="outline" className={cn("text-[9px] capitalize", userModal.kycStatus === "approved" ? "bg-emerald-50 text-emerald-600" : userModal.kycStatus === "rejected" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{userModal.kycStatus}</Badge>
+                  </div>
+                )}
               </div>
+
+              {/* KYC verification controls */}
+              {kycEnabledInAdmin && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">KYC Verification</p>
+                  <div className="flex flex-wrap gap-2">
+                    {userModal.kycStatus !== "approved" && (
+                      <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => handleApproveKyc(userModal.id)}>
+                        <Check size={11} className="mr-1" />Approve
+                      </Button>
+                    )}
+                    {userModal.kycStatus !== "rejected" && (
+                      <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={() => { setRejectModal({ type: "kyc", id: userModal.id }); setRejectReason(""); setUserModal(null); }}>
+                        <X size={11} className="mr-1" />Reject
+                      </Button>
+                    )}
+                    {userModal.kycStatus === "approved" && (
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-amber-300 text-amber-600" onClick={() => adminApi(`/admin/kyc/${userModal.id}/remove-verification`, "POST").then(() => { toast({ title: "Verification removed" }); queryClient.invalidateQueries({ queryKey: ["admin-users"] }); setUserModal(null); })}>
+                        Remove Verification
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Financial stats */}
               <div>

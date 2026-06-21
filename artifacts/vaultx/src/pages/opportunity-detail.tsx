@@ -48,7 +48,7 @@ function useCountdown(endDate?: string) {
     if (!endDate) return;
     const tick = () => setMsLeft(Math.max(0, new Date(endDate).getTime() - Date.now()));
     tick();
-    const id = setInterval(tick, 60_000);
+    const id = setInterval(tick, 1_000);
     return () => clearInterval(id);
   }, [endDate]);
   return msLeft;
@@ -263,6 +263,14 @@ export default function OpportunityDetailPage() {
               <p className="text-sm font-bold text-foreground">{value}</p>
             </div>
           ))}
+        </div>
+
+        {/* Opportunity Information */}
+        <div className="bg-card border border-border rounded-2xl p-4 space-y-2">
+          <p className="text-xs font-bold text-foreground">Opportunity Information</p>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Capital is allocated for the full duration of this opportunity. Returns are distributed per the stated schedule and credited to your wallet automatically. Participation is subject to availability; once fully allocated this opportunity closes to new entries. All terms are fixed at time of participation.
+          </p>
         </div>
 
       </div>

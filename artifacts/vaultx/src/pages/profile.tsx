@@ -71,10 +71,12 @@ export default function ProfilePage() {
   const initials = user?.fullName?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "V";
   const kyc = kycBadge(user?.kycStatus ?? "none");
 
-  const fields = [
-    { label: "Full Name", key: "fullName" as const, editable: true },
-    { label: "WhatsApp", key: "whatsapp" as const, editable: true },
-    { label: "Country", key: "country" as const, editable: true },
+  const fields = kycEnabled ? [
+    { label: "Full Name", key: "fullName" as const },
+    { label: "WhatsApp", key: "whatsapp" as const },
+    { label: "Country", key: "country" as const },
+  ] : [
+    { label: "Full Name", key: "fullName" as const },
   ];
 
   return (
@@ -159,16 +161,20 @@ export default function ProfilePage() {
                 )}
               </div>
             ))}
-            <div className="px-4 py-3">
-              <p className="text-xs text-muted-foreground mb-1">Email</p>
-              <p className="text-sm font-medium text-foreground">{user?.email}</p>
-            </div>
-            <div className="px-4 py-3">
-              <p className="text-xs text-muted-foreground mb-1">Member since</p>
-              <p className="text-sm font-medium text-foreground">
-                {user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "—"}
-              </p>
-            </div>
+            {kycEnabled && (
+              <div className="px-4 py-3">
+                <p className="text-xs text-muted-foreground mb-1">Email</p>
+                <p className="text-sm font-medium text-foreground">{user?.email}</p>
+              </div>
+            )}
+            {kycEnabled && (
+              <div className="px-4 py-3">
+                <p className="text-xs text-muted-foreground mb-1">Member since</p>
+                <p className="text-sm font-medium text-foreground">
+                  {user?.createdAt ? new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "—"}
+                </p>
+              </div>
+            )}
             <div className="px-4 py-3">
               <p className="text-xs text-muted-foreground mb-1">User ID</p>
               <p className="text-sm font-medium text-foreground font-mono">#{user?.id}</p>
