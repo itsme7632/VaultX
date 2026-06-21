@@ -2195,6 +2195,59 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
       </div>
 
       <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Users size={14} className="text-blue-500" />
+          <p className="text-sm font-bold text-foreground">Referral Community Data</p>
+        </div>
+        <p className="text-xs text-muted-foreground -mt-1">
+          Control how platform-wide community statistics are shown on the referrals page.
+          User-specific earnings, commissions, and referral counts are always real.
+        </p>
+
+        <div>
+          <Label className="text-xs text-muted-foreground">Community Stats Mode</Label>
+          <Select
+            value={form["referral_hybrid_mode"] ?? "auto"}
+            onValueChange={(v) => setForm((f) => ({ ...f, referral_hybrid_mode: v }))}
+          >
+            <SelectTrigger className="mt-1 h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Auto — Hybrid (demo fills gaps when real data is low)</SelectItem>
+              <SelectItem value="full_demo">Full Demo — Always show demo community data</SelectItem>
+              <SelectItem value="disabled">Disabled — Show only real data (may look sparse)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            <strong>Auto</strong>: blends real + demo. <strong>Full Demo</strong>: always uses demo values for community metrics. <strong>Disabled</strong>: pure real data only.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 pt-1">
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-purple-600 font-semibold uppercase tracking-wide mb-1">Community Stats</p>
+            <p className="text-[10px] text-muted-foreground">Total referrals, active referrers, rewards distributed</p>
+            <p className="text-[10px] font-bold text-purple-600 mt-1">Hybrid ✓</p>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-wide mb-1">Leaderboard</p>
+            <p className="text-[10px] text-muted-foreground">Real users first, demo names fill remaining slots</p>
+            <p className="text-[10px] font-bold text-emerald-600 mt-1">Hybrid ✓</p>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide mb-1">User Earnings</p>
+            <p className="text-[10px] text-muted-foreground">Personal stats are always real, never inflated</p>
+            <p className="text-[10px] font-bold text-blue-600 mt-1">Always Real ✓</p>
+          </div>
+        </div>
+
+        <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : "Save Referral Settings"}
+        </Button>
+      </div>
+
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
         <p className="text-sm font-bold text-foreground">Instructions &amp; Rules</p>
         <p className="text-xs text-muted-foreground -mt-1">Each line becomes one step. Leave empty to use the default instructions.</p>
 
