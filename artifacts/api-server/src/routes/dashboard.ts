@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, gte, lte, inArray, sum, count, or, sql } from "drizzle-orm";
+import { eq, and, desc, gte, lte, lt, inArray, sum, count, or, sql } from "drizzle-orm";
 import {
   db,
   walletsTable,
@@ -187,10 +187,8 @@ router.get("/platform/performance", requireAuth, async (req, res): Promise<void>
     monthlyInvestmentsRes,
     monthlyEarningsRes,
     monthlyUsersRes,
-    activePlansRes,
-    actualInvestmentTotalRes,
   ] = await Promise.all([
-    // Real investment amounts per month (what participants actually put in)
+    // Real investment amounts per month — actual capital deployed into plans
     db.select({
       month: sql<number>`extract(month from ${userInvestmentsTable.createdAt})`,
       total: sum(userInvestmentsTable.amount),
@@ -198,7 +196,7 @@ router.get("/platform/performance", requireAuth, async (req, res): Promise<void>
       .from(userInvestmentsTable)
       .where(and(
         gte(userInvestmentsTable.createdAt, yearStart),
-        lte(userInvestmentsTable.createdAt, yearEnd),
+        lt(userInvestmentsTable.createdAt, yearEnd),
       ))
       .groupBy(sql`extract(month from ${userInvestmentsTable.createdAt})`),
 
@@ -212,7 +210,7 @@ router.get("/platform/performance", requireAuth, async (req, res): Promise<void>
         or(eq(transactionsTable.type, "earning"), eq(transactionsTable.type, "reinvest")),
         eq(transactionsTable.status, "completed"),
         gte(transactionsTable.createdAt, yearStart),
-        lte(transactionsTable.createdAt, yearEnd),
+        lt(transactionsTable.createdAt, yearEnd),
       ))
       .groupBy(sql`extract(month from ${transactionsTable.createdAt})`),
 
@@ -224,18 +222,9 @@ router.get("/platform/performance", requireAuth, async (req, res): Promise<void>
       .from(usersTable)
       .where(and(
         gte(usersTable.createdAt, yearStart),
-        lte(usersTable.createdAt, yearEnd),
+        lt(usersTable.createdAt, yearEnd),
       ))
       .groupBy(sql`extract(month from ${usersTable.createdAt})`),
-
-    // Active plans — need currentFunding overrides for reconciliation
-    db.select({
-      id: investmentPlansTable.id,
-      currentFunding: investmentPlansTable.currentFunding,
-    }).from(investmentPlansTable).where(eq(investmentPlansTable.isActive, true)),
-
-    // Total actual investment sum across all time (for surplus calculation)
-    db.select({ s: sum(userInvestmentsTable.amount) }).from(userInvestmentsTable),
   ]);
 
   // ── Helper: sparse DB rows → 12-element numeric array ────────────────────
@@ -257,24 +246,14 @@ router.get("/platform/performance", requireAuth, async (req, res): Promise<void>
     return arr;
   };
 
-  const monthlyInvestments  = toMonthlyAmounts(monthlyInvestmentsRes as any);
-  const monthlyEarnings     = toMonthlyAmounts(monthlyEarningsRes as any);
-  const monthlyNewUsers     = toMonthlyCounts(monthlyUsersRes as any);
+  const monthlyInvestments = toMonthlyAmounts(monthlyInvestmentsRes as any);
+  const monthlyEarnings    = toMonthlyAmounts(monthlyEarningsRes as any);
+  const monthlyNewUsers    = toMonthlyCounts(monthlyUsersRes as any);
 
-  // ── Reconcile inflow with Platform Capital ───────────────────────────────
-  // Platform Capital = sum of max(plan.currentFunding, actualInvestments) per plan.
-  // If admins have set currentFunding overrides that exceed actual recorded
-  // investments, the difference (surplus) is added to the current month so
-  // that the sum of all monthly inflow bars equals the top-line figure.
-  const actualTotal = parseFloat(actualInvestmentTotalRes[0]?.s ?? "0");
-  const overrideTotal = activePlansRes.reduce((acc, plan) => {
-    const override = plan.currentFunding != null ? parseFloat(String(plan.currentFunding)) : 0;
-    return acc + override;
-  }, 0);
-  const surplus = Math.max(0, overrideTotal - actualTotal);
-  if (surplus > 0) {
-    monthlyInvestments[currentMonthIdx] += surplus;
-  }
+  // NOTE: Admin-set currentFunding overrides are intentionally NOT injected into
+  // the monthly inflow array. The chart shows real, timestamped investment
+  // transactions only. The hero-card "Platform Capital" (platform-metrics endpoint)
+  // may differ and represents the admin-configured funding level.
 
   // ── Cumulative user totals (running sum up to each month) ─────────────────
   // Total registered users before this year (for the running baseline)

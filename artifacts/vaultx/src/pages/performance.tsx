@@ -61,6 +61,13 @@ export default function PerformancePage() {
   // Slice to current month for chart display
   const monthlyDepositsSlice  = monthlyDeposits.slice(0, currentMonth + 1);
   const monthlyEarningsSlice  = monthlyEarnings.slice(0, currentMonth + 1);
+  const monthlyNewUsersSlice  = monthlyNewUsers.slice(0, currentMonth + 1);
+
+  // Year-to-date totals computed from the same monthly arrays used by chart bars
+  // and table rows. This guarantees the "Total" row always equals the visible row sums.
+  const ytdInflow      = monthlyDepositsSlice.reduce((a, v) => a + v, 0);
+  const ytdEarnings    = monthlyEarningsSlice.reduce((a, v) => a + v, 0);
+  const ytdNewUsers    = monthlyNewUsersSlice.reduce((a, v) => a + v, 0);
 
   const isLoading = metricsLoading;
 
@@ -176,7 +183,7 @@ export default function PerformancePage() {
             ))}
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 text-right">
-            Total: {formatUSDTCompact(metrics?.totalRaised ?? 0)}
+            {new Date().getFullYear()} YTD: {formatUSDTCompact(ytdInflow)}
           </p>
         </div>
 
@@ -200,7 +207,7 @@ export default function PerformancePage() {
             ))}
           </div>
           <p className="text-[10px] text-muted-foreground mt-2 text-right">
-            Total: {formatUSDTCompact(metrics?.distributionsPaid ?? 0)}
+            {new Date().getFullYear()} YTD: {formatUSDTCompact(ytdEarnings)}
           </p>
         </div>
 
@@ -261,18 +268,19 @@ export default function PerformancePage() {
                 </div>
               )}
 
-              {/* Totals row */}
+              {/* Totals row — sums of visible monthly rows only, guaranteeing
+                  mathematical consistency (Total = sum of all rows above). */}
               {!chartLoading && (
                 <div className="grid grid-cols-4 px-4 py-3 bg-muted/30 border-t border-border text-sm font-bold">
-                  <span className="text-foreground">Total</span>
+                  <span className="text-foreground">YTD Total</span>
                   <span className="text-right text-foreground">
-                    {formatUSDTCompact(metrics?.totalRaised ?? 0)}
+                    {ytdInflow > 0 ? formatUSDTCompact(ytdInflow) : "—"}
                   </span>
                   <span className="text-right text-emerald-600">
-                    {formatUSDTCompact(metrics?.distributionsPaid ?? 0)}
+                    {ytdEarnings > 0 ? formatUSDTCompact(ytdEarnings) : "—"}
                   </span>
                   <span className="text-right text-muted-foreground">
-                    {(metrics?.totalParticipants ?? 0).toLocaleString()}
+                    {ytdNewUsers > 0 ? `+${ytdNewUsers.toLocaleString()}` : "—"}
                   </span>
                 </div>
               )}
