@@ -180,7 +180,7 @@ export default function ProfilePage() {
             <div className="px-4 py-3">
               <p className="text-xs text-muted-foreground mb-1">Member ID</p>
               <p className="text-sm font-bold text-foreground font-mono tracking-wider">
-                WX{user?.displayId ?? String(user?.id ?? "").padStart(6, "0")}
+                {user?.displayId ? `WX${user.displayId}` : "—"}
               </p>
             </div>
           </div>
