@@ -54,37 +54,34 @@ const BADGE_DISPLAY: Record<BadgeKey, { label: string; cls: string }> = {
 
 /* ─── Momentum Indicator ────────────────────────────────────────────────── */
 
-type MomentumLevel = "high" | "stable" | "cooling";
+type MomentumLevel = "trending" | "high" | "growing" | "stable";
 
 const MOMENTUM_CONFIG: Record<MomentumLevel, { label: string; icon: typeof Flame; bg: string; text: string; arrow: string }> = {
-  high:    { label: "High Momentum",  icon: Flame,       bg: "bg-orange-100 dark:bg-orange-950/40", text: "text-orange-600 dark:text-orange-400", arrow: "↑ Accelerating" },
-  stable:  { label: "Stable Demand",  icon: Minus,       bg: "bg-blue-100 dark:bg-blue-950/40",    text: "text-blue-600 dark:text-blue-400",   arrow: "→ Steady" },
-  cooling: { label: "Cooling Down",   icon: TrendingDown, bg: "bg-amber-100 dark:bg-amber-950/40",  text: "text-amber-600 dark:text-amber-400", arrow: "↓ Slowing" },
+  trending: { label: "🚀 Trending",         icon: Flame,      bg: "bg-purple-100 dark:bg-purple-950/40",  text: "text-purple-600 dark:text-purple-400",  arrow: "🚀 Trending" },
+  high:     { label: "🔥 High Momentum",    icon: Flame,      bg: "bg-orange-100 dark:bg-orange-950/40",  text: "text-orange-600 dark:text-orange-400",  arrow: "🔥 Accelerating" },
+  growing:  { label: "📈 Growing Interest", icon: TrendingUp, bg: "bg-emerald-100 dark:bg-emerald-950/40", text: "text-emerald-600 dark:text-emerald-400", arrow: "📈 Growing" },
+  stable:   { label: "⭐ Stable Demand",    icon: Minus,      bg: "bg-blue-100 dark:bg-blue-950/40",      text: "text-blue-600 dark:text-blue-400",      arrow: "⭐ Steady" },
 };
 
-function computeMomentum(joinedToday: number, joinedWeek: number): MomentumLevel {
-  if (joinedWeek <= 0) return "stable";
-  const ratio = joinedToday / joinedWeek;
-  if (ratio > 0.20) return "high";
-  if (ratio < 0.08) return "cooling";
+function computeMomentum(raisedPct: number): MomentumLevel {
+  if (raisedPct >= 76) return "trending";
+  if (raisedPct >= 51) return "high";
+  if (raisedPct >= 26) return "growing";
   return "stable";
 }
 
 function MomentumBadge({ level, compact = false }: { level: MomentumLevel; compact?: boolean }) {
   const cfg = MOMENTUM_CONFIG[level];
-  const Icon = cfg.icon;
   if (compact) {
     return (
       <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold", cfg.bg, cfg.text)}>
-        <Icon size={9} />
-        {level === "high" ? "🔥" : level === "stable" ? "⭐" : "⚠"} {cfg.label}
-        <span className="opacity-70 font-normal">({cfg.arrow})</span>
+        {cfg.label}
       </span>
     );
   }
   return (
     <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold", cfg.bg, cfg.text)}>
-      {level === "high" ? "🔥" : level === "stable" ? "⭐" : "⚠"} {cfg.arrow}
+      {cfg.arrow}
     </span>
   );
 }
@@ -97,11 +94,13 @@ function seededInt(planId: number, salt: number, min: number, max: number) {
 }
 
 function autoStats(id: number) {
-  const participants   = seededInt(id, 3, 120, 520);
-  const raisedPct      = seededInt(id, 2, 48, 82);
-  const joinedToday    = seededInt(id, 5, 3, 25);
-  const joinedWeek     = seededInt(id, 6, 15, 85);
-  const capitalTargetK = seededInt(id, 1, 80, 200);
+  const raisedPct      = seededInt(id, 2, 30, 90);
+  const capitalTargetK = seededInt(id, 1, 80, 300);
+  const participants   = seededInt(id, 3, 80, 600);
+  // Activity scales with funding level — higher funded = more participant activity
+  const activityBase   = Math.max(2, Math.floor(raisedPct / 5));
+  const joinedToday    = activityBase + seededInt(id, 5, 1, 8);
+  const joinedWeek     = joinedToday * 4 + seededInt(id, 6, 5, 25);
   return { participants, raisedPct, joinedToday, joinedWeek, capitalTargetK };
 }
 
@@ -276,7 +275,7 @@ export default function InvestmentsPage() {
     if (!momentumEnabled) return null;
     const override = momentumOverrides[String(plan.id)];
     if (momentumMode === "custom" && override) return override;
-    return computeMomentum(s.joinedToday, s.joinedWeek);
+    return computeMomentum(s.raisedPct);
   };
 
   return (
@@ -309,9 +308,25 @@ export default function InvestmentsPage() {
               {plansLoading ? (
                 [1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
               ) : [...(plans ?? [])].sort((a: any, b: any) => {
-                const aOrd = a.sortOrder ?? 999, bOrd = b.sortOrder ?? 999;
-                if (aOrd !== bOrd) return aOrd - bOrd;
-                return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+                // 1. Featured / status priority
+                const statusScore = (p: any) => {
+                  if (p.status === "featured" || p.isFeatured) return 5;
+                  if (p.status === "trending") return 4;
+                  const pct = getPlanStats(p).raisedPct;
+                  if (pct >= 76) return 3;
+                  if (pct >= 51) return 2;
+                  if (pct >= 26) return 1;
+                  return 0;
+                };
+                const scoreDiff = statusScore(b) - statusScore(a);
+                if (scoreDiff !== 0) return scoreDiff;
+                // 2. Highest funding %
+                const aStats = getPlanStats(a), bStats = getPlanStats(b);
+                if (bStats.raisedPct !== aStats.raisedPct) return bStats.raisedPct - aStats.raisedPct;
+                // 3. Highest capital raised
+                if (bStats.capitalRaised !== aStats.capitalRaised) return bStats.capitalRaised - aStats.capitalRaised;
+                // 4. Highest activity (joinedToday)
+                return bStats.joinedToday - aStats.joinedToday;
               }).map((plan: any) => {
                 const minRoi = plan.minRoiRate ?? 0.025;
                 const maxRoi = plan.maxRoiRate ?? 0.030;

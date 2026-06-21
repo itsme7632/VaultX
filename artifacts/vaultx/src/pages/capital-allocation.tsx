@@ -85,7 +85,7 @@ export default function CapitalAllocationPage() {
 
         {/* Back button */}
         <button
-          onClick={() => navigate("/dashboard")}
+          onClick={() => window.history.back()}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={16} />
