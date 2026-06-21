@@ -430,7 +430,7 @@ export default function InvestmentsPage() {
                     )}
 
                     {/* Gradient header */}
-                    <div className={cn("bg-gradient-to-br p-5 text-white isolate", gradient)}>
+                    <div className={cn("bg-gradient-to-br p-5 text-white", gradient)}>
                       <div className="flex items-center justify-between mb-2">
                         <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold no-default-hover-elevate">
                           {category}

@@ -2144,39 +2144,65 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
           </div>
         ))}
 
-        {/* Maintenance ETA — only shown when maintenance mode is enabled */}
+        {/* Maintenance options — only shown when maintenance mode is enabled */}
         {form["maintenance_mode"] === "true" && (
-          <div className="pt-2 pb-1 border-b border-border">
-            <p className="text-sm font-medium text-foreground mb-1">Estimated Return Time</p>
-            <p className="text-xs text-muted-foreground mb-2">
-              Set when the platform will be back. A live countdown timer will display on the maintenance screen.
-            </p>
-            <input
-              type="datetime-local"
-              value={form["maintenance_eta"]
-                ? new Date(form["maintenance_eta"]).toISOString().slice(0, 16)
-                : ""}
-              onChange={(e) => {
-                const iso = e.target.value ? new Date(e.target.value).toISOString() : "";
-                setForm((f) => ({ ...f, maintenance_eta: iso }));
-              }}
-              className="w-full rounded-lg border border-border bg-background text-foreground text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-            {form["maintenance_eta"] && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Users will see: "Back by {new Date(form["maintenance_eta"]).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}"
+          <>
+            {/* Custom Message */}
+            <div className="pt-2 pb-1 border-b border-border space-y-1.5">
+              <p className="text-sm font-medium text-foreground">Maintenance Message</p>
+              <p className="text-xs text-muted-foreground">
+                Shown to users on the maintenance screen. Leave blank for the default message.
               </p>
-            )}
-            {form["maintenance_eta"] && (
-              <button
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, maintenance_eta: "" }))}
-                className="mt-1 text-xs text-red-500 hover:text-red-400"
-              >
-                Clear ETA
-              </button>
-            )}
-          </div>
+              <textarea
+                rows={2}
+                value={form["maintenance_message"] ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, maintenance_message: e.target.value }))}
+                placeholder={`e.g. "Upgrading our trading engine" or "Security enhancements underway"`}
+                className="w-full rounded-lg border border-border bg-background text-foreground text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none"
+              />
+            </div>
+
+            {/* Return Date & Time */}
+            <div className="pt-2 pb-1 border-b border-border space-y-1.5">
+              <p className="text-sm font-medium text-foreground">Return Date &amp; Time</p>
+              <p className="text-xs text-muted-foreground">
+                Set when the platform will be back. A live countdown (Days · Hours · Minutes · Seconds) will display on the maintenance screen.
+              </p>
+              <input
+                type="datetime-local"
+                value={form["maintenance_eta"]
+                  ? new Date(form["maintenance_eta"]).toISOString().slice(0, 16)
+                  : ""}
+                onChange={(e) => {
+                  const iso = e.target.value ? new Date(e.target.value).toISOString() : "";
+                  setForm((f) => ({ ...f, maintenance_eta: iso }));
+                }}
+                className="w-full rounded-lg border border-border bg-background text-foreground text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+              {form["maintenance_eta"] && (() => {
+                const d = new Date(form["maintenance_eta"]);
+                return (
+                  <div className="rounded-lg bg-muted/50 border border-border px-3 py-2">
+                    <p className="text-xs text-muted-foreground">
+                      Preview — Users will see:
+                    </p>
+                    <p className="text-xs font-semibold text-foreground mt-0.5">
+                      "Back by {d.toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}"
+                    </p>
+                  </div>
+                );
+              })()}
+              {form["maintenance_eta"] && (
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, maintenance_eta: "" }))}
+                  className="text-xs text-red-500 hover:text-red-400 font-medium"
+                >
+                  ✕ Clear ETA
+                </button>
+              )}
+            </div>
+          </>
         )}
 
         <div className="pt-1 space-y-3">

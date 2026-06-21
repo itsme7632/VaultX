@@ -221,7 +221,7 @@ function Router() {
 
 // ─── Countdown timer hook ──────────────────────────────────────────────────────
 function useCountdown(isoEta: string) {
-  const [remaining, setRemaining] = useState<{ h: number; m: number; s: number } | null>(null);
+  const [remaining, setRemaining] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
   const [expired, setExpired] = useState(false);
 
   useEffect(() => {
@@ -238,7 +238,8 @@ function useCountdown(isoEta: string) {
       }
       const totalSecs = Math.floor(diff / 1000);
       setRemaining({
-        h: Math.floor(totalSecs / 3600),
+        d: Math.floor(totalSecs / 86400),
+        h: Math.floor((totalSecs % 86400) / 3600),
         m: Math.floor((totalSecs % 3600) / 60),
         s: totalSecs % 60,
       });
@@ -254,15 +255,18 @@ function useCountdown(isoEta: string) {
 
 // ─── Maintenance page ─────────────────────────────────────────────────────────
 function MaintenancePage({ settings }: { settings: Record<string, string> | undefined }) {
-  const platformName   = settings?.platform_name       ?? "Wexora Global";
-  const telegramLink   = settings?.support_telegram_group ?? settings?.support_telegram ?? "";
-  const whatsappLink   = settings?.support_whatsapp_community ?? settings?.support_whatsapp ?? "";
-  const supportEmail   = settings?.support_email       ?? "";
-  const eta            = settings?.maintenance_eta      ?? "";
+  const platformName    = settings?.platform_name       ?? "Wexora Global";
+  const telegramLink    = settings?.support_telegram_group ?? settings?.support_telegram ?? "";
+  const whatsappLink    = settings?.support_whatsapp_community ?? settings?.support_whatsapp ?? "";
+  const supportEmail    = settings?.support_email       ?? "";
+  const eta             = settings?.maintenance_eta     ?? "";
+  const customMessage   = settings?.maintenance_message ?? "";
 
   const { remaining, expired } = useCountdown(eta);
   const etaDate = eta ? new Date(eta) : null;
   const etaValid = etaDate && !isNaN(etaDate.getTime());
+
+  const defaultMsg = "Wexora Global is currently undergoing scheduled maintenance to improve platform performance and security.";
 
   const handleRefresh = () => window.location.reload();
 
@@ -294,17 +298,16 @@ function MaintenancePage({ settings }: { settings: Record<string, string> | unde
         Platform Under Maintenance
       </h1>
 
-      {/* Message */}
+      {/* Custom or default message */}
       <p className="text-slate-400 text-sm leading-relaxed max-w-sm mb-3">
-        Thank you for your patience. Wexora Global is currently undergoing scheduled
-        maintenance to improve platform performance and security.
+        {customMessage || defaultMsg}
       </p>
       <p className="text-slate-500 text-xs leading-relaxed max-w-sm mb-6">
         Your account, investments, and balances remain safe and will be fully
         accessible once maintenance is complete.
       </p>
 
-      {/* Countdown timer */}
+      {/* Countdown timer — only shown when a valid ETA is set */}
       {etaValid && (
         <div className="mb-8 w-full max-w-xs">
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
@@ -317,15 +320,16 @@ function MaintenancePage({ settings }: { settings: Record<string, string> | unde
               </span>
             </div>
             {!expired && remaining && (
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-2">
                 {[
+                  { value: remaining.d, label: "DAYS" },
                   { value: remaining.h, label: "HRS" },
                   { value: remaining.m, label: "MIN" },
                   { value: remaining.s, label: "SEC" },
                 ].map(({ value, label }) => (
                   <div key={label} className="flex flex-col items-center">
-                    <div className="w-16 h-14 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
-                      <span className="text-2xl font-bold text-white tabular-nums">
+                    <div className="w-14 h-12 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
+                      <span className="text-xl font-bold text-white tabular-nums">
                         {String(value).padStart(2, "0")}
                       </span>
                     </div>
@@ -337,9 +341,11 @@ function MaintenancePage({ settings }: { settings: Record<string, string> | unde
               </div>
             )}
             {expired && (
-              <p className="text-center text-amber-400 text-xs font-medium">
-                Maintenance completing soon — please refresh
-              </p>
+              <div className="rounded-xl bg-amber-400/10 border border-amber-400/30 px-4 py-3">
+                <p className="text-center text-amber-400 text-xs font-semibold">
+                  ⚠️ Maintenance completing soon — please refresh
+                </p>
+              </div>
             )}
           </div>
         </div>

@@ -1,13 +1,14 @@
 import { ArrowRight, Users, Clock, TrendingUp, CheckCircle, Star, BarChart3, Target, Shield, Zap } from "lucide-react";
 import { useGetInvestmentPlans, getGetInvestmentPlansQueryKey } from "@workspace/api-client-react";
 import { useLocation, useParams } from "wouter";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SubPageLayout } from "@/components/SubPageLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatUSDT } from "@/lib/format";
+import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 
 const THEME_GRADIENT: Record<string, string> = {
   blue:   "from-blue-600 to-indigo-700",
@@ -20,11 +21,6 @@ const THEME_GRADIENT: Record<string, string> = {
 
 function planGradient(colorTheme?: string) {
   return THEME_GRADIENT[colorTheme ?? "blue"] ?? "from-blue-600 to-indigo-700";
-}
-
-function seededInt(planId: number, salt: number, min: number, max: number) {
-  const seed = (planId * 31 + salt * 17) % 97;
-  return min + Math.floor((seed / 97) * (max - min));
 }
 
 function planStatusBadge(status?: string) {
@@ -71,8 +67,16 @@ export default function OpportunityDetailPage() {
   const [, navigate] = useLocation();
 
   const { data: plans, isLoading } = useGetInvestmentPlans({
-    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
+    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 30000 },
   });
+
+  // Canonical per-plan stats — single source of truth shared with the card page
+  const { data: platformMetrics } = usePlatformMetrics();
+  const metricsMap = useMemo(() => {
+    const m: Record<number, any> = {};
+    for (const p of (platformMetrics?.plans ?? [])) m[p.id] = p;
+    return m;
+  }, [platformMetrics]);
 
   const plan: any = plans?.find((p: any) => String(p.id) === planId);
   const id = plan?.id ?? 1;
@@ -83,15 +87,34 @@ export default function OpportunityDetailPage() {
   const maxRoi = plan?.maxRoiRate ?? 0.030;
   const sb = planStatusBadge(plan?.status);
 
-  const capitalTarget = plan?.fundingGoal ?? seededInt(id, 1, 80, 200) * 1000;
-  const capitalRaised = plan?.currentFunding ?? Math.floor(capitalTarget * (seededInt(id, 2, 48, 82) / 100));
-  const raisedPct = capitalTarget > 0 ? Math.round((capitalRaised / capitalTarget) * 100) : seededInt(id, 2, 48, 82);
-  const participants = plan?.totalParticipants ?? seededInt(id, 3, 120, 520);
+  // Use canonical platform-metrics values (same source as opportunity cards)
+  const canonical = metricsMap[id];
+  const capitalTarget   = canonical?.fundingGoal   ?? (plan?.fundingGoal    != null ? Number(plan.fundingGoal)    : 0);
+  const capitalRaised   = canonical?.capitalRaised ?? (plan?.currentFunding != null ? Number(plan.currentFunding) : 0);
+  const raisedPct       = canonical != null ? Math.round(canonical.fundingPct)
+    : capitalTarget > 0 ? Math.round((capitalRaised / capitalTarget) * 100) : 0;
+  const participants    = canonical?.participants   ?? (plan?.totalParticipants != null ? Number(plan.totalParticipants) : 0);
+  const joinedToday     = canonical?.joinedToday   ?? 0;
+  const joinedWeek      = canonical?.joinedWeek    ?? 0;
+  const capitalRemaining = canonical?.capitalRemaining ?? Math.max(0, capitalTarget - capitalRaised);
+
+  // Data consistency check — log a warning if plan fields and canonical metrics diverge
+  useEffect(() => {
+    if (!plan || !canonical) return;
+    const planRaised = plan.currentFunding != null ? Number(plan.currentFunding) : null;
+    const planPart   = plan.totalParticipants != null ? Number(plan.totalParticipants) : null;
+    if (planRaised !== null && Math.abs(planRaised - canonical.capitalRaised) > 1) {
+      console.warn(`[Wexora] Plan #${id} data mismatch — currentFunding: DB=${planRaised} vs metrics=${canonical.capitalRaised}`);
+    }
+    if (planPart !== null && planPart !== canonical.participants) {
+      console.warn(`[Wexora] Plan #${id} data mismatch — participants: DB=${planPart} vs metrics=${canonical.participants}`);
+    }
+  }, [plan, canonical, id]);
 
   const msLeft = useCountdown(plan?.endDate);
   const countdownLabel = plan?.endDate
     ? formatCountdown(msLeft)
-    : `~${seededInt(id, 4, 5, 21)}d`;
+    : "—";
 
   if (isLoading) {
     return (
@@ -123,7 +146,7 @@ export default function OpportunityDetailPage() {
       <div className="px-4 pt-5 pb-36 space-y-5">
 
         {/* Header card */}
-        <div className={cn("rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br text-white isolate", gradient)}>
+        <div className={cn("rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br text-white", gradient)}>
           {plan.isFeatured && (
             <div className="bg-white/20 px-4 py-2 flex items-center gap-1.5 border-b border-white/20">
               <Star size={11} className="text-amber-300 fill-amber-300" />
@@ -252,8 +275,8 @@ export default function OpportunityDetailPage() {
           {[
             { label: "Participants in this opportunity", value: participants.toLocaleString(), icon: "👥" },
             { label: "Capital allocated", value: formatUSDT(capitalRaised), icon: "💰" },
-            { label: "New participants today", value: `+${seededInt(id, 5, 3, 25)}`, icon: "🚀" },
-            { label: "New this week", value: `+${seededInt(id, 6, 15, 85)}`, icon: "📈" },
+            { label: "New participants today", value: joinedToday > 0 ? `+${joinedToday}` : "—", icon: "🚀" },
+            { label: "New this week", value: joinedWeek > 0 ? `+${joinedWeek}` : "—", icon: "📈" },
           ].map(({ label, value, icon }) => (
             <div key={label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
               <div className="flex items-center gap-2">
