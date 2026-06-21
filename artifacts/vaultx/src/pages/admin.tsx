@@ -1449,6 +1449,7 @@ export default function AdminPage() {
                 { label: "Funding Goal (USDT)", field: "fundingGoal", type: "number", placeholder: "1000000" },
                 { label: "Current Funding (USDT)", field: "currentFunding", type: "number", placeholder: "0" },
                 { label: "Max Participants (optional)", field: "totalParticipantLimit", type: "number", placeholder: "Leave blank for unlimited" },
+                { label: "Participant Count Override (optional)", field: "displayParticipantCount", type: "number", placeholder: "Leave blank to auto-calculate" },
               ].map(({ label, field, type, placeholder }) => (
                 <div key={field}>
                   <Label className="text-xs">{label}</Label>

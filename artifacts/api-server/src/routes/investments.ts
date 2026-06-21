@@ -46,6 +46,7 @@ function serializePlan(p: typeof investmentPlansTable.$inferSelect, stats?: { to
     totalParticipants: stats?.totalParticipants ?? 0,
     averageAllocation: stats?.averageAllocation ?? 0,
     totalParticipantLimit: (p as any).totalParticipantLimit ?? null,
+    displayParticipantCount: (p as any).displayParticipantCount ?? null,
     status: (p as any).status ?? "active",
     colorTheme: (p as any).colorTheme ?? "blue",
     autoCompoundAvailable: (p as any).autoCompoundAvailable ?? true,

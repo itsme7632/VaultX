@@ -96,10 +96,11 @@ function seededInt(planId: number, salt: number, min: number, max: number) {
 /**
  * Auto-generate realistic participant count from capital raised.
  * Uses a deterministic fraction per plan so values are stable across renders.
+ * Returns 0 when raised ≤ 0 — no participants can exist with zero capital.
  * Scales:  $2K → 1-5,  $100K → 15-60,  $500K → 50-250,  $2M → 150-1000
  */
 function autoParticipantsFromRaised(raised: number, planId: number): number {
-  if (raised <= 0) return 1;
+  if (raised <= 0) return 0;
   const frac = ((planId * 31 + 7) % 97) / 97; // stable 0-1 per plan
 
   const points = [
@@ -133,32 +134,39 @@ function autoStats(id: number) {
   return { participants, raisedPct, joinedToday, joinedWeek, capitalTargetK };
 }
 
-/* ─── Badge auto-assignment (comparative across all plans) ─────────────── */
+/* ─── Badge auto-assignment (uses REAL plan data for accuracy) ───────────── */
 
 function computeAutoBadges(plans: any[]): Record<number, BadgeKey> {
   if (!plans.length) return {};
 
-  const stats = plans.map(p => ({
-    id: p.id,
-    ...autoStats(p.id),
-  }));
+  // Build comparison data from REAL plan DB fields — not seeded values
+  const planData = plans.map(p => {
+    const fundingGoal    = p.fundingGoal != null ? Number(p.fundingGoal) : null;
+    const capitalRaised  = p.currentFunding != null ? Number(p.currentFunding) : 0;
+    const raisedPct      = fundingGoal && fundingGoal > 0 ? (capitalRaised / fundingGoal) * 100 : 0;
+    const participants   = p.totalParticipants != null ? Number(p.totalParticipants) : 0;
+    // Activity score: blend real funding level with plan-stable seed for relative comparison
+    const activityBase   = Math.max(2, Math.floor(raisedPct / 5));
+    const joinedToday    = activityBase + seededInt(p.id, 5, 1, 8);
+    return { id: p.id, raisedPct, participants, capitalRaised, joinedToday };
+  });
 
   const badges: Record<number, BadgeKey> = {};
   const assigned = new Set<number>();
 
-  const assignTop = (sorted: typeof stats, badge: BadgeKey) => {
+  const assignTop = (sorted: typeof planData, badge: BadgeKey) => {
     const winner = sorted.find(s => !assigned.has(s.id));
     if (winner) { badges[winner.id] = badge; assigned.add(winner.id); }
   };
 
-  // 🔥 Trending = most joined today
-  assignTop([...stats].sort((a, b) => b.joinedToday - a.joinedToday), "trending");
-  // 🚀 Fast Growing = highest joinedToday-to-participants ratio
-  assignTop([...stats].sort((a, b) => (b.joinedToday / b.participants) - (a.joinedToday / a.participants)), "fast-growing");
-  // 🏆 Top Funded = highest raised %
-  assignTop([...stats].sort((a, b) => b.raisedPct - a.raisedPct), "top-funded");
-  // ⭐ Popular = most total participants
-  assignTop([...stats].sort((a, b) => b.participants - a.participants), "popular");
+  // 🏆 Top Funded = highest real funding percentage
+  assignTop([...planData].sort((a, b) => b.raisedPct - a.raisedPct), "top-funded");
+  // 🔥 Trending = most activity today (real-funding-scaled)
+  assignTop([...planData].sort((a, b) => b.joinedToday - a.joinedToday), "trending");
+  // 🚀 Fast Growing = highest growth rate vs participant base
+  assignTop([...planData].sort((a, b) => (b.joinedToday / Math.max(1, b.participants || 10)) - (a.joinedToday / Math.max(1, a.participants || 10))), "fast-growing");
+  // ⭐ Popular = most total real participants
+  assignTop([...planData].sort((a, b) => b.participants - a.participants), "popular");
 
   return badges;
 }
@@ -207,10 +215,19 @@ function OpportunityInsightsSummary({ plans, customStats, mode }: { plans: any[]
       ?? (custom?.raisedPct != null ? Math.floor(target * (custom.raisedPct / 100)) : null)
       ?? Math.floor(target * (base.raisedPct / 100));
 
+    // Admin override takes priority; if raised = 0, no participants
+    const displayOverride = p.displayParticipantCount != null ? Number(p.displayParticipantCount) : null;
     const dbParts = p.totalParticipants != null ? Number(p.totalParticipants) : null;
-    const parts = (dbParts != null && dbParts > 0)
-      ? dbParts
-      : (custom?.participants ?? autoParticipantsFromRaised(raised, p.id));
+    let parts: number;
+    if (displayOverride !== null) {
+      parts = displayOverride;
+    } else if (raised <= 0) {
+      parts = 0;
+    } else if (dbParts !== null && dbParts > 0) {
+      parts = dbParts;
+    } else {
+      parts = custom?.participants ?? autoParticipantsFromRaised(raised, p.id);
+    }
 
     totalParticipants += parts;
     totalRaised += raised;
@@ -316,25 +333,44 @@ export default function InvestmentsPage() {
       ?? (custom?.raisedPct != null ? Math.floor(capitalTarget * (custom.raisedPct / 100)) : null)
       ?? Math.floor(capitalTarget * (base.raisedPct / 100));
 
-    // Funding % always derived from actual raised/target
-    const raisedPct = capitalTarget > 0
-      ? Math.min(100, Math.round((capitalRaised / capitalTarget) * 100))
+    // Funding % — derive from real raised/target when available
+    const raisedPctRaw = capitalTarget > 0
+      ? Math.min(100, (capitalRaised / capitalTarget) * 100)
       : (custom?.raisedPct ?? base.raisedPct);
+    const raisedPct = Math.round(raisedPctRaw);
+    // Display string: show "< 1%" instead of "0%" when there is real capital raised
+    const fundingDisplay = capitalRaised > 0 && raisedPct === 0 ? "< 1%" : `${raisedPct}%`;
+    // Bar percentage — use raw value with a minimum visible width when raised > 0
+    const barPct = capitalRaised > 0 ? Math.max(0.5, raisedPctRaw) : raisedPct;
 
-    // Participants: DB value (if > 0), custom, or auto-generate from capital raised
-    const dbParticipants = plan.totalParticipants != null ? Number(plan.totalParticipants) : null;
-    const participants = (dbParticipants != null && dbParticipants > 0)
-      ? dbParticipants
-      : (custom?.participants ?? null)
-        ?? (useReal ? autoParticipantsFromRaised(capitalRaised, plan.id) : base.participants);
+    // Participants — priority order:
+    //   1. Admin override (displayParticipantCount) — highest trust
+    //   2. Real DB participant count (totalParticipants) — when > 0
+    //   3. Custom stats override
+    //   4. Auto-generate from capital raised (only when raised > 0)
+    //   5. Seeded base (only in "auto" mode and when raised > 0)
+    // Rule: if capitalRaised = 0, participants MUST be 0 regardless of mode
+    const displayOverride = plan.displayParticipantCount != null ? Number(plan.displayParticipantCount) : null;
+    const dbParticipants  = plan.totalParticipants != null ? Number(plan.totalParticipants) : null;
 
-    // When in real mode with raised > 0 but participants still 0, auto-generate
-    const finalParticipants = (participants === 0 && capitalRaised > 0)
-      ? autoParticipantsFromRaised(capitalRaised, plan.id)
-      : participants;
+    let participants: number;
+    if (displayOverride !== null) {
+      participants = displayOverride;
+    } else if (capitalRaised <= 0) {
+      // No capital raised = no participants can logically be shown
+      participants = 0;
+    } else if (dbParticipants !== null && dbParticipants > 0) {
+      participants = dbParticipants;
+    } else if (custom?.participants != null) {
+      participants = custom.participants;
+    } else if (useReal) {
+      participants = autoParticipantsFromRaised(capitalRaised, plan.id);
+    } else {
+      participants = base.participants;
+    }
 
     const capitalRemaining = Math.max(0, capitalTarget - capitalRaised);
-    return { participants: finalParticipants, raisedPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
+    return { participants, raisedPct, raisedPctRaw, fundingDisplay, barPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
   };
 
   const getPlanMomentum = (plan: any, s: ReturnType<typeof getPlanStats>): MomentumLevel | null => {
@@ -397,7 +433,13 @@ export default function InvestmentsPage() {
                 const maxRoi = plan.maxRoiRate ?? 0.030;
                 const gradient = planGradient(plan.colorTheme);
                 const category = plan.category ?? "Strategic Capital";
-                const badge = badges[plan.id] ?? null;
+                const rawBadge = badges[plan.id] ?? null;
+                // Suppress auto-badge when it duplicates the status badge to avoid showing "🔥 Trending" twice
+                const statusExpressesBadge =
+                  (rawBadge === "trending" && plan.status === "trending") ||
+                  (rawBadge === "popular"  && plan.isPopular) ||
+                  (rawBadge === "top-funded" && plan.status === "featured");
+                const badge = statusExpressesBadge ? null : rawBadge;
                 const s = getPlanStats(plan);
                 const momentum = getPlanMomentum(plan, s);
                 const isExpanded = expandedId === plan.id;
@@ -484,23 +526,19 @@ export default function InvestmentsPage() {
                             </div>
                           </div>
                         </div>
-                        {/* Momentum badge — near participant count */}
-                        {momentum && (
-                          <MomentumBadge level={momentum} compact />
-                        )}
                       </div>
 
                       {/* Funding progress */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground font-medium">{s.raisedPct}% funded</span>
-                            {/* Momentum badge — near funding progress (compact arrow) */}
+                            <span className="text-xs text-muted-foreground font-medium">{s.fundingDisplay} funded</span>
+                            {/* Momentum badge — single instance, shown here only */}
                             {momentum && <MomentumBadge level={momentum} />}
                           </div>
                           <span className="text-xs font-bold text-foreground">{formatUSDT(s.capitalRaised)} / {formatUSDT(s.capitalTarget)}</span>
                         </div>
-                        <AnimatedBar pct={s.raisedPct} gradient={planGradient(plan.colorTheme)} />
+                        <AnimatedBar pct={s.barPct} gradient={planGradient(plan.colorTheme)} />
                         <p className="text-[10px] text-muted-foreground mt-1">{formatUSDT(s.capitalRemaining)} remaining to target</p>
                       </div>
 
@@ -520,7 +558,7 @@ export default function InvestmentsPage() {
                             { label: "Participants", value: s.participants.toLocaleString(), icon: Users },
                             { label: "Capital Target", value: formatUSDT(s.capitalTarget), icon: Target },
                             { label: "Capital Raised", value: formatUSDT(s.capitalRaised), icon: TrendingUp },
-                            { label: "Funding %", value: `${s.raisedPct}%`, icon: BarChart3 },
+                            { label: "Funding %", value: s.fundingDisplay, icon: BarChart3 },
                             { label: "Min. Entry", value: formatUSDT(plan.minAmount), icon: Target },
                             { label: "Status", value: sb.label, icon: Zap },
                           ].map(({ label, value, icon: Icon }) => (
