@@ -13,6 +13,7 @@ import {
   referralsTable,
   platformSettingsTable,
   adminActionLogsTable,
+  withdrawalAddressesTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -20,7 +21,11 @@ import { processAllInvestments } from "../lib/roi-engine";
 
 const router: IRouter = Router();
 
-function serializeUser(user: typeof usersTable.$inferSelect, wallet?: typeof walletsTable.$inferSelect | null) {
+function serializeUser(
+  user: typeof usersTable.$inferSelect,
+  wallet?: typeof walletsTable.$inferSelect | null,
+  withdrawalAddressCount?: number,
+) {
   return {
     id: user.id,
     displayId: user.displayId,
@@ -37,6 +42,8 @@ function serializeUser(user: typeof usersTable.$inferSelect, wallet?: typeof wal
     isAdmin: user.isAdmin,
     isActive: user.isActive,
     twoFaEnabled: user.twoFaEnabled,
+    hasWithdrawalPassword: !!user.withdrawalPasswordHash,
+    withdrawalAddressCount: withdrawalAddressCount ?? 0,
     withdrawalLocked: user.withdrawalLocked,
     transferLocked: user.transferLocked,
     whatsappLocked: user.whatsappLocked,
@@ -69,12 +76,23 @@ router.get("/admin/users", requireAdmin, async (req, res): Promise<void> => {
     .limit(parseInt(limit, 10))
     .offset(parseInt(offset, 10));
 
+  const userIds = results.map((r) => r.user.id);
+  const addrCounts: Record<number, number> = {};
+  if (userIds.length > 0) {
+    const rows = await db
+      .select({ userId: withdrawalAddressesTable.userId, c: count() })
+      .from(withdrawalAddressesTable)
+      .where(sql`${withdrawalAddressesTable.userId} = ANY(${sql.raw(`ARRAY[${userIds.join(",")}]::int[]`)})`)
+      .groupBy(withdrawalAddressesTable.userId);
+    rows.forEach((r) => { addrCounts[r.userId] = Number(r.c); });
+  }
+
   const total = search
     ? results.length
     : (await db.select({ c: count() }).from(usersTable))[0]?.c ?? 0;
 
   res.json({
-    items: results.map((r) => serializeUser(r.user, r.wallet)),
+    items: results.map((r) => serializeUser(r.user, r.wallet, addrCounts[r.user.id] ?? 0)),
     total,
   });
 });

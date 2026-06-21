@@ -501,8 +501,11 @@ export default function AdminPage() {
                       <p className="text-sm font-medium text-foreground truncate">{u.fullName}</p>
                       <p className="text-[10px] text-muted-foreground">@{u.username} · #{u.displayId} · {formatUSDT(u.balance)}</p>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0">
                       <Badge variant="outline" className={cn("text-[9px]", u.kycStatus === "approved" ? "text-emerald-600 bg-emerald-50" : "")}>{u.kycStatus}</Badge>
+                      <Badge variant="outline" className={cn("text-[9px]", u.twoFaEnabled ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-slate-400")}>2FA</Badge>
+                      <Badge variant="outline" className={cn("text-[9px]", u.hasWithdrawalPassword ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-slate-400")}>WDP</Badge>
+                      <Badge variant="outline" className={cn("text-[9px]", u.withdrawalAddressCount > 0 ? "text-emerald-600 bg-emerald-50 border-emerald-200" : "text-slate-400")}>ADDR</Badge>
                       <button onClick={() => openUserModal(u)} className="p-1.5 rounded-lg hover:bg-muted"><ChevronRight size={13} /></button>
                     </div>
                   </div>
@@ -1322,6 +1325,9 @@ export default function AdminPage() {
                     <Badge variant="outline" className={cn("text-[9px] capitalize", userModal.kycStatus === "approved" ? "bg-emerald-50 text-emerald-600" : userModal.kycStatus === "rejected" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{userModal.kycStatus}</Badge>
                   </div>
                 )}
+                <div className="flex justify-between items-center"><span className="text-muted-foreground">2FA</span><Badge variant="outline" className={cn("text-[9px]", userModal.twoFaEnabled ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-500 border-red-200")}>{userModal.twoFaEnabled ? "Enabled" : "Disabled"}</Badge></div>
+                <div className="flex justify-between items-center"><span className="text-muted-foreground">Withdrawal Password</span><Badge variant="outline" className={cn("text-[9px]", userModal.hasWithdrawalPassword ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-500 border-red-200")}>{userModal.hasWithdrawalPassword ? "Set" : "Not Set"}</Badge></div>
+                <div className="flex justify-between items-center"><span className="text-muted-foreground">Withdrawal Addresses</span><Badge variant="outline" className={cn("text-[9px]", userModal.withdrawalAddressCount > 0 ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-500 border-red-200")}>{userModal.withdrawalAddressCount > 0 ? `${userModal.withdrawalAddressCount} saved` : "None"}</Badge></div>
               </div>
 
               {/* KYC verification controls */}

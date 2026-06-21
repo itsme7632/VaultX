@@ -20,6 +20,7 @@ import appInfoRouter from "./app-info";
 import aboutRouter from "./about";
 import faqRouter from "./faq";
 import platformMetricsRouter from "./platform-metrics";
+import securityRouter from "./security";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(appInfoRouter);
 router.use(aboutRouter);
 router.use(faqRouter);
 router.use(platformMetricsRouter);
+router.use(securityRouter);
 
 export default router;

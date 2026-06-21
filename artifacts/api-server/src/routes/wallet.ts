@@ -1,5 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, or, ilike, desc, and } from "drizzle-orm";
+import bcrypt from "bcryptjs";
+import speakeasy from "speakeasy";
 import {
   db,
   walletsTable,
@@ -8,6 +10,7 @@ import {
   platformSettingsTable,
   depositNetworksTable,
   notificationsTable,
+  withdrawalAddressesTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -148,7 +151,7 @@ router.post("/wallet/deposit", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => {
-  const { amount, network, address } = req.body;
+  const { amount, network, address, withdrawalPassword, twoFaCode } = req.body;
 
   if (!amount || !network || !address || amount <= 0) {
     res.status(400).json({ error: "Invalid input", message: "Amount, network, and address are required" });
@@ -158,6 +161,51 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
   if (user?.withdrawalLocked) {
     res.status(403).json({ error: "Withdrawals locked", message: "Withdrawals are currently locked on your account. Please contact support." });
+    return;
+  }
+
+  const savedAddresses = await db
+    .select()
+    .from(withdrawalAddressesTable)
+    .where(eq(withdrawalAddressesTable.userId, req.session.userId!));
+
+  const missing: string[] = [];
+  if (!user.twoFaEnabled) missing.push("Authenticator (2FA)");
+  if (!user.withdrawalPasswordHash) missing.push("Withdrawal Password");
+  if (savedAddresses.length === 0) missing.push("Withdrawal Address");
+
+  if (missing.length > 0) {
+    res.status(403).json({
+      error: "Security setup required",
+      message: `Complete security setup before withdrawing: ${missing.join(", ")}`,
+      requiresSecuritySetup: true,
+      missing,
+    });
+    return;
+  }
+
+  if (!withdrawalPassword) {
+    res.status(400).json({ error: "Password required", message: "Withdrawal password is required" });
+    return;
+  }
+  const passwordValid = await bcrypt.compare(withdrawalPassword, user.withdrawalPasswordHash!);
+  if (!passwordValid) {
+    res.status(400).json({ error: "Wrong password", message: "Withdrawal password is incorrect" });
+    return;
+  }
+
+  if (!twoFaCode) {
+    res.status(400).json({ error: "2FA required", message: "Authenticator code is required" });
+    return;
+  }
+  const codeValid = speakeasy.totp.verify({
+    secret: user.twoFaSecret!,
+    encoding: "base32",
+    token: String(twoFaCode),
+    window: 1,
+  });
+  if (!codeValid) {
+    res.status(400).json({ error: "Invalid 2FA code", message: "Authenticator code is incorrect or expired" });
     return;
   }
 
@@ -259,7 +307,7 @@ router.get("/wallet/resolve-user", requireAuth, async (req, res): Promise<void> 
 });
 
 router.post("/wallet/transfer", requireAuth, async (req, res): Promise<void> => {
-  const { recipientQuery, amount, note } = req.body;
+  const { recipientQuery, amount, note, withdrawalPassword, twoFaCode } = req.body;
 
   if (!recipientQuery || !amount || amount <= 0) {
     res.status(400).json({ error: "Invalid input", message: "Recipient and amount are required" });
@@ -270,6 +318,35 @@ router.post("/wallet/transfer", requireAuth, async (req, res): Promise<void> => 
   if (senderUser?.transferLocked) {
     res.status(403).json({ error: "Transfers locked", message: "Transfers are currently locked on your account." });
     return;
+  }
+
+  if (senderUser.withdrawalPasswordHash) {
+    if (!withdrawalPassword) {
+      res.status(400).json({ error: "Password required", message: "Withdrawal password is required for transfers" });
+      return;
+    }
+    const pwValid = await bcrypt.compare(withdrawalPassword, senderUser.withdrawalPasswordHash);
+    if (!pwValid) {
+      res.status(400).json({ error: "Wrong password", message: "Withdrawal password is incorrect" });
+      return;
+    }
+  }
+
+  if (senderUser.twoFaEnabled && senderUser.twoFaSecret) {
+    if (!twoFaCode) {
+      res.status(400).json({ error: "2FA required", message: "Authenticator code is required for transfers" });
+      return;
+    }
+    const codeValid = speakeasy.totp.verify({
+      secret: senderUser.twoFaSecret,
+      encoding: "base32",
+      token: String(twoFaCode),
+      window: 1,
+    });
+    if (!codeValid) {
+      res.status(400).json({ error: "Invalid 2FA code", message: "Authenticator code is incorrect or expired" });
+      return;
+    }
   }
 
   const [recipient] = await db

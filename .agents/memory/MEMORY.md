@@ -2,3 +2,4 @@
 - [Dark Mode Strategy](dark-mode.md) — Class-based dark mode: `.dark` on `<html>`, ThemeProvider in `lib/theme.tsx`, localStorage key `wexora-theme`, anti-flash script in index.html; CSS overrides handle hardcoded `bg-white`/`bg-slate-*` across 24 pages without per-page edits
 - [Wexora Brand](wexora-brand.md) — Full rebrand from VaultX → Wexora Global; WX logo assets in public/, brand color #060d1a, tagline "Global Opportunities. Smarter Growth.", domain wexoraglobal.com
 - [Member ID System](member-id.md) — displayId field in users table (6-digit random string, unique); profile shows WX{displayId}, never falls back to DB row id; generateDisplayId() in auth.ts; both seed users have displayId set
+- [Security System](security-system.md) — Full withdrawal security: withdrawal_password_hash on users table, withdrawal_addresses table; /api/security/* routes; hard gate on withdraw (all 3 required), soft gate on transfer (verify what's set); 3-step frontend flows

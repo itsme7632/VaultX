@@ -24,6 +24,7 @@ export const usersTable = pgTable("users", {
   kycStatus: text("kyc_status").notNull().default("none"),
   twoFaEnabled: boolean("two_fa_enabled").notNull().default(false),
   twoFaSecret: text("two_fa_secret"),
+  withdrawalPasswordHash: text("withdrawal_password_hash"),
   isAdmin: boolean("is_admin").notNull().default(false),
   isVerified: boolean("is_verified").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
