@@ -8,31 +8,35 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatUSDT } from "@/lib/format";
 
-const OPPORTUNITY_GRADIENTS: Record<number, string> = {
-  1: "from-blue-600 to-indigo-700",
-  2: "from-emerald-500 to-teal-700",
-  3: "from-amber-500 to-orange-600",
-  4: "from-purple-600 to-violet-800",
-  5: "from-rose-500 to-pink-700",
-  6: "from-cyan-500 to-blue-700",
-  7: "from-lime-500 to-green-700",
-  8: "from-fuchsia-600 to-purple-800",
+const THEME_GRADIENT: Record<string, string> = {
+  blue:   "from-blue-600 to-indigo-700",
+  purple: "from-purple-600 to-violet-800",
+  green:  "from-emerald-500 to-teal-700",
+  gold:   "from-amber-500 to-orange-600",
+  cyan:   "from-cyan-500 to-blue-700",
+  rose:   "from-rose-500 to-pink-700",
 };
 
-const CATEGORIES: Record<number, string> = {
-  1: "Digital Assets",
-  2: "Technology Infrastructure",
-  3: "Artificial Intelligence",
-  4: "Renewable Energy",
-  5: "Global Commerce",
-  6: "Financial Technology",
-  7: "Blockchain Innovation",
-  8: "Strategic Capital",
-};
+function planGradient(colorTheme?: string) {
+  return THEME_GRADIENT[colorTheme ?? "blue"] ?? "from-blue-600 to-indigo-700";
+}
 
 function seededInt(planId: number, salt: number, min: number, max: number) {
   const seed = (planId * 31 + salt * 17) % 97;
   return min + Math.floor((seed / 97) * (max - min));
+}
+
+function planStatusBadge(status?: string) {
+  switch (status) {
+    case "funding":         return { label: "Funding Active",  cls: "bg-blue-400/30 text-blue-100 border-blue-300/40" };
+    case "featured":        return { label: "⭐ Featured",     cls: "bg-amber-400/30 text-amber-100 border-amber-300/40" };
+    case "trending":        return { label: "🔥 Trending",     cls: "bg-orange-400/30 text-orange-100 border-orange-300/40" };
+    case "paused":          return { label: "Paused",           cls: "bg-gray-400/30 text-gray-200 border-gray-300/40" };
+    case "fully_allocated": return { label: "Fully Allocated", cls: "bg-purple-400/30 text-purple-100 border-purple-300/40" };
+    case "expired":         return { label: "Expired",         cls: "bg-red-400/30 text-red-100 border-red-300/40" };
+    case "closed":          return { label: "Closed",          cls: "bg-slate-400/30 text-slate-200 border-slate-300/40" };
+    default:                return { label: "Funding Active",  cls: "bg-emerald-400/30 text-emerald-100 border-emerald-300/40" };
+  }
 }
 
 export default function OpportunityDetailPage() {
@@ -46,17 +50,19 @@ export default function OpportunityDetailPage() {
   const plan: any = plans?.find((p: any) => String(p.id) === planId);
   const id = plan?.id ?? 1;
 
-  const gradient = OPPORTUNITY_GRADIENTS[id] ?? "from-blue-600 to-indigo-700";
-  const category = CATEGORIES[id] ?? "Strategic Capital";
+  const gradient = planGradient(plan?.colorTheme);
+  const category = plan?.category ?? "Strategic Capital";
   const minRoi = plan?.minRoiRate ?? 0.025;
   const maxRoi = plan?.maxRoiRate ?? 0.030;
+  const sb = planStatusBadge(plan?.status);
 
-  const capitalTargetMultiplier = seededInt(id, 1, 80, 200) * 1000;
-  const capitalTarget = capitalTargetMultiplier;
-  const raisedPct = seededInt(id, 2, 48, 82);
-  const capitalRaised = Math.floor(capitalTarget * (raisedPct / 100));
-  const participants = seededInt(id, 3, 120, 520);
-  const daysToClose = seededInt(id, 4, 5, 21);
+  const capitalTarget = plan?.fundingGoal ?? seededInt(id, 1, 80, 200) * 1000;
+  const capitalRaised = plan?.currentFunding ?? Math.floor(capitalTarget * (seededInt(id, 2, 48, 82) / 100));
+  const raisedPct = capitalTarget > 0 ? Math.round((capitalRaised / capitalTarget) * 100) : seededInt(id, 2, 48, 82);
+  const participants = plan?.totalParticipants ?? seededInt(id, 3, 120, 520);
+  const daysToClose = plan?.endDate
+    ? Math.max(0, Math.ceil((new Date(plan.endDate).getTime() - Date.now()) / 86400000))
+    : seededInt(id, 4, 5, 21);
 
   if (isLoading) {
     return (
@@ -100,8 +106,8 @@ export default function OpportunityDetailPage() {
               <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold mb-2">
                 {category}
               </Badge>
-              <Badge className="bg-emerald-400/30 text-emerald-100 border-emerald-300/40 text-[10px] font-semibold">
-                Funding Active
+              <Badge className={cn("text-[10px] font-semibold border", sb.cls)}>
+                {sb.label}
               </Badge>
             </div>
             <h2 className="font-bold text-2xl leading-tight mb-1">{plan.name}</h2>

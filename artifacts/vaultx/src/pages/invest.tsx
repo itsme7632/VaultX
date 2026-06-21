@@ -15,16 +15,18 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT } from "@/lib/format";
 
-const OPPORTUNITY_GRADIENTS: Record<number, string> = {
-  1: "from-blue-600 to-indigo-700",
-  2: "from-emerald-500 to-teal-700",
-  3: "from-amber-500 to-orange-600",
-  4: "from-purple-600 to-violet-800",
-  5: "from-rose-500 to-pink-700",
-  6: "from-cyan-500 to-blue-700",
-  7: "from-lime-500 to-green-700",
-  8: "from-fuchsia-600 to-purple-800",
+const THEME_GRADIENT: Record<string, string> = {
+  blue:   "from-blue-600 to-indigo-700",
+  purple: "from-purple-600 to-violet-800",
+  green:  "from-emerald-500 to-teal-700",
+  gold:   "from-amber-500 to-orange-600",
+  cyan:   "from-cyan-500 to-blue-700",
+  rose:   "from-rose-500 to-pink-700",
 };
+
+function planGradient(colorTheme?: string) {
+  return THEME_GRADIENT[colorTheme ?? "blue"] ?? "from-blue-600 to-indigo-700";
+}
 
 export default function InvestPage() {
   const { planId } = useParams<{ planId: string }>();
@@ -73,7 +75,7 @@ export default function InvestPage() {
     );
   };
 
-  const gradient = OPPORTUNITY_GRADIENTS[plan?.id as number] ?? "from-blue-600 to-indigo-700";
+  const gradient = planGradient(plan?.colorTheme);
 
   if (plansLoading) {
     return (

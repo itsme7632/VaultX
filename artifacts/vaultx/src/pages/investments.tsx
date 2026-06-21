@@ -16,27 +16,31 @@ import { useState, useEffect, useRef } from "react";
 
 /* ─── Shared constants ──────────────────────────────────────────────────── */
 
-const OPPORTUNITY_GRADIENTS: Record<number, string> = {
-  1: "from-blue-600 to-indigo-700",
-  2: "from-emerald-500 to-teal-700",
-  3: "from-amber-500 to-orange-600",
-  4: "from-purple-600 to-violet-800",
-  5: "from-rose-500 to-pink-700",
-  6: "from-cyan-500 to-blue-700",
-  7: "from-lime-500 to-green-700",
-  8: "from-fuchsia-600 to-purple-800",
+const THEME_GRADIENT: Record<string, string> = {
+  blue:   "from-blue-600 to-indigo-700",
+  purple: "from-purple-600 to-violet-800",
+  green:  "from-emerald-500 to-teal-700",
+  gold:   "from-amber-500 to-orange-600",
+  cyan:   "from-cyan-500 to-blue-700",
+  rose:   "from-rose-500 to-pink-700",
 };
 
-const CATEGORIES: Record<number, string> = {
-  1: "Digital Assets",
-  2: "Technology Infrastructure",
-  3: "Artificial Intelligence",
-  4: "Renewable Energy",
-  5: "Global Commerce",
-  6: "Financial Technology",
-  7: "Blockchain Innovation",
-  8: "Strategic Capital",
-};
+function planGradient(colorTheme?: string) {
+  return THEME_GRADIENT[colorTheme ?? "blue"] ?? "from-blue-600 to-indigo-700";
+}
+
+function planStatusBadge(status?: string) {
+  switch (status) {
+    case "funding":         return { label: "Funding",         cls: "bg-blue-400/30 text-blue-100 border-blue-300/40" };
+    case "featured":        return { label: "⭐ Featured",     cls: "bg-amber-400/30 text-amber-100 border-amber-300/40" };
+    case "trending":        return { label: "🔥 Trending",     cls: "bg-orange-400/30 text-orange-100 border-orange-300/40" };
+    case "paused":          return { label: "Paused",           cls: "bg-gray-400/30 text-gray-200 border-gray-300/40" };
+    case "fully_allocated": return { label: "Fully Allocated", cls: "bg-purple-400/30 text-purple-100 border-purple-300/40" };
+    case "expired":         return { label: "Expired",         cls: "bg-red-400/30 text-red-100 border-red-300/40" };
+    case "closed":          return { label: "Closed",          cls: "bg-slate-400/30 text-slate-200 border-slate-300/40" };
+    default:                return { label: "Active",           cls: "bg-emerald-400/30 text-emerald-100 border-emerald-300/40" };
+  }
+}
 
 type BadgeKey = "trending" | "popular" | "fast-growing" | "top-funded" | "none";
 
@@ -129,9 +133,10 @@ function OpportunityInsightsSummary({ plans, customStats, mode }: { plans: any[]
   activePlans.forEach(p => {
     const custom = mode === "custom" && customStats[p.id];
     const s = custom || autoStats(p.id);
-    const target = (custom?.capitalTargetK ?? s.capitalTargetK) * 1000;
-    const raised = Math.floor(target * (s.raisedPct / 100));
-    totalParticipants += s.participants;
+    const target = p.fundingGoal ?? (custom?.capitalTargetK ?? s.capitalTargetK) * 1000;
+    const raised = p.currentFunding ?? Math.floor(target * (s.raisedPct / 100));
+    const parts  = p.totalParticipants ?? s.participants;
+    totalParticipants += parts;
     totalRaised += raised;
     totalTarget += target;
   });
@@ -215,13 +220,12 @@ export default function InvestmentsPage() {
   const getPlanStats = (plan: any) => {
     const custom = analyticsMode === "custom" && customStatsMap[String(plan.id)];
     const base = autoStats(plan.id);
-    const participants   = custom?.participants   ?? base.participants;
-    const raisedPct      = custom?.raisedPct      ?? base.raisedPct;
-    const joinedToday    = custom?.joinedToday    ?? base.joinedToday;
-    const joinedWeek     = custom?.joinedWeek     ?? base.joinedWeek;
-    const capitalTargetK = custom?.capitalTargetK ?? base.capitalTargetK;
-    const capitalTarget  = capitalTargetK * 1000;
-    const capitalRaised  = Math.floor(capitalTarget * (raisedPct / 100));
+    const joinedToday    = custom?.joinedToday ?? base.joinedToday;
+    const joinedWeek     = custom?.joinedWeek  ?? base.joinedWeek;
+    const participants   = plan.totalParticipants ?? custom?.participants ?? base.participants;
+    const capitalTarget  = plan.fundingGoal ?? (custom?.capitalTargetK ?? base.capitalTargetK) * 1000;
+    const capitalRaised  = plan.currentFunding ?? Math.floor(capitalTarget * ((custom?.raisedPct ?? base.raisedPct) / 100));
+    const raisedPct      = capitalTarget > 0 ? Math.round((capitalRaised / capitalTarget) * 100) : (custom?.raisedPct ?? base.raisedPct);
     const capitalRemaining = capitalTarget - capitalRaised;
     return { participants, raisedPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
   };
@@ -255,17 +259,19 @@ export default function InvestmentsPage() {
             <div className="space-y-4">
               {plansLoading ? (
                 [1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
-              ) : [...(plans ?? [])].sort((a: any, b: any) => (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)).map((plan: any) => {
+              ) : [...(plans ?? [])].sort((a: any, b: any) => {
+                const aOrd = a.sortOrder ?? 999, bOrd = b.sortOrder ?? 999;
+                if (aOrd !== bOrd) return aOrd - bOrd;
+                return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+              }).map((plan: any) => {
                 const minRoi = plan.minRoiRate ?? 0.025;
                 const maxRoi = plan.maxRoiRate ?? 0.030;
-                const gradient = OPPORTUNITY_GRADIENTS[plan.id] ?? "from-blue-600 to-indigo-700";
-                const category = CATEGORIES[plan.id] ?? "Strategic Capital";
+                const gradient = planGradient(plan.colorTheme);
+                const category = plan.category ?? "Strategic Capital";
                 const badge = badges[plan.id] ?? null;
                 const s = getPlanStats(plan);
                 const isExpanded = expandedId === plan.id;
-
-                const statusLabel = s.raisedPct >= 90 ? "Almost Funded" : s.raisedPct >= 70 ? "Funding Active" : "Open";
-                const statusCls   = s.raisedPct >= 90 ? "bg-amber-400/30 text-amber-100 border-amber-300/40" : "bg-emerald-400/30 text-emerald-100 border-emerald-300/40";
+                const sb = planStatusBadge(plan.status);
 
                 return (
                   <div
@@ -295,13 +301,22 @@ export default function InvestmentsPage() {
                               {BADGE_DISPLAY[badge].label}
                             </span>
                           )}
-                          <Badge className={cn("text-[10px] border", statusCls)}>
-                            {statusLabel}
+                          <Badge className={cn("text-[10px] border", sb.cls)}>
+                            {sb.label}
                           </Badge>
                         </div>
                       </div>
                       <h3 className="font-bold text-xl mb-1">{plan.name}</h3>
                       <p className="text-white/70 text-xs">{plan.description}</p>
+                      {plan.endDate && (() => {
+                        const diff = new Date(plan.endDate).getTime() - Date.now();
+                        if (diff <= 0) return <p className="text-[10px] text-red-300 mt-1 font-medium">Funding period ended</p>;
+                        const d = Math.floor(diff / 86400000);
+                        const h = Math.floor((diff % 86400000) / 3600000);
+                        const m = Math.floor((diff % 3600000) / 60000);
+                        const t = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
+                        return <p className="text-[10px] text-white/60 mt-1 flex items-center gap-1"><Clock size={9} />Closes in {t}</p>;
+                      })()}
 
                       {/* ROI stats */}
                       <div className="grid grid-cols-3 gap-2 mt-4">
@@ -345,7 +360,7 @@ export default function InvestmentsPage() {
                           <span className="text-xs text-muted-foreground font-medium">{s.raisedPct}% funded</span>
                           <span className="text-xs font-bold text-foreground">{formatUSDT(s.capitalRaised)} / {formatUSDT(s.capitalTarget)}</span>
                         </div>
-                        <AnimatedBar pct={s.raisedPct} gradient={OPPORTUNITY_GRADIENTS[plan.id] ?? "from-blue-600 to-indigo-700"} />
+                        <AnimatedBar pct={s.raisedPct} gradient={planGradient(plan.colorTheme)} />
                         <p className="text-[10px] text-muted-foreground mt-1">{formatUSDT(s.capitalRemaining)} remaining to target</p>
                       </div>
 

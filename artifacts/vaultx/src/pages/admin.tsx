@@ -1,5 +1,19 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag, Lock } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag, Lock, Copy, AlertTriangle } from "lucide-react";
+
+function opportunityStatusBadge(status: string) {
+  switch (status) {
+    case "active":         return { label: "Active",         cls: "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400" };
+    case "funding":        return { label: "Funding",        cls: "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400" };
+    case "featured":       return { label: "⭐ Featured",    cls: "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400" };
+    case "trending":       return { label: "🔥 Trending",    cls: "bg-orange-50 text-orange-600 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400" };
+    case "paused":         return { label: "Paused",         cls: "bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400" };
+    case "fully_allocated":return { label: "Fully Allocated",cls: "bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30 dark:text-purple-400" };
+    case "expired":        return { label: "Expired",        cls: "bg-red-50 text-red-500 border-red-200 dark:bg-red-950/30 dark:text-red-400" };
+    case "closed":         return { label: "Closed",         cls: "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400" };
+    default:               return { label: status || "Active",cls: "bg-emerald-50 text-emerald-600 border-emerald-200" };
+  }
+}
 import { Switch } from "@/components/ui/switch";
 import {
   useAdminGetAnalytics, getAdminGetAnalyticsQueryKey,
@@ -163,6 +177,18 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const deletePlan = useMutation({
+    mutationFn: (id: number) => adminApi(`/admin/plans/${id}`, "DELETE"),
+    onSuccess: () => { toast({ title: "Opportunity deleted" }); queryClient.invalidateQueries({ queryKey: ["admin-plans"] }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const duplicatePlan = useMutation({
+    mutationFn: (id: number) => adminApi(`/admin/plans/${id}/duplicate`, "POST"),
+    onSuccess: () => { toast({ title: "Opportunity duplicated" }); queryClient.invalidateQueries({ queryKey: ["admin-plans"] }); },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   const reset2fa = useMutation({
     mutationFn: (userId: number) => adminApi(`/admin/users/${userId}/reset-2fa`, "POST"),
     onSuccess: () => toast({ title: "2FA reset" }),
@@ -252,6 +278,10 @@ export default function AdminPage() {
     { label: "Pending Withdrawals", value: analytics.pendingWithdrawals, color: "text-red-500", bg: "bg-red-50" },
     { label: "Pending Deposits", value: (analytics as any).pendingDeposits ?? 0, color: "text-blue-500", bg: "bg-blue-50" },
     { label: "New Today", value: analytics.newUsersToday, color: "text-teal-500", bg: "bg-teal-50" },
+    { label: "Expired Opportunities", value: (analytics as any).expiredOpportunities ?? 0, color: "text-red-500", bg: "bg-red-50" },
+    { label: "Fully Allocated", value: (analytics as any).fullyAllocatedOpportunities ?? 0, color: "text-purple-600", bg: "bg-purple-50" },
+    { label: "Total Participants", value: ((analytics as any).totalParticipants ?? 0).toLocaleString(), color: "text-teal-600", bg: "bg-teal-50" },
+    { label: "Capital Allocated", value: formatUSDTCompact((analytics as any).totalCapitalAllocated ?? 0), color: "text-indigo-500", bg: "bg-indigo-50" },
   ] : [];
 
   return (
@@ -642,28 +672,38 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <Button className="w-full h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, riskLevel: "medium", features: [], isActive: true })}>
+              <Button className="w-full h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, riskLevel: "medium", features: [], isActive: true, isFeatured: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompound: false, fundingGoal: null, currentFunding: 0 })}>
                 <Plus size={15} className="mr-1.5" />Add Opportunity
               </Button>
               <div className="space-y-3">
-                {plans?.map((plan: any) => (
-                  <div key={plan.id} className="bg-white dark:bg-card border border-border rounded-2xl p-4 shadow-sm">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm">{plan.name}</p>
-                          <Badge variant="outline" className={cn("text-[9px]", plan.isActive ? "text-emerald-600 bg-emerald-50" : "text-muted-foreground")}>{plan.isActive ? "Active" : "Disabled"}</Badge>
-                          {plan.isFeatured && <Badge variant="outline" className="text-[9px] text-amber-600 bg-amber-50">Featured</Badge>}
+                {plans?.map((plan: any) => {
+                  const sb = opportunityStatusBadge(plan.status ?? (plan.isActive ? "active" : "paused"));
+                  return (
+                    <div key={plan.id} className="bg-white dark:bg-card border border-border rounded-2xl p-4 shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-bold text-sm">{plan.name}</p>
+                            <Badge variant="outline" className={cn("text-[9px]", sb.cls)}>{sb.label}</Badge>
+                            {plan.category && <Badge variant="outline" className="text-[9px] text-blue-600 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400">{plan.category}</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{plan.description}</p>
+                          <p className="text-xs text-primary font-semibold mt-1">
+                            {(plan.minRoiRate * 100).toFixed(1)}%–{(plan.maxRoiRate * 100).toFixed(1)}% daily · {plan.durationDays}d · {formatUSDT(plan.minAmount)}–{formatUSDT(plan.maxAmount)}
+                          </p>
+                          {plan.endDate && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">Ends: {new Date(plan.endDate).toLocaleDateString()}</p>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{plan.description}</p>
-                        <p className="text-xs text-primary font-semibold mt-1">
-                          {(plan.minRoiRate * 100).toFixed(1)}%–{(plan.maxRoiRate * 100).toFixed(1)}% daily · {plan.durationDays}d · {formatUSDT(plan.minAmount)}–{formatUSDT(plan.maxAmount)}
-                        </p>
+                        <div className="flex items-center gap-1 ml-2 shrink-0">
+                          <button onClick={() => duplicatePlan.mutate(plan.id)} className="p-1.5 rounded-lg hover:bg-muted" title="Duplicate"><Copy size={13} className="text-blue-500" /></button>
+                          <button onClick={() => setPlanModal({ ...plan })} className="p-1.5 rounded-lg hover:bg-muted" title="Edit"><Edit2 size={13} className="text-muted-foreground" /></button>
+                          <button onClick={() => { if (confirm(`Delete "${plan.name}"? This cannot be undone.`)) deletePlan.mutate(plan.id); }} className="p-1.5 rounded-lg hover:bg-red-50" title="Delete"><Trash2 size={13} className="text-red-500" /></button>
+                        </div>
                       </div>
-                      <button onClick={() => setPlanModal({ ...plan })} className="p-2 rounded-lg hover:bg-muted ml-2"><Edit2 size={14} className="text-muted-foreground" /></button>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1073,31 +1113,90 @@ export default function AdminPage() {
               {[
                 { label: "Name", field: "name", type: "text", placeholder: "e.g. Digital Assets Fund" },
                 { label: "Description", field: "description", type: "text", placeholder: "Short description" },
+                { label: "Category", field: "category", type: "text", placeholder: "e.g. Digital Assets" },
                 { label: "Min Amount (USDT)", field: "minAmount", type: "number", placeholder: "100" },
                 { label: "Max Amount (USDT)", field: "maxAmount", type: "number", placeholder: "10000" },
                 { label: "Min Daily ROI (e.g. 0.025)", field: "minRoiRate", type: "number", placeholder: "0.025" },
                 { label: "Max Daily ROI (e.g. 0.030)", field: "maxRoiRate", type: "number", placeholder: "0.030" },
                 { label: "Duration (days)", field: "durationDays", type: "number", placeholder: "30" },
+                { label: "Sort Order", field: "sortOrder", type: "number", placeholder: "0" },
+                { label: "Banner URL (optional)", field: "bannerUrl", type: "text", placeholder: "https://..." },
+                { label: "Funding Goal (USDT)", field: "fundingGoal", type: "number", placeholder: "1000000" },
+                { label: "Current Funding (USDT)", field: "currentFunding", type: "number", placeholder: "0" },
               ].map(({ label, field, type, placeholder }) => (
                 <div key={field}>
                   <Label className="text-xs">{label}</Label>
-                  <Input type={type} value={planModal[field] ?? ""} onChange={(e) => setPlanModal((p: any) => ({ ...p, [field]: type === "number" ? parseFloat(e.target.value) : e.target.value }))} placeholder={placeholder} className="mt-1 h-9 text-sm" />
+                  <Input type={type} value={planModal[field] ?? ""} onChange={(e) => setPlanModal((p: any) => ({ ...p, [field]: type === "number" ? (e.target.value === "" ? "" : parseFloat(e.target.value)) : e.target.value }))} placeholder={placeholder} className="mt-1 h-9 text-sm" />
                 </div>
               ))}
+
+              <div>
+                <Label className="text-xs">Status</Label>
+                <Select value={planModal.status ?? "active"} onValueChange={(v) => setPlanModal((p: any) => ({ ...p, status: v }))}>
+                  <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[
+                      { val: "active", label: "Active" },
+                      { val: "funding", label: "Funding" },
+                      { val: "featured", label: "⭐ Featured" },
+                      { val: "trending", label: "🔥 Trending" },
+                      { val: "paused", label: "Paused" },
+                      { val: "fully_allocated", label: "Fully Allocated" },
+                      { val: "expired", label: "Expired" },
+                      { val: "closed", label: "Closed" },
+                    ].map(({ val, label }) => <SelectItem key={val} value={val}>{label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs">Color Theme</Label>
+                <Select value={planModal.colorTheme ?? "blue"} onValueChange={(v) => setPlanModal((p: any) => ({ ...p, colorTheme: v }))}>
+                  <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[
+                      { val: "blue",   label: "Blue" },
+                      { val: "purple", label: "Purple" },
+                      { val: "green",  label: "Green" },
+                      { val: "gold",   label: "Gold" },
+                      { val: "cyan",   label: "Cyan" },
+                      { val: "rose",   label: "Rose" },
+                    ].map(({ val, label }) => <SelectItem key={val} value={val}>{label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <div>
                 <Label className="text-xs">Risk Level</Label>
-                <Select value={planModal.riskLevel} onValueChange={(v) => setPlanModal((p: any) => ({ ...p, riskLevel: v }))}>
+                <Select value={planModal.riskLevel ?? "medium"} onValueChange={(v) => setPlanModal((p: any) => ({ ...p, riskLevel: v }))}>
                   <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>{["low", "medium", "high"].map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Start Date</Label>
+                  <Input type="date" value={planModal.startDate ? String(planModal.startDate).slice(0, 10) : ""} onChange={(e) => setPlanModal((p: any) => ({ ...p, startDate: e.target.value || null }))} className="mt-1 h-9 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs">End Date</Label>
+                  <Input type="date" value={planModal.endDate ? String(planModal.endDate).slice(0, 10) : ""} onChange={(e) => setPlanModal((p: any) => ({ ...p, endDate: e.target.value || null }))} className="mt-1 h-9 text-sm" />
+                </div>
+              </div>
+
               <div>
                 <Label className="text-xs">Features (one per line)</Label>
                 <Textarea value={Array.isArray(planModal.features) ? planModal.features.join("\n") : ""} onChange={(e) => setPlanModal((p: any) => ({ ...p, features: e.target.value.split("\n").filter(Boolean) }))} className="mt-1 text-xs min-h-[80px] resize-none" placeholder="Daily returns&#10;24/7 support&#10;Auto-compound" />
               </div>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={planModal.isActive} onChange={(e) => setPlanModal((p: any) => ({ ...p, isActive: e.target.checked }))} />Active</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={planModal.isFeatured} onChange={(e) => setPlanModal((p: any) => ({ ...p, isFeatured: e.target.checked }))} />Featured</label>
-              <div className="flex gap-2">
+
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isActive} onChange={(e) => setPlanModal((p: any) => ({ ...p, isActive: e.target.checked }))} />Active</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.isFeatured} onChange={(e) => setPlanModal((p: any) => ({ ...p, isFeatured: e.target.checked }))} />Featured</label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!planModal.autoCompound} onChange={(e) => setPlanModal((p: any) => ({ ...p, autoCompound: e.target.checked }))} />Auto Compound</label>
+              </div>
+
+              <div className="flex gap-2 pt-1">
                 <Button variant="outline" className="flex-1" onClick={() => setPlanModal(null)}>Cancel</Button>
                 <Button className="flex-1" onClick={() => savePlan.mutate(planModal)} disabled={savePlan.isPending}>Save Opportunity</Button>
               </div>
@@ -1633,6 +1732,7 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
   ];
 
   const TOGGLE_FIELDS = [
+    { key: "kyc_enabled", label: "KYC Verification", description: "Enable identity verification flow for users" },
     { key: "maintenance_mode", label: "Maintenance Mode", description: "Disable access for all non-admin users" },
     { key: "kyc_required_for_withdrawal", label: "KYC Required for Withdrawal", description: "Block withdrawals until KYC is approved" },
     { key: "signup_bonus_enabled", label: "Signup Bonus", description: "Credit a welcome bonus to every new user on registration" },

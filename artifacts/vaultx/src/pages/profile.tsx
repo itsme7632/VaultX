@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Camera, Edit3, Check, X, Shield, FileCheck, Copy, CheckCircle } from "lucide-react";
 import { useUpdateUserProfile, getGetMeQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,17 @@ export default function ProfilePage() {
   const updateProfile = useUpdateUserProfile();
   const [editing, setEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const { data: publicSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/public", { credentials: "include" });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 300000,
+  });
+  const kycEnabled = !publicSettings || publicSettings?.kyc_enabled !== "false";
 
   const [form, setForm] = useState({
     fullName: user?.fullName ?? "",
@@ -81,10 +92,12 @@ export default function ProfilePage() {
           <h2 className="font-bold text-foreground text-xl">{user?.fullName}</h2>
           <p className="text-muted-foreground text-sm">@{user?.username}</p>
           <div className="flex items-center justify-center gap-2 mt-2">
-            <Badge variant="outline" className={cn("text-xs font-medium", kyc.color)}>
-              {user?.kycStatus === "approved" ? <CheckCircle size={10} className="mr-1" /> : <Shield size={10} className="mr-1" />}
-              {kyc.label}
-            </Badge>
+            {kycEnabled && (
+              <Badge variant="outline" className={cn("text-xs font-medium", kyc.color)}>
+                {user?.kycStatus === "approved" ? <CheckCircle size={10} className="mr-1" /> : <Shield size={10} className="mr-1" />}
+                {kyc.label}
+              </Badge>
+            )}
             {user?.twoFaEnabled && (
               <Badge variant="outline" className="text-xs bg-accent/10 text-accent border-accent/20 font-medium">
                 <Shield size={10} className="mr-1" />

@@ -5,7 +5,7 @@ import {
   Globe, Moon, Sun, Languages,
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -98,6 +98,17 @@ export default function SettingsPage() {
   const logout = useLogout();
   const [notifMuted, setNotifMuted] = useState(() => isNotificationMuted());
 
+  const { data: publicSettings } = useQuery({
+    queryKey: ["public-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/public", { credentials: "include" });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    staleTime: 300000,
+  });
+  const kycEnabled = !publicSettings || publicSettings?.kyc_enabled !== "false";
+
   const handleLogout = () => {
     logout.mutate(undefined, {
       onSuccess: () => { queryClient.clear(); setLocation("/login"); },
@@ -136,14 +147,16 @@ export default function SettingsPage() {
         <Section title="Account">
           <Item icon={User} label="Profile" description="Name, email, avatar" onClick={() => setLocation("/profile")} testId="settings-profile" />
           <Item icon={Shield} label="Security" description="Password, 2FA, sessions" onClick={() => setLocation("/security")} testId="settings-security" />
-          <Item
-            icon={FileCheck}
-            label="KYC Verification"
-            description={user?.kycStatus === "approved" ? "Identity verified ✓" : user?.kycStatus === "pending" ? "Under review…" : "Verify your identity"}
-            onClick={() => setLocation("/kyc")}
-            badge={user?.kycStatus === "pending" ? "Pending" : undefined}
-            testId="settings-kyc"
-          />
+          {kycEnabled && (
+            <Item
+              icon={FileCheck}
+              label="KYC Verification"
+              description={user?.kycStatus === "approved" ? "Identity verified ✓" : user?.kycStatus === "pending" ? "Under review…" : "Verify your identity"}
+              onClick={() => setLocation("/kyc")}
+              badge={user?.kycStatus === "pending" ? "Pending" : undefined}
+              testId="settings-kyc"
+            />
+          )}
         </Section>
 
         {/* Notifications */}
