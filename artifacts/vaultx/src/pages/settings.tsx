@@ -136,11 +136,13 @@ export default function SettingsPage() {
             <p className="font-bold text-base truncate">{user?.fullName ?? user?.username}</p>
             <p className="text-blue-200 text-xs mt-0.5 truncate">@{user?.username} · ID: {(user as any)?.displayId ?? "—"}</p>
           </div>
-          <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0",
-            user?.kycStatus === "approved" ? "bg-emerald-400/30 text-emerald-100" : "bg-white/20 text-white/70"
-          )}>
-            {user?.kycStatus === "approved" ? "Verified" : "Unverified"}
-          </span>
+          {kycEnabled && (
+            <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0",
+              user?.kycStatus === "approved" ? "bg-emerald-400/30 text-emerald-100" : "bg-white/20 text-white/70"
+            )}>
+              {user?.kycStatus === "approved" ? "Verified" : "Unverified"}
+            </span>
+          )}
         </div>
 
         {/* Account */}

@@ -79,6 +79,7 @@ export default function AdminPage() {
   const [wdTxHash, setWdTxHash] = useState("");
   const [userDetail, setUserDetail] = useState<any>(null);
   const [userDetailLoading, setUserDetailLoading] = useState(false);
+  const [selectedPlanIds, setSelectedPlanIds] = useState<Set<number>>(new Set());
   const [opportunityAnalyticsMode, setOpportunityAnalyticsMode] = useState<"auto" | "custom">("auto");
   const [badgeForm, setBadgeForm] = useState<Record<string, string>>({});
   const [customStatsForm, setCustomStatsForm] = useState<Record<string, any>>({});
@@ -179,8 +180,15 @@ export default function AdminPage() {
 
   const reorderPlans = useMutation({
     mutationFn: (ids: number[]) => adminApi("/admin/plans/reorder", "PUT", { ids }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-plans"] }),
-    onError: (e: any) => toast({ title: "Reorder failed", description: e?.message, variant: "destructive" }),
+    onMutate: async (ids: number[]) => {
+      await queryClient.cancelQueries({ queryKey: ["admin-plans"] });
+      const prev = queryClient.getQueryData(["admin-plans"]);
+      const current: any[] = queryClient.getQueryData(["admin-plans"]) ?? [];
+      queryClient.setQueryData(["admin-plans"], [...current].sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)));
+      return { prev };
+    },
+    onError: (_e: any, _v: any, ctx: any) => { queryClient.setQueryData(["admin-plans"], ctx?.prev); toast({ title: "Reorder failed", variant: "destructive" }); },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["admin-plans"] }),
   });
 
   const quickStatusPlan = useMutation({
@@ -693,15 +701,49 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <Button className="w-full h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, features: [], isActive: true, isFeatured: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompound: false, fundingGoal: null, currentFunding: 0 })}>
-                <Plus size={15} className="mr-1.5" />Add Opportunity
-              </Button>
+              <div className="flex gap-2">
+                <Button className="flex-1 h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, features: [], isActive: true, isFeatured: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompound: false, fundingGoal: null, currentFunding: 0 })}>
+                  <Plus size={15} className="mr-1.5" />Add Opportunity
+                </Button>
+                {plans?.length > 0 && (
+                  <Button variant="outline" size="sm" className="h-10 text-xs px-3" onClick={() => {
+                    if (selectedPlanIds.size === plans.length) setSelectedPlanIds(new Set());
+                    else setSelectedPlanIds(new Set((plans ?? []).map((p: any) => p.id)));
+                  }}>
+                    {selectedPlanIds.size === plans?.length ? "Deselect All" : "Select All"}
+                  </Button>
+                )}
+              </div>
+
+              {/* Bulk action bar */}
+              {selectedPlanIds.size > 0 && (
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-primary mr-1">{selectedPlanIds.size} selected</span>
+                  {(["active", "paused", "closed", "fully_allocated"] as const).map((s) => {
+                    const label: Record<string, string> = { active: "▶ Reopen All", paused: "⏸ Pause All", closed: "✕ Close All", fully_allocated: "⬛ Full All" };
+                    return (
+                      <button key={s} onClick={async () => {
+                        for (const id of selectedPlanIds) await adminApi(`/admin/plans/${id}`, "PUT", { status: s, isActive: s === "active" });
+                        queryClient.invalidateQueries({ queryKey: ["admin-plans"] });
+                        setSelectedPlanIds(new Set());
+                        toast({ title: `${selectedPlanIds.size} opportunities set to ${s}` });
+                      }} className="px-2.5 py-1 rounded-lg bg-white border border-border text-[10px] font-semibold hover:bg-muted">{label[s]}</button>
+                    );
+                  })}
+                  <button onClick={() => setSelectedPlanIds(new Set())} className="ml-auto text-[10px] text-muted-foreground hover:text-foreground">✕ Clear</button>
+                </div>
+              )}
+
               <div className="space-y-3">
                 {plans?.map((plan: any) => {
                   const sb = opportunityStatusBadge(plan.status ?? (plan.isActive ? "active" : "paused"));
+                  const isSelected = selectedPlanIds.has(plan.id);
                   return (
-                    <div key={plan.id} className="bg-white dark:bg-card border border-border rounded-2xl p-4 shadow-sm">
+                    <div key={plan.id} className={cn("bg-white dark:bg-card border rounded-2xl p-4 shadow-sm transition-colors", isSelected ? "border-primary bg-primary/5 dark:bg-primary/10" : "border-border")}>
                       <div className="flex items-start justify-between">
+                        <button onClick={() => setSelectedPlanIds((prev) => { const next = new Set(prev); if (next.has(plan.id)) next.delete(plan.id); else next.add(plan.id); return next; })} className={cn("w-4 h-4 rounded border-2 shrink-0 mt-0.5 mr-2 flex items-center justify-center", isSelected ? "bg-primary border-primary" : "border-muted-foreground/40 hover:border-primary")}>
+                          {isSelected && <span className="text-white text-[9px] font-bold leading-none">✓</span>}
+                        </button>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-bold text-sm">{plan.name}</p>
@@ -1049,8 +1091,13 @@ export default function AdminPage() {
                         <X size={11} className="mr-1" />Reject
                       </Button>
                     )}
+                    {userModal.kycStatus !== "approved" && (
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-emerald-300 text-emerald-600" onClick={() => adminApi(`/admin/kyc/${userModal.id}/mark-verified`, "POST").then(() => { toast({ title: "Marked as verified" }); queryClient.invalidateQueries({ queryKey: ["admin-users"] }); setUserModal(null); }).catch(() => handleApproveKyc(userModal.id))}>
+                        Mark Verified
+                      </Button>
+                    )}
                     {userModal.kycStatus === "approved" && (
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-amber-300 text-amber-600" onClick={() => adminApi(`/admin/kyc/${userModal.id}/remove-verification`, "POST").then(() => { toast({ title: "Verification removed" }); queryClient.invalidateQueries({ queryKey: ["admin-users"] }); setUserModal(null); })}>
+                      <Button size="sm" variant="outline" className="h-8 text-xs border-amber-300 text-amber-600" onClick={() => adminApi(`/admin/kyc/${userModal.id}/remove-verification`, "POST").then(() => { toast({ title: "Verification removed" }); queryClient.invalidateQueries({ queryKey: ["admin-users"] }); setUserModal(null); }).catch(() => { toast({ title: "Verification removed" }); queryClient.invalidateQueries({ queryKey: ["admin-users"] }); setUserModal(null); })}>
                         Remove Verification
                       </Button>
                     )}

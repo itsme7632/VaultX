@@ -112,19 +112,21 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Referral code */}
-        <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-muted-foreground">Referral Code</p>
-              <p className="font-bold text-foreground tracking-widest">{user?.referralCode}</p>
+        {/* Referral code — only shown with KYC enabled */}
+        {kycEnabled && (
+          <div className="bg-white border border-border rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Referral Code</p>
+                <p className="font-bold text-foreground tracking-widest">{user?.referralCode}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleCopyCode} className="h-8 text-xs gap-1">
+                {copied ? <Check size={12} /> : <Copy size={12} />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
             </div>
-            <Button variant="outline" size="sm" onClick={handleCopyCode} className="h-8 text-xs gap-1">
-              {copied ? <Check size={12} /> : <Copy size={12} />}
-              {copied ? "Copied" : "Copy"}
-            </Button>
           </div>
-        </div>
+        )}
 
         {/* Info fields */}
         <div className="bg-white border border-border rounded-xl shadow-sm overflow-hidden">

@@ -89,7 +89,7 @@ function KycGuard({ children }: { children: React.ReactNode }) {
         const val = Array.isArray(d)
           ? d.find((x: any) => x.key === "kyc_enabled")?.value
           : d?.kyc_enabled;
-        if (val === "false") { navigate("/settings"); setAllowed(false); }
+        if (val === "false") { navigate("/"); setAllowed(false); }
         setReady(true);
       })
       .catch(() => setReady(true));
