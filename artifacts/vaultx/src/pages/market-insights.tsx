@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { TrendingUp, Newspaper, BarChart3, Globe, Zap, ArrowRight, Calendar, Tag, ArrowLeft } from "lucide-react";
+import { TrendingUp, Newspaper, BarChart3, Globe, Zap, ArrowRight, Calendar, Tag, ArrowLeft, Users, DollarSign, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/format";
+import { usePlatformMetrics, formatMetricCompact } from "@/hooks/usePlatformMetrics";
 
 const SECTION_TABS = [
   { id: "all", label: "All Insights", icon: Newspaper },
@@ -39,6 +40,7 @@ const GROWTH_SECTORS = [
 export default function MarketInsightsPage() {
   const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("all");
+  const { data: metrics, isLoading: metricsLoading } = usePlatformMetrics();
 
   const { data: allNews, isLoading } = useQuery({
     queryKey: ["news", "insights"],
@@ -86,6 +88,41 @@ export default function MarketInsightsPage() {
               Stay informed with real-time analysis, weekly market updates, and expert insights on emerging investment opportunities.
             </p>
           </div>
+        </div>
+
+        {/* Platform Metrics Strip */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            {
+              icon: DollarSign,
+              label: "Capital Raised",
+              value: metricsLoading ? "—" : formatMetricCompact(metrics?.totalRaised ?? 0),
+              color: "text-emerald-600",
+              bg: "bg-emerald-500/10",
+            },
+            {
+              icon: Users,
+              label: "Participants",
+              value: metricsLoading ? "—" : (metrics?.totalParticipants ?? 0).toLocaleString(),
+              color: "text-primary",
+              bg: "bg-primary/10",
+            },
+            {
+              icon: Activity,
+              label: "Active Funds",
+              value: metricsLoading ? "—" : String(metrics?.activeOpportunities ?? 0),
+              color: "text-purple-600",
+              bg: "bg-purple-500/10",
+            },
+          ].map(({ icon: Icon, label, value, color, bg }) => (
+            <div key={label} className="bg-card border border-border rounded-xl p-3 shadow-sm text-center">
+              <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center mx-auto mb-1.5", bg)}>
+                <Icon size={13} className={color} />
+              </div>
+              <p className={cn("font-bold text-sm", color)}>{value}</p>
+              <p className="text-[9px] text-muted-foreground mt-0.5">{label}</p>
+            </div>
+          ))}
         </div>
 
         {/* Growth Sectors */}

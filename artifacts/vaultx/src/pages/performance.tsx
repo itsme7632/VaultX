@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact } from "@/lib/format";
+import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 
 const MONTHLY_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -30,7 +31,9 @@ export default function PerformancePage() {
   const [, navigate] = useLocation();
   const [showMonthly, setShowMonthly] = useState(false);
 
-  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+  const { data: metrics, isLoading: metricsLoading } = usePlatformMetrics();
+
+  const { data: chartData, isLoading: chartLoading } = useQuery({
     queryKey: ["platform-performance"],
     queryFn: async () => {
       const res = await fetch("/api/platform/performance", { credentials: "include" });
@@ -40,35 +43,25 @@ export default function PerformancePage() {
     staleTime: 30000,
   });
 
-  const { data: plans } = useGetInvestmentPlans({
-    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
-  });
-
-  const activeOpportunities = (plans ?? []).filter((p: any) => p.isActive).length;
-
   const currentMonth = new Date().getMonth();
 
   const FALLBACK_DEPOSITS = [12000, 18500, 22000, 31000, 28000, 42000, 38000, 51000, 47000, 62000, 58000, 75000];
   const FALLBACK_EARNINGS = [800, 1200, 1600, 2400, 2100, 3200, 2800, 4100, 3700, 5200, 4800, 6400];
 
-  const rawMonthlyDeposits: number[] = analytics?.monthlyDeposits ?? [];
+  const rawMonthlyDeposits: number[] = chartData?.monthlyDeposits ?? [];
   const hasRealDepositData = rawMonthlyDeposits.some((v: number) => v > 0);
   const monthlyData: number[] = hasRealDepositData ? rawMonthlyDeposits : FALLBACK_DEPOSITS.slice(0, currentMonth + 1);
 
-  const rawMonthlyEarnings: number[] = analytics?.monthlyEarnings ?? [];
+  const rawMonthlyEarnings: number[] = chartData?.monthlyEarnings ?? [];
   const hasRealEarningData = rawMonthlyEarnings.some((v: number) => v > 0);
   const monthlyEarnings: number[] = hasRealEarningData ? rawMonthlyEarnings : FALLBACK_EARNINGS.slice(0, currentMonth + 1);
 
-  const displayDeposits = analytics?.totalDeposits > 0 ? analytics.totalDeposits : monthlyData.reduce((a: number, b: number) => a + b, 0);
-  const displayEarnings = analytics?.totalEarningsPaid > 0 ? analytics.totalEarningsPaid : monthlyEarnings.reduce((a: number, b: number) => a + b, 0);
-  const displayActiveInvestments = analytics?.activeInvestmentsValue > 0 ? analytics.activeInvestmentsValue : Math.round(displayDeposits * 0.37);
-  const displayParticipants = analytics?.totalParticipants > 0 ? analytics.totalParticipants : Math.max(12, Math.round(displayDeposits / 1200));
+  const isLoading = metricsLoading;
 
   return (
     <AppLayout title="Performance Center">
       <div className="px-4 pt-5 pb-24 space-y-5">
 
-        {/* Back button */}
         <button
           onClick={() => window.history.back()}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -90,18 +83,18 @@ export default function PerformancePage() {
           </div>
           <div className="grid grid-cols-2 gap-3 mt-2">
             <div className="bg-white/15 rounded-xl py-3 px-3.5">
-              {analyticsLoading ? (
+              {isLoading ? (
                 <Skeleton className="h-6 w-20 bg-white/20 mb-1" />
               ) : (
-                <p className="text-xl font-bold">{analyticsLoading ? "—" : formatUSDTCompact(displayDeposits)}</p>
+                <p className="text-xl font-bold">{formatUSDTCompact(metrics?.totalRaised ?? 0)}</p>
               )}
               <p className="text-[10px] text-blue-100 mt-0.5">Platform Capital</p>
             </div>
             <div className="bg-white/15 rounded-xl py-3 px-3.5">
-              {analyticsLoading ? (
+              {isLoading ? (
                 <Skeleton className="h-6 w-16 bg-white/20 mb-1" />
               ) : (
-                <p className="text-xl font-bold">{activeOpportunities}</p>
+                <p className="text-xl font-bold">{metrics?.activeOpportunities ?? 0}</p>
               )}
               <p className="text-[10px] text-blue-100 mt-0.5">Active Opportunities</p>
             </div>
@@ -111,16 +104,44 @@ export default function PerformancePage() {
         {/* Key metrics */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Total Participants", value: analyticsLoading ? null : displayParticipants.toLocaleString(), icon: Users, color: "text-primary", bg: "bg-primary/10" },
-            { label: "Capital Deployed", value: analyticsLoading ? null : formatUSDTCompact(displayDeposits), icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50 dark:bg-emerald-950/30" },
-            { label: "Distributions Paid", value: analyticsLoading ? null : formatUSDTCompact(displayEarnings), icon: TrendingUp, color: "text-purple-600", bg: "bg-purple-50 dark:bg-purple-950/30" },
-            { label: "Active Investments", value: analyticsLoading ? null : formatUSDTCompact(displayActiveInvestments), icon: Activity, color: "text-amber-600", bg: "bg-amber-50 dark:bg-amber-950/30" },
+            {
+              label: "Total Participants",
+              value: isLoading ? null : (metrics?.totalParticipants ?? 0).toLocaleString(),
+              icon: Users,
+              color: "text-primary",
+              bg: "bg-primary/10",
+            },
+            {
+              label: "Capital Deployed",
+              value: isLoading ? null : formatUSDTCompact(metrics?.capitalDeployed ?? 0),
+              icon: DollarSign,
+              color: "text-emerald-600",
+              bg: "bg-emerald-50 dark:bg-emerald-950/30",
+            },
+            {
+              label: "Distributions Paid",
+              value: isLoading ? null : formatUSDTCompact(metrics?.distributionsPaid ?? 0),
+              icon: TrendingUp,
+              color: "text-purple-600",
+              bg: "bg-purple-50 dark:bg-purple-950/30",
+            },
+            {
+              label: "Active Investments",
+              value: isLoading ? null : formatUSDTCompact(metrics?.activeInvestments ?? 0),
+              icon: Activity,
+              color: "text-amber-600",
+              bg: "bg-amber-50 dark:bg-amber-950/30",
+            },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} className="bg-card border border-border rounded-xl p-3.5 shadow-sm">
               <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-2.5", bg)}>
                 <Icon size={16} className={color} />
               </div>
-              {value === null ? <Skeleton className="h-6 w-24 mb-1" /> : <p className="font-bold text-foreground text-base leading-tight">{value}</p>}
+              {value === null ? (
+                <Skeleton className="h-6 w-24 mb-1" />
+              ) : (
+                <p className="font-bold text-foreground text-base leading-tight">{value}</p>
+              )}
               <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
             </div>
           ))}
@@ -196,7 +217,9 @@ export default function PerformancePage() {
                     <span className="text-foreground font-medium">{month}</span>
                     <span className="text-right text-foreground font-semibold">{formatUSDTCompact(monthlyData[i] ?? 0)}</span>
                     <span className="text-right text-emerald-600 font-semibold">{formatUSDTCompact(monthlyEarnings[i] ?? 0)}</span>
-                    <span className="text-right text-muted-foreground">{10 + i * 8 + (analytics?.totalParticipants ? Math.floor(analytics.totalParticipants / 12) : 5)}</span>
+                    <span className="text-right text-muted-foreground">
+                      {10 + i * 8 + (metrics?.totalParticipants ? Math.floor(metrics.totalParticipants / 12) : 5)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -204,26 +227,24 @@ export default function PerformancePage() {
           )}
         </div>
 
-        {/* Active opportunities list */}
-        {(plans ?? []).filter((p: any) => p.isActive).length > 0 && (
-          <div>
-            <p className="font-semibold text-sm text-foreground mb-3">Active Opportunities</p>
+        {/* Top opportunities */}
+        {(metrics?.mostPopular || metrics?.topFunded || metrics?.fastestGrowing) && (
+          <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+            <p className="font-semibold text-sm text-foreground mb-3 flex items-center gap-2">
+              <Activity size={14} className="text-primary" />
+              Opportunity Highlights
+            </p>
             <div className="space-y-2.5">
-              {(plans ?? []).filter((p: any) => p.isActive).map((plan: any) => (
-                <div key={plan.id} className="bg-card border border-border rounded-xl p-3.5 flex items-center gap-3 shadow-sm">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                    <Activity size={16} className="text-primary" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm text-foreground truncate">{plan.name}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {(plan.minRoiRate * 100).toFixed(1)}%–{(plan.maxRoiRate * 100).toFixed(1)}% daily · {plan.durationDays} days
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs font-bold text-emerald-600">{formatUSDT(plan.minAmount)}+</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">min. entry</p>
-                  </div>
+              {[
+                { icon: "⭐", label: "Most Popular", plan: metrics?.mostPopular },
+                { icon: "🏆", label: "Top Funded", plan: metrics?.topFunded },
+                { icon: "🚀", label: "Fastest Growing", plan: metrics?.fastestGrowing },
+              ].filter(({ plan }) => plan != null).map(({ icon, label, plan }) => (
+                <div key={label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <span>{icon}</span>{label}
+                  </span>
+                  <span className="text-sm font-semibold text-foreground">{plan?.name}</span>
                 </div>
               ))}
             </div>

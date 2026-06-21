@@ -29,6 +29,7 @@ import {
   type AdminBroadcastBodyType,
 } from "@workspace/api-client-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,6 +95,7 @@ export default function AdminPage() {
   const [savingAnalytics, setSavingAnalytics] = useState(false);
   const [showBadgeManager, setShowBadgeManager] = useState(false);
   const { data: analytics, isLoading: analyticsLoading } = useAdminGetAnalytics({ query: { queryKey: getAdminGetAnalyticsQueryKey(), staleTime: 30000 } });
+  const { data: platformMetrics, isLoading: platformMetricsLoading } = usePlatformMetrics();
   const { data: usersData } = useAdminGetUsers({ search: search || undefined, limit: 20 }, { query: { queryKey: getAdminGetUsersQueryKey({ search: search || undefined, limit: 20 }), staleTime: 20000 } });
   const { data: kycData } = useAdminGetKycSubmissions({ status: kycFilter }, { query: { queryKey: getAdminGetKycSubmissionsQueryKey({ status: kycFilter }), staleTime: 20000 } });
   const { data: wdData } = useAdminGetWithdrawals({ status: wdFilter }, { query: { queryKey: getAdminGetWithdrawalsQueryKey({ status: wdFilter }), staleTime: 20000 } });
@@ -357,6 +359,49 @@ export default function AdminPage() {
                   ))}
                 </div>
               )}
+
+              {/* Platform Metrics Audit */}
+              <div className="bg-white border border-border rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <BarChart3 size={15} className="text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Platform Metrics Audit</p>
+                    <p className="text-[11px] text-muted-foreground">Single source of truth — all pages use these values</p>
+                  </div>
+                </div>
+                {platformMetricsLoading ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[1,2,3,4,5,6,7,8].map(i => <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />)}
+                  </div>
+                ) : platformMetrics ? (
+                  <div className="space-y-0">
+                    {[
+                      { label: "Total Raised", value: formatUSDTCompact(platformMetrics.totalRaised), sub: `Target: ${formatUSDTCompact(platformMetrics.totalTarget)}` },
+                      { label: "Funding %", value: `${platformMetrics.fundingPercentage.toFixed(1)}%`, sub: "Platform-wide average" },
+                      { label: "Total Participants", value: platformMetrics.totalParticipants.toLocaleString(), sub: "With display overrides applied" },
+                      { label: "Active Opportunities", value: String(platformMetrics.activeOpportunities), sub: "isActive = true" },
+                      { label: "Capital Deployed", value: formatUSDTCompact(platformMetrics.capitalDeployed), sub: "= Total Raised" },
+                      { label: "Active Investments", value: formatUSDTCompact(platformMetrics.activeInvestments), sub: "Active user investments" },
+                      { label: "Distributions Paid", value: formatUSDTCompact(platformMetrics.distributionsPaid), sub: "Earnings + reinvest (completed)" },
+                      { label: "Most Popular", value: platformMetrics.mostPopular?.name ?? "—", sub: `${(platformMetrics.mostPopular?.participants ?? 0).toLocaleString()} participants` },
+                      { label: "Top Funded", value: platformMetrics.topFunded?.name ?? "—", sub: `${platformMetrics.topFunded?.fundingPct?.toFixed(1) ?? 0}% funded` },
+                      { label: "Fastest Growing", value: platformMetrics.fastestGrowing?.name ?? "—", sub: "Highest growth score" },
+                    ].map(({ label, value, sub }) => (
+                      <div key={label} className="flex items-center justify-between py-2.5 border-b border-border/50 last:border-0">
+                        <div>
+                          <p className="text-xs font-medium text-foreground">{label}</p>
+                          <p className="text-[10px] text-muted-foreground">{sub}</p>
+                        </div>
+                        <p className="text-sm font-bold text-primary tabular-nums">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-4">Failed to load platform metrics</p>
+                )}
+              </div>
 
               {/* ROI Payout Trigger */}
               <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">

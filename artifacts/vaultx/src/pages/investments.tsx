@@ -13,6 +13,7 @@ import { LiveCounter } from "@/components/LiveCounter";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
 import { useState, useEffect, useRef } from "react";
+import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 
 /* ─── Shared constants ──────────────────────────────────────────────────── */
 
@@ -195,46 +196,14 @@ function AnimatedBar({ pct, gradient, className }: { pct: number; gradient: stri
 
 /* ─── Opportunity Insights summary (top of page) ───────────────────────── */
 
-function OpportunityInsightsSummary({ plans, customStats, mode }: { plans: any[]; customStats: Record<string, any>; mode: string }) {
-  const activePlans = plans.filter(p => p.isActive);
-  if (!activePlans.length) return null;
+function OpportunityInsightsSummary() {
+  const { data: metrics, isLoading } = usePlatformMetrics();
 
-  let totalParticipants = 0;
-  let totalRaised = 0;
-  let totalTarget = 0;
-
-  activePlans.forEach(p => {
-    const custom = mode === "custom" && customStats[String(p.id)];
-    const base = autoStats(p.id);
-
-    const target = (p.fundingGoal != null ? p.fundingGoal : null)
-      ?? (custom?.capitalTargetK != null ? custom.capitalTargetK * 1000 : null)
-      ?? base.capitalTargetK * 1000;
-
-    const raised = (p.currentFunding != null ? p.currentFunding : null)
-      ?? (custom?.raisedPct != null ? Math.floor(target * (custom.raisedPct / 100)) : null)
-      ?? Math.floor(target * (base.raisedPct / 100));
-
-    // Admin override takes priority; if raised = 0, no participants
-    const displayOverride = p.displayParticipantCount != null ? Number(p.displayParticipantCount) : null;
-    const dbParts = p.totalParticipants != null ? Number(p.totalParticipants) : null;
-    let parts: number;
-    if (displayOverride !== null) {
-      parts = displayOverride;
-    } else if (raised <= 0) {
-      parts = 0;
-    } else if (dbParts !== null && dbParts > 0) {
-      parts = dbParts;
-    } else {
-      parts = custom?.participants ?? autoParticipantsFromRaised(raised, p.id);
-    }
-
-    totalParticipants += parts;
-    totalRaised += raised;
-    totalTarget += target;
-  });
-
-  const overallPct = totalTarget > 0 ? Math.min(100, Math.round((totalRaised / totalTarget) * 100)) : 0;
+  const overallPct = Math.round(metrics?.fundingPercentage ?? 0);
+  const totalRaised = metrics?.totalRaised ?? 0;
+  const totalTarget = metrics?.totalTarget ?? 0;
+  const fmtRaised = totalRaised >= 1_000_000 ? `$${(totalRaised / 1_000_000).toFixed(1)}M` : totalRaised >= 1_000 ? `$${(totalRaised / 1_000).toFixed(0)}K` : `$${totalRaised}`;
+  const fmtTarget = totalTarget >= 1_000_000 ? `$${(totalTarget / 1_000_000).toFixed(1)}M` : totalTarget >= 1_000 ? `$${(totalTarget / 1_000).toFixed(0)}K` : `$${totalTarget}`;
 
   return (
     <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-primary/60 rounded-2xl p-4 text-white shadow-lg mb-4">
@@ -244,24 +213,22 @@ function OpportunityInsightsSummary({ plans, customStats, mode }: { plans: any[]
       </div>
       <div className="grid grid-cols-3 gap-2 mb-3">
         <div className="bg-white/10 rounded-xl py-2.5 text-center">
-          <p className="font-bold text-base">{activePlans.length}</p>
+          <p className="font-bold text-base">{isLoading ? "—" : String(metrics?.activeOpportunities ?? 0)}</p>
           <p className="text-[9px] text-white/60 mt-0.5">Active</p>
         </div>
         <div className="bg-white/10 rounded-xl py-2.5 text-center">
-          <p className="font-bold text-base">{totalParticipants.toLocaleString()}</p>
+          <p className="font-bold text-base">{isLoading ? "—" : (metrics?.totalParticipants ?? 0).toLocaleString()}</p>
           <p className="text-[9px] text-white/60 mt-0.5">Participants</p>
         </div>
         <div className="bg-white/10 rounded-xl py-2.5 text-center">
-          <p className="font-bold text-base">{overallPct}%</p>
+          <p className="font-bold text-base">{isLoading ? "—" : `${overallPct}%`}</p>
           <p className="text-[9px] text-white/60 mt-0.5">Avg Funded</p>
         </div>
       </div>
       <div className="flex items-center justify-between text-[10px] text-white/60 mb-1">
         <span>Platform Capital Raised</span>
         <span className="text-white font-semibold">
-          {totalRaised >= 1_000_000 ? `$${(totalRaised / 1_000_000).toFixed(1)}M` : totalRaised >= 1_000 ? `$${(totalRaised / 1_000).toFixed(0)}K` : `$${totalRaised}`}
-          {" / "}
-          {totalTarget >= 1_000_000 ? `$${(totalTarget / 1_000_000).toFixed(1)}M` : `$${(totalTarget / 1_000).toFixed(0)}K`}
+          {isLoading ? "—" : `${fmtRaised} / ${fmtTarget}`}
         </span>
       </div>
       <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -403,7 +370,7 @@ export default function InvestmentsPage() {
           <div>
             {/* Platform-wide insights summary */}
             {!plansLoading && (plans ?? []).length > 0 && (
-              <OpportunityInsightsSummary plans={plans ?? []} customStats={customStatsMap} mode={analyticsMode} />
+              <OpportunityInsightsSummary />
             )}
 
             <div className="space-y-4">

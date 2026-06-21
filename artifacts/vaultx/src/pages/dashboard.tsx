@@ -6,6 +6,7 @@ import {
   useGetReferralStats, getGetReferralStatsQueryKey,
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
 } from "@workspace/api-client-react";
+import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -132,55 +133,16 @@ function ReferralWidget() {
   );
 }
 
-function autoParticipantsFromRaisedD(raised: number, planId: number): number {
-  if (raised <= 0) return 1;
-  const frac = ((planId * 31 + 7) % 97) / 97;
-  const points = [
-    { r: 0,       min: 1,   max: 2 },
-    { r: 2000,    min: 1,   max: 5 },
-    { r: 100000,  min: 15,  max: 60 },
-    { r: 500000,  min: 50,  max: 250 },
-    { r: 2000000, min: 150, max: 1000 },
-  ];
-  for (let i = 1; i < points.length; i++) {
-    if (raised <= points[i].r || i === points.length - 1) {
-      const prev = points[i - 1], curr = points[i];
-      const t = prev.r === curr.r ? 1 : Math.min(1, Math.max(0, (raised - prev.r) / (curr.r - prev.r)));
-      return Math.max(1, Math.floor((prev.min + t * (curr.min - prev.min)) + frac * ((prev.max + t * (curr.max - prev.max)) - (prev.min + t * (curr.min - prev.min)))));
-    }
-  }
-  return Math.floor(150 + frac * 850);
-}
+function OpportunityInsightsWidget() {
+  const { data: metrics, isLoading } = usePlatformMetrics();
 
-function OpportunityInsightsWidget({ plans }: { plans: any[] }) {
-  const activePlans = plans.filter((p: any) => p.isActive);
-  if (!activePlans.length) return null;
-
-  let totalParticipants = 0;
-  let totalRaised = 0;
-  let mostPopular = activePlans[0];
-  let fastestGrowing = activePlans[0];
-  let maxPart = 0, maxFunding = 0;
-
-  activePlans.forEach((p: any) => {
-    // Use real DB values first
-    const capitalRaised: number = p.currentFunding != null ? Number(p.currentFunding) : 0;
-    const dbParts = p.totalParticipants != null ? Number(p.totalParticipants) : 0;
-    const participants = dbParts > 0 ? dbParts : autoParticipantsFromRaisedD(capitalRaised, p.id);
-    const fundingGoal = p.fundingGoal != null ? Number(p.fundingGoal) : 0;
-    const fundingPct = fundingGoal > 0 ? Math.min(100, Math.round((capitalRaised / fundingGoal) * 100)) : 0;
-
-    totalParticipants += participants;
-    totalRaised += capitalRaised;
-    if (participants > maxPart) { maxPart = participants; mostPopular = p; }
-    if (fundingPct > maxFunding) { maxFunding = fundingPct; fastestGrowing = p; }
-  });
-
-  const fmtRaised = totalRaised >= 1_000_000
-    ? `$${(totalRaised / 1_000_000).toFixed(1)}M`
-    : totalRaised >= 1_000
-      ? `$${(totalRaised / 1_000).toFixed(0)}K`
-      : `$${totalRaised}`;
+  const fmtRaised = metrics
+    ? metrics.totalRaised >= 1_000_000
+      ? `$${(metrics.totalRaised / 1_000_000).toFixed(1)}M`
+      : metrics.totalRaised >= 1_000
+        ? `$${(metrics.totalRaised / 1_000).toFixed(0)}K`
+        : `$${metrics.totalRaised.toFixed(0)}`
+    : "—";
 
   return (
     <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
@@ -196,9 +158,9 @@ function OpportunityInsightsWidget({ plans }: { plans: any[] }) {
 
       <div className="grid grid-cols-3 gap-2 mb-3">
         {[
-          { val: String(activePlans.length), lbl: "Active Funds" },
-          { val: totalParticipants.toLocaleString(), lbl: "Participants" },
-          { val: fmtRaised, lbl: "Allocated" },
+          { val: isLoading ? "—" : String(metrics?.activeOpportunities ?? 0), lbl: "Active Funds" },
+          { val: isLoading ? "—" : (metrics?.totalParticipants ?? 0).toLocaleString(), lbl: "Participants" },
+          { val: isLoading ? "—" : fmtRaised, lbl: "Allocated" },
         ].map(({ val, lbl }) => (
           <div key={lbl} className="bg-muted/40 border border-border rounded-xl p-2 text-center">
             <p className="font-bold text-foreground text-sm">{val}</p>
@@ -210,11 +172,21 @@ function OpportunityInsightsWidget({ plans }: { plans: any[] }) {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs py-1 border-b border-border/60">
           <span className="text-muted-foreground flex items-center gap-1"><span>⭐</span>Most Popular</span>
-          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">{mostPopular?.name}</span>
+          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">
+            {isLoading ? "—" : (metrics?.mostPopular?.name ?? "—")}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-xs py-1 border-b border-border/60">
+          <span className="text-muted-foreground flex items-center gap-1"><span>🏆</span>Top Funded</span>
+          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">
+            {isLoading ? "—" : (metrics?.topFunded?.name ?? "—")}
+          </span>
         </div>
         <div className="flex items-center justify-between text-xs py-1">
           <span className="text-muted-foreground flex items-center gap-1"><span>🚀</span>Fastest Growing</span>
-          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">{fastestGrowing?.name}</span>
+          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">
+            {isLoading ? "—" : (metrics?.fastestGrowing?.name ?? "—")}
+          </span>
         </div>
       </div>
     </div>
@@ -338,7 +310,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Opportunity Insights */}
-        {plans && plans.length > 0 && <OpportunityInsightsWidget plans={plans} />}
+        <OpportunityInsightsWidget />
 
         {/* Referral Widget */}
         <ReferralWidget />

@@ -19,6 +19,7 @@ import storageRouter from "./storage";
 import appInfoRouter from "./app-info";
 import aboutRouter from "./about";
 import faqRouter from "./faq";
+import platformMetricsRouter from "./platform-metrics";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(storageRouter);
 router.use(appInfoRouter);
 router.use(aboutRouter);
 router.use(faqRouter);
+router.use(platformMetricsRouter);
 
 export default router;
