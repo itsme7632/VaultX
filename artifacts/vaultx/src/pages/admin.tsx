@@ -177,6 +177,13 @@ export default function AdminPage() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
+  const quickStatusPlan = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      adminApi(`/admin/plans/${id}`, "PUT", { status, isActive: status === "active" }),
+    onSuccess: (_d, v) => { toast({ title: `Opportunity ${v.status}` }); queryClient.invalidateQueries({ queryKey: ["admin-plans"] }); },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
+
   const deletePlan = useMutation({
     mutationFn: (id: number) => adminApi(`/admin/plans/${id}`, "DELETE"),
     onSuccess: () => { toast({ title: "Opportunity deleted" }); queryClient.invalidateQueries({ queryKey: ["admin-plans"] }); },
@@ -680,7 +687,7 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <Button className="w-full h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, riskLevel: "medium", features: [], isActive: true, isFeatured: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompound: false, fundingGoal: null, currentFunding: 0 })}>
+              <Button className="w-full h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, features: [], isActive: true, isFeatured: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompound: false, fundingGoal: null, currentFunding: 0 })}>
                 <Plus size={15} className="mr-1.5" />Add Opportunity
               </Button>
               <div className="space-y-3">
@@ -708,6 +715,22 @@ export default function AdminPage() {
                           <button onClick={() => setPlanModal({ ...plan })} className="p-1.5 rounded-lg hover:bg-muted" title="Edit"><Edit2 size={13} className="text-muted-foreground" /></button>
                           <button onClick={() => { if (confirm(`Delete "${plan.name}"? This cannot be undone.`)) deletePlan.mutate(plan.id); }} className="p-1.5 rounded-lg hover:bg-red-50" title="Delete"><Trash2 size={13} className="text-red-500" /></button>
                         </div>
+                      </div>
+                      {/* Quick status row */}
+                      <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-border flex-wrap">
+                        {plan.status !== "active" && (
+                          <button onClick={() => quickStatusPlan.mutate({ id: plan.id, status: "active" })} className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-semibold hover:bg-emerald-100">▶ Reopen</button>
+                        )}
+                        {plan.status !== "paused" && (
+                          <button onClick={() => quickStatusPlan.mutate({ id: plan.id, status: "paused" })} className="px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-[10px] font-semibold hover:bg-gray-200">⏸ Pause</button>
+                        )}
+                        {plan.status !== "closed" && (
+                          <button onClick={() => { if (confirm(`Close "${plan.name}"? Users won't be able to participate.`)) quickStatusPlan.mutate({ id: plan.id, status: "closed" }); }} className="px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 text-[10px] font-semibold hover:bg-red-100">✕ Close</button>
+                        )}
+                        {plan.status !== "fully_allocated" && (
+                          <button onClick={() => quickStatusPlan.mutate({ id: plan.id, status: "fully_allocated" })} className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 text-[10px] font-semibold hover:bg-purple-100">⬛ Full</button>
+                        )}
+                        <span className="ml-auto text-[9px] text-muted-foreground">Sort: {plan.sortOrder ?? 0}</span>
                       </div>
                     </div>
                   );
@@ -1171,14 +1194,6 @@ export default function AdminPage() {
                       { val: "rose",   label: "Rose" },
                     ].map(({ val, label }) => <SelectItem key={val} value={val}>{label}</SelectItem>)}
                   </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs">Risk Level</Label>
-                <Select value={planModal.riskLevel ?? "medium"} onValueChange={(v) => setPlanModal((p: any) => ({ ...p, riskLevel: v }))}>
-                  <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>{["low", "medium", "high"].map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
 

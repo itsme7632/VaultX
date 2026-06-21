@@ -7,7 +7,8 @@ import { ThemeProvider } from "@/lib/theme";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SplashScreen } from "@/components/SplashScreen";
 import { setBaseUrl } from "@workspace/api-client-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Wrench } from "lucide-react";
 
 import LoginPage from "@/pages/login";
@@ -74,6 +75,27 @@ const SPLASH_ALREADY_SHOWN = (() => {
 const SHOW_SPLASH = IS_APP_MODE && !SPLASH_ALREADY_SHOWN;
 if (SHOW_SPLASH) {
   try { sessionStorage.setItem("vaultx-splash-shown", "1"); } catch {}
+}
+
+// ─── KYC route guard ──────────────────────────────────────────────────────────
+function KycGuard({ children }: { children: React.ReactNode }) {
+  const [, navigate] = useLocation();
+  const [ready, setReady] = useState(false);
+  const [allowed, setAllowed] = useState(true);
+  useEffect(() => {
+    fetch("/api/settings/public", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d: any) => {
+        const val = Array.isArray(d)
+          ? d.find((x: any) => x.key === "kyc_enabled")?.value
+          : d?.kyc_enabled;
+        if (val === "false") { navigate("/settings"); setAllowed(false); }
+        setReady(true);
+      })
+      .catch(() => setReady(true));
+  }, []);
+  if (!ready) return null;
+  return allowed ? <>{children}</> : null;
 }
 
 // ─── Query client ──────────────────────────────────────────────────────────────
@@ -149,7 +171,7 @@ function Router() {
         <ProtectedRoute><Setup2FAPage /></ProtectedRoute>
       </Route>
       <Route path="/kyc">
-        <ProtectedRoute><KycPage /></ProtectedRoute>
+        <ProtectedRoute><KycGuard><KycPage /></KycGuard></ProtectedRoute>
       </Route>
       <Route path="/settings">
         <ProtectedRoute><SettingsPage /></ProtectedRoute>

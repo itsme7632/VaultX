@@ -456,7 +456,7 @@ export default function AboutPage() {
               className="bg-white text-primary hover:bg-white/90 font-bold h-10 px-6 text-sm"
               onClick={() => setLocation("/investments")}
             >
-              Explore Investment Plans <ArrowRight size={14} className="ml-1" />
+              Explore Opportunities <ArrowRight size={14} className="ml-1" />
             </Button>
           </div>
 

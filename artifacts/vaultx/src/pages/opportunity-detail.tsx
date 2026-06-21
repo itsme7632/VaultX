@@ -1,6 +1,7 @@
 import { ArrowRight, Users, Clock, TrendingUp, CheckCircle, Star, BarChart3, Target, Shield, Zap } from "lucide-react";
 import { useGetInvestmentPlans, getGetInvestmentPlansQueryKey } from "@workspace/api-client-react";
 import { useLocation, useParams } from "wouter";
+import { useState, useEffect } from "react";
 import { SubPageLayout } from "@/components/SubPageLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,32 @@ function planStatusBadge(status?: string) {
   }
 }
 
+function useCountdown(endDate?: string) {
+  const [msLeft, setMsLeft] = useState(() =>
+    endDate ? Math.max(0, new Date(endDate).getTime() - Date.now()) : null
+  );
+  useEffect(() => {
+    if (!endDate) return;
+    const tick = () => setMsLeft(Math.max(0, new Date(endDate).getTime() - Date.now()));
+    tick();
+    const id = setInterval(tick, 60_000);
+    return () => clearInterval(id);
+  }, [endDate]);
+  return msLeft;
+}
+
+function formatCountdown(ms: number | null): string {
+  if (ms === null) return "—";
+  if (ms <= 0) return "Ended";
+  const totalSec = Math.floor(ms / 1000);
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor((totalSec % 86400) / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
 export default function OpportunityDetailPage() {
   const { planId } = useParams<{ planId: string }>();
   const [, navigate] = useLocation();
@@ -60,9 +87,11 @@ export default function OpportunityDetailPage() {
   const capitalRaised = plan?.currentFunding ?? Math.floor(capitalTarget * (seededInt(id, 2, 48, 82) / 100));
   const raisedPct = capitalTarget > 0 ? Math.round((capitalRaised / capitalTarget) * 100) : seededInt(id, 2, 48, 82);
   const participants = plan?.totalParticipants ?? seededInt(id, 3, 120, 520);
-  const daysToClose = plan?.endDate
-    ? Math.max(0, Math.ceil((new Date(plan.endDate).getTime() - Date.now()) / 86400000))
-    : seededInt(id, 4, 5, 21);
+
+  const msLeft = useCountdown(plan?.endDate);
+  const countdownLabel = plan?.endDate
+    ? formatCountdown(msLeft)
+    : `~${seededInt(id, 4, 5, 21)}d`;
 
   if (isLoading) {
     return (
@@ -167,7 +196,7 @@ export default function OpportunityDetailPage() {
             { label: "Participants", value: participants.toLocaleString(), icon: Users, color: "text-primary", bg: "bg-primary/10" },
             { label: "Duration", value: `${plan.durationDays} Days`, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
             { label: "Min. Participation", value: formatUSDT(plan.minAmount), icon: Target, color: "text-emerald-600", bg: "bg-emerald-50" },
-            { label: "Closes In", value: `~${daysToClose} days`, icon: Zap, color: "text-purple-600", bg: "bg-purple-50" },
+            { label: "Closes In", value: countdownLabel, icon: Zap, color: "text-purple-600", bg: "bg-purple-50" },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} className="bg-card border border-border rounded-xl p-4 shadow-sm">
               <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center mb-2.5", bg)}>
@@ -234,13 +263,6 @@ export default function OpportunityDetailPage() {
               <p className="text-sm font-bold text-foreground">{value}</p>
             </div>
           ))}
-        </div>
-
-        {/* Risk notice */}
-        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4">
-          <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-            <span className="font-bold">Risk Notice:</span> All capital allocations carry inherent market risk. Past performance does not guarantee future results. Only participate with capital you can afford to allocate.
-          </p>
         </div>
 
       </div>

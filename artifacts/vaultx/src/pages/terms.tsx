@@ -21,8 +21,8 @@ const DEFAULT_SECTIONS = [
     content: `Withdrawals are processed within 24 hours of submission, subject to review. Minimum withdrawal amounts and fees apply as displayed. You must ensure your withdrawal address is correct — VaultX cannot reverse completed blockchain transactions. KYC verification may be required before withdrawals are processed.`,
   },
   {
-    title: "Investment Plans",
-    content: `Investment plans on VaultX offer structured returns based on defined durations and ROI rates. Returns are credited as described in each plan. Investment performance depends on plan terms. Past performance is not indicative of future results. You should only invest funds you can afford to lock for the plan duration.`,
+    title: "Opportunities",
+    content: `Opportunities on VaultX offer structured returns based on defined durations and ROI rates. Returns are credited as described in each opportunity. Performance depends on plan terms. Past performance is not indicative of future results. You should only allocate funds you can afford to lock for the opportunity duration.`,
   },
   {
     title: "Referral Program",
