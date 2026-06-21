@@ -37,8 +37,10 @@ async function fetchCommunity() {
     dailyChart: number[];
     weeklyChart: number[];
     monthlyChart: number[];
+    referralSources: { source: string; count: number; pct: number }[];
     mode: string;
     isHybrid: boolean;
+    realStats?: { referrals: number; activeReferrers: number; rewards: number };
   }>;
 }
 
@@ -84,8 +86,24 @@ function last7DayLabels() {
   });
 }
 
-const WEEK_LABELS   = ["W-3", "W-2", "W-1", "Now"];
-const MONTH_LABELS  = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
+function buildWeekLabels(): string[] {
+  return Array.from({ length: 4 }, (_, i) => {
+    const d = new Date(Date.now() - (3 - i) * 7 * 86_400_000);
+    return `${d.getDate()}/${d.getMonth() + 1}`;
+  });
+}
+
+function buildMonthLabels(): string[] {
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    return MONTHS[d.getMonth()];
+  });
+}
+
+const WEEK_LABELS  = buildWeekLabels();
+const MONTH_LABELS = buildMonthLabels();
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -111,6 +129,28 @@ export default function ReferralsPage() {
     queryFn: fetchCommunity,
     staleTime: 60000,
   });
+
+  // Client-side consistency audit: log when community stats vs real stats diverge noticeably
+  useEffect(() => {
+    if (!community || !stats) return;
+    const real = community.realStats;
+    if (!real) return;
+    const personalTotal = (stats as any)?.totalReferrals ?? 0;
+    // If personal referrals exceed the community real count, something is wrong
+    if (personalTotal > real.referrals) {
+      console.warn(
+        `[Wexora Referral Audit] Personal referral count (${personalTotal}) exceeds ` +
+        `community real referrals (${real.referrals}). Possible data sync issue.`
+      );
+    }
+    if (community.isHybrid) {
+      console.info(
+        `[Wexora Referral Audit] Hybrid mode active. ` +
+        `Real: ${real.referrals} referrals / $${real.rewards.toFixed(2)} rewards | ` +
+        `Displayed (incl. demo): ${community.communityReferrals} / $${community.rewardsDistributed.toFixed(2)}`
+      );
+    }
+  }, [community, stats]);
 
   const history = historyData as any;
   const perUser: any[]      = history?.perUser ?? [];
@@ -159,7 +199,7 @@ export default function ReferralsPage() {
       <div className="px-4 pt-5 pb-24 space-y-4">
 
         {/* ── Hero invite card ────────────────────────────────────── */}
-        <div className="isolate bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 rounded-2xl p-5 text-white shadow-lg">
+        <div className="bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 rounded-2xl p-5 text-white shadow-lg">
           <div className="flex items-center justify-between mb-1">
             <p className="text-purple-200 text-xs uppercase tracking-widest">Your Invite Code</p>
             <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", tierCfg.bg, tierCfg.color)}>
@@ -580,22 +620,37 @@ export default function ReferralsPage() {
                 <p className="text-sm font-bold text-foreground">Top Referral Sources</p>
               </div>
               <div className="space-y-2.5">
-                {[
-                  { source: "WhatsApp Share",  pct: 44, color: "bg-green-500" },
-                  { source: "Direct Link",     pct: 31, color: "bg-blue-500" },
-                  { source: "Telegram",        pct: 18, color: "bg-sky-500" },
-                  { source: "Other",           pct:  7, color: "bg-gray-400" },
-                ].map(({ source, pct, color }) => (
-                  <div key={source}>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs text-foreground font-medium">{source}</p>
-                      <p className="text-xs font-bold text-muted-foreground">{pct}%</p>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div className={cn("h-full rounded-full transition-all duration-700", color)} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                ))}
+                {(() => {
+                  const SOURCE_META: Record<string, { label: string; color: string }> = {
+                    whatsapp: { label: "WhatsApp Share", color: "bg-green-500" },
+                    direct:   { label: "Direct Link",   color: "bg-blue-500" },
+                    telegram: { label: "Telegram",      color: "bg-sky-500" },
+                    other:    { label: "Other",         color: "bg-gray-400" },
+                  };
+                  const FALLBACK = [
+                    { source: "whatsapp", pct: 44 },
+                    { source: "direct",   pct: 31 },
+                    { source: "telegram", pct: 18 },
+                    { source: "other",    pct:  7 },
+                  ];
+                  const rows = community?.referralSources?.length
+                    ? community.referralSources.map((r) => ({ source: r.source, pct: r.pct }))
+                    : FALLBACK;
+                  return rows.map(({ source, pct }) => {
+                    const meta = SOURCE_META[source] ?? { label: source.charAt(0).toUpperCase() + source.slice(1), color: "bg-purple-500" };
+                    return (
+                      <div key={source}>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs text-foreground font-medium">{meta.label}</p>
+                          <p className="text-xs font-bold text-muted-foreground">{pct}%</p>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className={cn("h-full rounded-full transition-all duration-700", meta.color)} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 

@@ -45,7 +45,7 @@ async function generateDisplayId(): Promise<string> {
 }
 
 router.post("/auth/signup", async (req, res): Promise<void> => {
-  const { fullName, username, email, whatsapp, country, password, confirmPassword, referralCode } = req.body;
+  const { fullName, username, email, whatsapp, country, password, confirmPassword, referralCode, referralSource } = req.body;
 
   // --- Individual field validation ---
   if (!fullName || !String(fullName).trim()) {
@@ -135,11 +135,16 @@ router.post("/auth/signup", async (req, res): Promise<void> => {
   await ensureWallet(user.id);
 
   if (referredById) {
+    const validSources = ["whatsapp", "telegram", "direct", "other"];
+    const src = typeof referralSource === "string" && validSources.includes(referralSource.toLowerCase())
+      ? referralSource.toLowerCase()
+      : "direct";
     await db.insert(referralsTable).values({
       referrerId: referredById,
       referredId: user.id,
       commissionAmount: "0",
       status: "pending",
+      referralSource: src,
     });
   }
 

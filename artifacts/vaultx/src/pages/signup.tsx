@@ -278,7 +278,8 @@ export default function SignupPage() {
   const { toast } = useToast();
   const signup = useSignup();
 
-  const refFromUrl = new URLSearchParams(window.location.search).get("ref") ?? "";
+  const refFromUrl    = new URLSearchParams(window.location.search).get("ref") ?? "";
+  const sourceFromUrl = new URLSearchParams(window.location.search).get("source") ?? "direct";
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -336,7 +337,7 @@ export default function SignupPage() {
     }
     const whatsappFull = `${data.dialCode ?? ""}${data.whatsapp.replace(/^0+/, "")}`;
     signup.mutate(
-      { data: { ...data, whatsapp: whatsappFull } },
+      { data: { ...data, whatsapp: whatsappFull, referralSource: sourceFromUrl } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });

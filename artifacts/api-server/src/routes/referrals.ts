@@ -51,17 +51,46 @@ const DEMO_STATS = {
 };
 
 const DEMO_CHARTS = {
-  daily:   [3, 7, 5, 12, 8, 15, 11],          // last 7 days
-  weekly:  [24, 38, 51, 67],                   // last 4 weeks
-  monthly: [45, 78, 112, 149, 187, 234],        // last 6 months
+  daily:   [3, 7, 5, 12, 8, 15, 11],
+  weekly:  [24, 38, 51, 67],
+  monthly: [45, 78, 112, 149, 187, 234],
 };
+
+// ─── Helpers: bucket referral timestamps into chart arrays ───────────────────
+
+function buildWeeklyChart(rows: { createdAt: Date | string }[]): number[] {
+  const chart = [0, 0, 0, 0];
+  const now = Date.now();
+  for (const r of rows) {
+    const msAgo = now - new Date(r.createdAt).getTime();
+    const weekIndex = Math.floor(msAgo / (7 * 86_400_000));
+    if (weekIndex >= 0 && weekIndex < 4) chart[3 - weekIndex]++;
+  }
+  return chart;
+}
+
+function buildMonthlyChart(rows: { createdAt: Date | string }[]): number[] {
+  const chart = new Array<number>(6).fill(0);
+  const now = new Date();
+  for (const r of rows) {
+    const d = new Date(r.createdAt);
+    const monthDiff = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+    if (monthDiff >= 0 && monthDiff < 6) chart[5 - monthDiff]++;
+  }
+  return chart;
+}
+
+function growthPct(current: number, previous: number): number {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
 
 // ─── Community / hybrid stats endpoint ───────────────────────────────────────
 
 router.get("/referrals/community", requireAuth, async (req, res): Promise<void> => {
   const mode = await getSetting("referral_hybrid_mode", "auto");
 
-  // Real DB aggregates
+  // ── Real DB aggregates ──────────────────────────────────────────────────────
   const [totalRes, rewardsRes] = await Promise.all([
     db.select({ c: count() }).from(referralsTable),
     db.select({ s: sum(referralsTable.commissionAmount) }).from(referralsTable),
@@ -70,7 +99,7 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
   const realTotal   = Number(totalRes[0]?.c ?? 0);
   const realRewards = parseFloat(rewardsRes[0]?.s ?? "0");
 
-  // Real leaderboard (exclude admin accounts)
+  // ── Real leaderboard (exclude admin accounts) ───────────────────────────────
   const realLbRows = await db
     .select({
       referrerId:     referralsTable.referrerId,
@@ -87,7 +116,16 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
 
   const realLbClean = realLbRows.filter((r) => !r.isAdmin);
 
-  // Real daily chart – last 7 days
+  // ── Active referrers: unique users who made a referral in last 30 days ───────
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000);
+  const activeReferrersRes = await db
+    .select({ referrerId: referralsTable.referrerId })
+    .from(referralsTable)
+    .where(gte(referralsTable.createdAt, thirtyDaysAgo))
+    .groupBy(referralsTable.referrerId);
+  const realActiveReferrers = activeReferrersRes.length;
+
+  // ── Daily chart – last 7 days ──────────────────────────────────────────────
   const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
   const dailyRows = await db
     .select({
@@ -110,6 +148,61 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
     realDailyChart.push(dailyMap[d] ?? 0);
   }
 
+  // ── Weekly chart – last 28 days (4 × 7-day buckets) ───────────────────────
+  const twentyEightDaysAgo = new Date(Date.now() - 28 * 86_400_000);
+  const weeklyRawRows = await db
+    .select({ createdAt: referralsTable.createdAt })
+    .from(referralsTable)
+    .where(gte(referralsTable.createdAt, twentyEightDaysAgo));
+  const realWeeklyChart = buildWeeklyChart(weeklyRawRows);
+
+  // ── Monthly chart – last 6 calendar months ─────────────────────────────────
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const monthlyRawRows = await db
+    .select({ createdAt: referralsTable.createdAt })
+    .from(referralsTable)
+    .where(gte(referralsTable.createdAt, sixMonthsAgo));
+  const realMonthlyChart = buildMonthlyChart(monthlyRawRows);
+
+  // ── Real growth percentages ────────────────────────────────────────────────
+  const realWeeklyGrowthPct  = growthPct(realWeeklyChart[3],  realWeeklyChart[2]);
+  const realMonthlyGrowthPct = growthPct(realMonthlyChart[5], realMonthlyChart[4]);
+
+  // ── Referral source breakdown (from tracked data) ──────────────────────────
+  const sourceRows = await db
+    .select({
+      source: referralsTable.referralSource,
+      total:  count(),
+    })
+    .from(referralsTable)
+    .groupBy(referralsTable.referralSource);
+
+  const sourceTotal = sourceRows.reduce((a, r) => a + Number(r.total), 0);
+  const referralSources = sourceTotal > 0
+    ? sourceRows
+        .map((r) => ({
+          source: r.source ?? "direct",
+          count:  Number(r.total),
+          pct:    Math.round((Number(r.total) / sourceTotal) * 100),
+        }))
+        .sort((a, b) => b.pct - a.pct)
+    : [];
+
+  // ── Server-side audit consistency check ────────────────────────────────────
+  const totalFromRewards = realRewards;
+  if (mode !== "disabled") {
+    // In hybrid mode, warn if demo inflation is extreme
+    const HYBRID_INFLATION_THRESHOLD = 50;
+    if (realTotal > 0 && DEMO_STATS.communityReferrals / realTotal > HYBRID_INFLATION_THRESHOLD) {
+      console.warn(
+        `[Wexora Referral Audit] Hybrid mode: demo data (${DEMO_STATS.communityReferrals}) is ` +
+        `${HYBRID_INFLATION_THRESHOLD}x+ larger than real referrals (${realTotal}). ` +
+        `Consider switching to "disabled" mode once real data grows.`
+      );
+    }
+  }
+
   const isDisabled  = mode === "disabled";
   const hasRealData = realTotal >= 5;
 
@@ -117,10 +210,10 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
     // Pure real data – no demo mixing
     res.json({
       communityReferrals: realTotal,
-      activeReferrers:    realLbClean.length,
+      activeReferrers:    realActiveReferrers,
       rewardsDistributed: realRewards,
-      weeklyGrowthPct:    0,
-      monthlyGrowthPct:   0,
+      weeklyGrowthPct:    realWeeklyGrowthPct,
+      monthlyGrowthPct:   realMonthlyGrowthPct,
       leaderboard: realLbClean.map((r, i) => ({
         rank: i + 1,
         username: r.username ?? "User",
@@ -128,9 +221,10 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
         totalEarned:    parseFloat(r.totalEarned ?? "0"),
         isReal: true,
       })),
-      dailyChart:   realDailyChart,
-      weeklyChart:  [0, 0, 0, 0],
-      monthlyChart: [0, 0, 0, 0, 0, 0],
+      dailyChart:      realDailyChart,
+      weeklyChart:     realWeeklyChart,
+      monthlyChart:    realMonthlyChart,
+      referralSources,
       mode,
       isHybrid: false,
     });
@@ -138,11 +232,13 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
   }
 
   // ── Hybrid / auto / full_demo ────────────────────────────────────────────
-
-  // Community numbers: real on top of demo base
   const communityReferrals  = hasRealData ? realTotal + DEMO_STATS.communityReferrals : DEMO_STATS.communityReferrals;
-  const activeReferrers     = hasRealData ? realLbClean.length + DEMO_STATS.activeReferrers : DEMO_STATS.activeReferrers;
+  const activeReferrers     = hasRealData ? realActiveReferrers + DEMO_STATS.activeReferrers : DEMO_STATS.activeReferrers;
   const rewardsDistributed  = hasRealData ? realRewards + DEMO_STATS.rewardsDistributed : DEMO_STATS.rewardsDistributed;
+
+  // Growth: use real if real data exists, else use demo
+  const weeklyGrowthPct  = hasRealData ? realWeeklyGrowthPct  : DEMO_STATS.weeklyGrowthPct;
+  const monthlyGrowthPct = hasRealData ? realMonthlyGrowthPct : DEMO_STATS.monthlyGrowthPct;
 
   // Leaderboard: real users first, fill remainder with demo names
   const realEntries = realLbClean.map((r) => ({
@@ -164,22 +260,30 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
     .slice(0, 10)
     .map((e, i) => ({ ...e, rank: i + 1 }));
 
-  // Charts: prefer real if any activity exists, otherwise demo
-  const hasRealDaily = realDailyChart.some((v) => v > 0);
-  const finalDaily   = hasRealDaily ? realDailyChart : DEMO_CHARTS.daily;
+  // Charts: prefer real if any activity exists, else demo
+  const hasRealDaily   = realDailyChart.some((v) => v > 0);
+  const hasRealWeekly  = realWeeklyChart.some((v) => v > 0);
+  const hasRealMonthly = realMonthlyChart.some((v) => v > 0);
 
   res.json({
     communityReferrals,
     activeReferrers,
     rewardsDistributed,
-    weeklyGrowthPct:  DEMO_STATS.weeklyGrowthPct,
-    monthlyGrowthPct: DEMO_STATS.monthlyGrowthPct,
+    weeklyGrowthPct,
+    monthlyGrowthPct,
     leaderboard,
-    dailyChart:   finalDaily,
-    weeklyChart:  DEMO_CHARTS.weekly,
-    monthlyChart: DEMO_CHARTS.monthly,
+    dailyChart:      hasRealDaily   ? realDailyChart   : DEMO_CHARTS.daily,
+    weeklyChart:     hasRealWeekly  ? realWeeklyChart  : DEMO_CHARTS.weekly,
+    monthlyChart:    hasRealMonthly ? realMonthlyChart : DEMO_CHARTS.monthly,
+    referralSources,
     mode,
     isHybrid: true,
+    // Transparency: expose what portion of stats is real
+    realStats: {
+      referrals:       realTotal,
+      activeReferrers: realActiveReferrers,
+      rewards:         realRewards,
+    },
   });
 });
 
@@ -318,6 +422,17 @@ router.get("/referrals/history", requireAuth, async (req, res): Promise<void> =>
     };
   });
 
+  // Audit consistency check: total from transactions should match sum of commission amounts
+  const txTotal    = txWithSource.reduce((a, t) => a + t.amount, 0);
+  const refTotal   = referrals.reduce((a, r) => a + parseFloat(r.ref.commissionAmount), 0);
+  if (Math.abs(txTotal - refTotal) > 0.01) {
+    console.warn(
+      `[Wexora Referral Audit] User #${req.session.userId}: ` +
+      `transaction total (${txTotal.toFixed(4)}) differs from referral commission total (${refTotal.toFixed(4)}). ` +
+      `This may indicate pending commissions not yet reflected in transactions.`
+    );
+  }
+
   res.json({
     perUser: referrals.map((row) => ({
       id: row.ref.id,
@@ -325,6 +440,7 @@ router.get("/referrals/history", requireAuth, async (req, res): Promise<void> =>
       totalEarned: parseFloat(row.ref.commissionAmount),
       status: row.ref.status,
       joinedAt: row.ref.createdAt,
+      referralSource: row.ref.referralSource ?? "direct",
     })),
     transactions: txWithSource,
   });

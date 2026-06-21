@@ -337,6 +337,7 @@ const COLUMN_MIGRATIONS_SQL = [
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "total_participant_limit" integer`,
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "is_popular" boolean DEFAULT false NOT NULL`,
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "display_participant_count" integer`,
+  `ALTER TABLE "referrals" ADD COLUMN IF NOT EXISTS "referral_source" text DEFAULT 'direct'`,
 
   `CREATE TABLE IF NOT EXISTS "faqs" (
     "id" serial PRIMARY KEY NOT NULL,
