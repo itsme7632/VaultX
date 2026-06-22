@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, count, sum, and, sql } from "drizzle-orm";
+import { eq, desc, count, sum, and, sql, countDistinct, gte, lt } from "drizzle-orm";
 import { db, usersTable, referralsTable, walletsTable, transactionsTable, notificationsTable, platformSettingsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -193,6 +193,155 @@ router.get("/referrals/leaderboard", requireAuth, async (req, res): Promise<void
       totalEarned: parseFloat(row.totalEarned ?? "0"),
     }))
   );
+});
+
+// ─── Platform-wide community referral analytics ───────────────────────────────
+// All 7 community widgets (cards, chart, sources, leaderboard) read from THIS
+// single endpoint so they always share the same dataset.
+router.get("/referrals/platform-stats", requireAuth, async (req, res): Promise<void> => {
+  const now = new Date();
+
+  // ── Helper: start-of-day offset ──────────────────────────────────────────
+  const daysAgo = (n: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - n);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+  const weeksAgo = (n: number) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - n * 7);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+  const monthsAgo = (n: number) => {
+    const d = new Date(now);
+    d.setMonth(d.getMonth() - n);
+    d.setDate(1);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  // ── 1. Aggregate totals ──────────────────────────────────────────────────
+  const [totals] = await db
+    .select({
+      totalReferrals: count(referralsTable.id),
+      activeReferrers: countDistinct(referralsTable.referrerId),
+      rewardsDistributed: sum(referralsTable.commissionAmount),
+    })
+    .from(referralsTable);
+
+  const totalReferrals = Number(totals?.totalReferrals ?? 0);
+  const activeReferrers = Number(totals?.activeReferrers ?? 0);
+  const rewardsDistributed = parseFloat(totals?.rewardsDistributed ?? "0");
+
+  // ── 2. Monthly growth ────────────────────────────────────────────────────
+  const thisMonthStart = monthsAgo(0);
+  const lastMonthStart = monthsAgo(1);
+
+  const [thisMonthCount] = await db
+    .select({ c: count() })
+    .from(referralsTable)
+    .where(gte(referralsTable.createdAt, thisMonthStart));
+  const [lastMonthCount] = await db
+    .select({ c: count() })
+    .from(referralsTable)
+    .where(and(
+      gte(referralsTable.createdAt, lastMonthStart),
+      lt(referralsTable.createdAt, thisMonthStart),
+    ));
+
+  const thisMonth = Number(thisMonthCount?.c ?? 0);
+  const lastMonth = Number(lastMonthCount?.c ?? 0);
+  const monthlyGrowthPct = lastMonth === 0
+    ? (thisMonth > 0 ? 100 : 0)
+    : Math.round(((thisMonth - lastMonth) / lastMonth) * 1000) / 10;
+
+  // ── 3. Chart data — 7D (per day) ─────────────────────────────────────────
+  const chart7D: { label: string; value: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const start = daysAgo(i);
+    const end = daysAgo(i - 1);
+    const [row] = await db
+      .select({ c: count() })
+      .from(referralsTable)
+      .where(and(gte(referralsTable.createdAt, start), lt(referralsTable.createdAt, end)));
+    chart7D.push({
+      label: start.toLocaleDateString("en-US", { weekday: "short" }),
+      value: Number(row?.c ?? 0),
+    });
+  }
+
+  // ── 4. Chart data — 4W (per week) ────────────────────────────────────────
+  const chart4W: { label: string; value: number }[] = [];
+  for (let i = 3; i >= 0; i--) {
+    const start = weeksAgo(i + 1);
+    const end = weeksAgo(i);
+    const [row] = await db
+      .select({ c: count() })
+      .from(referralsTable)
+      .where(and(gte(referralsTable.createdAt, start), lt(referralsTable.createdAt, end)));
+    const weekLabel = start.toLocaleDateString("en-US", { month: "numeric", day: "numeric" });
+    chart4W.push({ label: weekLabel, value: Number(row?.c ?? 0) });
+  }
+
+  // ── 5. Chart data — 6M (per month) ───────────────────────────────────────
+  const chart6M: { label: string; value: number }[] = [];
+  for (let i = 5; i >= 0; i--) {
+    const start = monthsAgo(i + 1);
+    const end = monthsAgo(i);
+    const [row] = await db
+      .select({ c: count() })
+      .from(referralsTable)
+      .where(and(gte(referralsTable.createdAt, start), lt(referralsTable.createdAt, end)));
+    chart6M.push({
+      label: start.toLocaleDateString("en-US", { month: "short" }),
+      value: Number(row?.c ?? 0),
+    });
+  }
+
+  // ── 6. Top referral sources ───────────────────────────────────────────────
+  // Currently we track source in transactions notes; derive from referral join_type if present,
+  // otherwise label all as "Direct Link" until source tracking is added.
+  const totalForSources = totalReferrals;
+  const sources = totalForSources > 0
+    ? [{ label: "Direct Link", count: totalForSources, pct: 100 }]
+    : [];
+
+  // ── 7. Top referrers leaderboard ─────────────────────────────────────────
+  const leaderboardRows = await db
+    .select({
+      referrerId: referralsTable.referrerId,
+      totalReferrals: count(referralsTable.id),
+      totalEarned: sum(referralsTable.commissionAmount),
+      username: usersTable.username,
+    })
+    .from(referralsTable)
+    .leftJoin(usersTable, eq(referralsTable.referrerId, usersTable.id))
+    .groupBy(referralsTable.referrerId, usersTable.username)
+    .orderBy(desc(count(referralsTable.id)))
+    .limit(10);
+
+  const leaderboard = leaderboardRows.map((row, index) => ({
+    rank: index + 1,
+    username: row.username ?? "Unknown",
+    totalReferrals: Number(row.totalReferrals),
+    totalEarned: parseFloat(row.totalEarned ?? "0"),
+  }));
+
+  res.json({
+    totalReferrals,
+    activeReferrers,
+    rewardsDistributed,
+    monthlyGrowthPct,
+    thisMonthCount: thisMonth,
+    lastMonthCount: lastMonth,
+    chart7D,
+    chart4W,
+    chart6M,
+    sources,
+    leaderboard,
+  });
 });
 
 export default router;

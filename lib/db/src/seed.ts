@@ -14,7 +14,7 @@ import {
   newsPostsTable,
   notificationsTable,
 } from "./schema";
-import { eq, count } from "drizzle-orm";
+import { eq, count, or } from "drizzle-orm";
 
 const { Pool } = pg;
 
@@ -521,7 +521,11 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
   const existing = await db
     .select({ c: count() })
     .from(usersTable)
-    .where(eq(usersTable.email, "demo@wexoraglobal.com"));
+    .where(or(
+      eq(usersTable.email, "demo@wexoraglobal.com"),
+      eq(usersTable.username, "alexj"),
+      eq(usersTable.displayId, "100042"),
+    ));
 
   if ((existing[0]?.c ?? 0) > 0) {
     console.log("[seed] Demo user already exists, skipping");

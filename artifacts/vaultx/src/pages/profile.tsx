@@ -68,7 +68,7 @@ export default function ProfilePage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const initials = user?.fullName?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "W";
+  const initials = user?.fullName?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() ?? "W";
   const kyc = kycBadge(user?.kycStatus ?? "none");
 
   const fields = kycEnabled ? [
