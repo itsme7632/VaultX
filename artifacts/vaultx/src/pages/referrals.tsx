@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Copy, Check, Share2, Users, DollarSign, Trophy,
   TrendingUp, Wallet, ChevronDown, ChevronUp, ArrowDownCircle,
-  GitBranch, BarChart3, Globe, Star, Zap,
+  GitBranch, BarChart3, Globe, Star, Zap, Banknote, CalendarDays,
 } from "lucide-react";
 import {
   useGetReferralStats, getGetReferralStatsQueryKey,
@@ -43,6 +43,24 @@ async function fetchCommunity() {
     mode: string;
     isHybrid: boolean;
     realStats?: { referrals: number; activeReferrers: number; rewards: number };
+  }>;
+}
+
+// ─── Salary status fetch ──────────────────────────────────────────────────────
+
+async function fetchSalaryStatus() {
+  const res = await fetch("/api/referrals/salary", { credentials: "include" });
+  if (!res.ok) throw new Error("Failed to load salary status");
+  return res.json() as Promise<{
+    programEnabled: boolean;
+    currentVolume: number;
+    currentTier: number | null;
+    monthlySalary: number;
+    nextPaymentDate: string | null;
+    totalSalaryPaid: number;
+    tiers: { tier: number; minVolume: number; salary: number }[];
+    qualifies1: boolean;
+    qualifies2: boolean;
   }>;
 }
 
@@ -129,6 +147,12 @@ export default function ReferralsPage() {
   const { data: community, isLoading: communityLoading } = useQuery({
     queryKey: ["referrals-community"],
     queryFn: fetchCommunity,
+    staleTime: 60000,
+  });
+
+  const { data: salary, isLoading: salaryLoading } = useQuery({
+    queryKey: ["referrals-salary"],
+    queryFn: fetchSalaryStatus,
     staleTime: 60000,
   });
 
@@ -319,6 +343,127 @@ export default function ReferralsPage() {
             </div>
           ))}
         </div>
+
+        {/* ── Salary Progress widget ───────────────────────────────── */}
+        {salary?.programEnabled !== false && (
+          (() => {
+            const tier1 = salary?.tiers?.find((t) => t.tier === 1);
+            const tier2 = salary?.tiers?.find((t) => t.tier === 2);
+            const t1Vol = tier1?.minVolume ?? 1500;
+            const t2Vol = tier2?.minVolume ?? 3500;
+            const vol   = salary?.currentVolume ?? 0;
+            const pct   = Math.min((vol / t2Vol) * 100, 100);
+            const t1Pct = (t1Vol / t2Vol) * 100;
+            const qualified = (salary?.currentTier ?? 0) > 0;
+            const nextPay   = salary?.nextPaymentDate ? new Date(salary.nextPaymentDate) : null;
+            const daysLeft  = nextPay ? Math.max(0, Math.ceil((nextPay.getTime() - Date.now()) / 86400000)) : null;
+
+            return (
+              <div className={cn(
+                "rounded-2xl border-2 p-4 shadow-sm",
+                qualified
+                  ? "bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300 dark:from-amber-950/20 dark:to-yellow-950/20 dark:border-amber-700"
+                  : "bg-card border-border"
+              )}>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center",
+                      qualified ? "bg-amber-100 dark:bg-amber-900/30" : "bg-muted"
+                    )}>
+                      <Banknote size={16} className={qualified ? "text-amber-600" : "text-muted-foreground"} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground leading-tight">Referral Salary Program</p>
+                      <p className="text-[10px] text-muted-foreground">Monthly income from your network's investments</p>
+                    </div>
+                  </div>
+                  {qualified && (
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-1 rounded-full border",
+                      salary?.currentTier === 2
+                        ? "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700"
+                        : "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700"
+                    )}>
+                      Tier {salary?.currentTier} Active
+                    </span>
+                  )}
+                </div>
+
+                {/* Volume + progress */}
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[11px] text-muted-foreground font-medium">Network Investment Volume</p>
+                    <p className="text-[11px] font-bold text-foreground">
+                      {salaryLoading ? "…" : `${formatUSDT(vol)} / ${formatUSDT(t2Vol)}`}
+                    </p>
+                  </div>
+
+                  {/* Progress bar with tier markers */}
+                  <div className="relative h-3 bg-muted rounded-full overflow-visible">
+                    {/* Fill */}
+                    <div
+                      className={cn("h-full rounded-full transition-all duration-700",
+                        vol >= t2Vol ? "bg-amber-500" : vol >= t1Vol ? "bg-emerald-500" : "bg-blue-500"
+                      )}
+                      style={{ width: `${pct}%` }}
+                    />
+                    {/* Tier 1 marker */}
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 w-0.5 h-5 bg-amber-400 rounded-full"
+                      style={{ left: `${t1Pct}%` }}
+                    />
+                  </div>
+
+                  {/* Milestone labels */}
+                  <div className="relative mt-1 h-4">
+                    <span
+                      className="absolute text-[9px] font-semibold text-amber-600 -translate-x-1/2"
+                      style={{ left: `${t1Pct}%` }}
+                    >
+                      T1 {formatUSDT(t1Vol)}
+                    </span>
+                    <span className="absolute right-0 text-[9px] font-semibold text-amber-600">
+                      T2 {formatUSDT(t2Vol)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status rows */}
+                {salaryLoading ? (
+                  <div className="h-10 bg-muted rounded-xl animate-pulse" />
+                ) : qualified ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-white/60 dark:bg-white/5 border border-amber-200 dark:border-amber-800/50 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground">Monthly Salary</p>
+                      <p className="text-sm font-bold text-amber-600 mt-0.5">{formatUSDT(salary?.monthlySalary ?? 0)}</p>
+                    </div>
+                    <div className="bg-white/60 dark:bg-white/5 border border-amber-200 dark:border-amber-800/50 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground">Next Payment</p>
+                      <p className="text-sm font-bold text-foreground mt-0.5">
+                        {daysLeft !== null ? `${daysLeft}d` : "—"}
+                      </p>
+                    </div>
+                    <div className="bg-white/60 dark:bg-white/5 border border-amber-200 dark:border-amber-800/50 rounded-xl p-2 text-center">
+                      <p className="text-[10px] text-muted-foreground">Total Paid</p>
+                      <p className="text-sm font-bold text-emerald-600 mt-0.5">{formatUSDT(salary?.totalSalaryPaid ?? 0)}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl px-3 py-2.5">
+                    <CalendarDays size={14} className="text-blue-500 shrink-0" />
+                    <p className="text-[11px] text-blue-700 dark:text-blue-400 leading-relaxed">
+                      {vol < t1Vol
+                        ? <><strong>{formatUSDT(t1Vol - vol)} more</strong> referral investment volume needed to qualify for Tier 1 ({formatUSDT(tier1?.salary ?? 100)}/mo)</>
+                        : <><strong>Tier 1 reached!</strong> Grow volume to {formatUSDT(t2Vol)} to unlock Tier 2 ({formatUSDT(tier2?.salary ?? 300)}/mo)</>
+                      }
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()
+        )}
 
         {/* ── 3-Level commission card ───────────────────────────────── */}
         {(() => {
