@@ -172,10 +172,27 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
   const realMonthlyGrowthPct = growthPct(realMonthlyChart[5], realMonthlyChart[4]);
 
   // ── Referral source breakdown ──────────────────────────────────────────────
-  // referral_source column is not yet in schema — return empty array so the
-  // frontend falls back to its own display data. Will be populated once the
-  // column is added via migration.
-  const referralSources: { source: string; count: number; pct: number }[] = [];
+  // referral_source column exists in schema (default: "direct").
+  // Query real GROUP BY counts; calculate percentages; return empty array only
+  // when there are truly no referrals so the frontend can fall back to demo.
+  const sourceRows = await db
+    .select({
+      source: referralsTable.referralSource,
+      total:  count(),
+    })
+    .from(referralsTable)
+    .groupBy(referralsTable.referralSource)
+    .orderBy(desc(count()));
+
+  const sourceGrandTotal = sourceRows.reduce((acc, r) => acc + Number(r.total), 0);
+  const referralSources: { source: string; count: number; pct: number }[] =
+    sourceGrandTotal > 0
+      ? sourceRows.map((r) => ({
+          source: r.source ?? "direct",
+          count:  Number(r.total),
+          pct:    Math.round((Number(r.total) / sourceGrandTotal) * 100),
+        }))
+      : [];
 
   // ── Server-side audit consistency check ────────────────────────────────────
   if (mode !== "disabled") {
