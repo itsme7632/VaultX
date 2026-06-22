@@ -1,18 +1,18 @@
 import { useEffect, useState, useRef } from "react";
-import { TrendingUp, DollarSign, Activity, ArrowUpRight, Zap, Clock, Newspaper, ArrowRight, Users, Copy, Check, BarChart3, Target } from "lucide-react";
+import { TrendingUp, DollarSign, Activity, Zap, Clock, ArrowRight, Users, Copy, Check, BarChart3, Trophy, Star } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import {
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
   useGetMarketPrices, getGetMarketPricesQueryKey,
-  useGetDashboardActivity, getGetDashboardActivityQueryKey,
   useGetReferralStats, getGetReferralStatsQueryKey,
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
 } from "@workspace/api-client-react";
-import { useQuery } from "@tanstack/react-query";
+import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 import { AppLayout } from "@/components/AppLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatUSDT, formatDateTime } from "@/lib/format";
+import { formatUSDT } from "@/lib/format";
 import { Link } from "wouter";
 import { LiveActivityFeed } from "@/components/LiveActivityFeed";
 import { useAuth } from "@/lib/auth";
@@ -62,36 +62,68 @@ function MarketTicker({ data }: { data: any[] }) {
   );
 }
 
-const activityTypeColor: Record<string, string> = {
-  deposit: "text-emerald-500",
-  withdrawal: "text-destructive",
-  earning: "text-amber-500",
-  reinvest: "text-primary",
-  investment: "text-primary",
-  transfer: "text-blue-400",
-  referral: "text-purple-500",
-};
 
-const activityTypeBg: Record<string, string> = {
-  deposit: "bg-emerald-500/10",
-  withdrawal: "bg-destructive/10",
-  earning: "bg-amber-500/10",
-  reinvest: "bg-primary/10",
-  investment: "bg-primary/10",
-  transfer: "bg-blue-500/10",
-  referral: "bg-purple-500/10",
-};
+async function fetchCommunity() {
+  const res = await fetch("/api/referrals/community", { credentials: "include" });
+  if (!res.ok) return null;
+  return res.json() as Promise<{
+    communityReferrals: number;
+    activeReferrers: number;
+    rewardsDistributed: number;
+    leaderboard: { rank: number; username: string; totalReferrals: number; isReal: boolean }[];
+  }>;
+}
+
+function computeRank(userReferrals: number, community: NonNullable<Awaited<ReturnType<typeof fetchCommunity>>>) {
+  const lb = community.leaderboard;
+  // Check if user is on the leaderboard
+  const lbMin = lb[lb.length - 1]?.totalReferrals ?? 0;
+  if (userReferrals >= lbMin && lb.length > 0) {
+    // Count how many leaderboard entries beat the user
+    const above = lb.filter((e) => e.totalReferrals > userReferrals).length;
+    return above + 1;
+  }
+  // Estimate position beyond leaderboard
+  // Leaderboard has `lb.length` people; `activeReferrers` total active
+  const totalActive = community.activeReferrers;
+  const belowLb = Math.max(0, totalActive - lb.length);
+  if (lbMin <= 0 || userReferrals <= 0) return totalActive;
+  // Linear estimate: rank proportional to where userReferrals sits between 1 and lbMin
+  const ratio = Math.min(userReferrals / lbMin, 1);
+  return Math.round(lb.length + belowLb * (1 - ratio));
+}
 
 function ReferralWidget() {
   const [copied, setCopied] = useState(false);
+
   const { data: stats, isLoading } = useGetReferralStats({
     query: { queryKey: getGetReferralStatsQueryKey(), staleTime: 30000 },
   });
 
+  const { data: community } = useQuery({
+    queryKey: ["referrals-community"],
+    queryFn: fetchCommunity,
+    staleTime: 120000,
+  });
+
   const pendingEarnings = (stats as any)?.pendingEarnings ?? 0;
-  const referralLink = stats?.code
-    ? `${window.location.origin}/signup?ref=${stats.code}`
+  const userReferrals   = (stats as any)?.totalReferrals ?? 0;
+  const referralLink    = stats?.code ? `${window.location.origin}/signup?ref=${stats.code}` : null;
+
+  const rank       = community && userReferrals >= 0 ? computeRank(userReferrals, community) : null;
+  const totalPool  = community?.activeReferrers ?? null;
+  const hasReferred = userReferrals > 0;
+
+  const rankLabel = rank && totalPool
+    ? `#${rank.toLocaleString()} of ${totalPool.toLocaleString()} referrers`
     : null;
+
+  // Trophy colour based on rank
+  const rankColor = !rank ? "text-purple-200"
+    : rank === 1           ? "text-amber-300"
+    : rank <= 3            ? "text-slate-300"
+    : rank <= 10           ? "text-amber-600"
+    : "text-purple-200";
 
   const handleCopy = () => {
     if (!referralLink) return;
@@ -101,7 +133,9 @@ function ReferralWidget() {
   };
 
   return (
-    <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-2xl p-4 text-white shadow-md">
+    <div className="bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 rounded-2xl p-4 text-white shadow-md">
+
+      {/* Header row */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
@@ -124,6 +158,43 @@ function ReferralWidget() {
           </Button>
         </Link>
       </div>
+
+      {/* Rank badge */}
+      <Link href="/referrals">
+        <div className="bg-white/10 hover:bg-white/15 transition-colors rounded-xl px-3 py-2 mb-3 flex items-center gap-2.5 cursor-pointer">
+          <Trophy size={16} className={cn("flex-shrink-0", rankColor)} />
+          <div className="flex-1 min-w-0">
+            {isLoading || !community ? (
+              <Skeleton className="h-3.5 w-36 bg-white/20" />
+            ) : hasReferred && rankLabel ? (
+              <>
+                <p className="text-xs font-bold text-white leading-tight">
+                  You're ranked <span className={rankColor}>{rankLabel}</span>
+                </p>
+                <p className="text-[10px] text-purple-200 mt-0.5">
+                  {userReferrals} referral{userReferrals !== 1 ? "s" : ""} · Tap to see leaderboard
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-bold text-white leading-tight">
+                  Join{" "}
+                  <span className="text-purple-200">
+                    {totalPool ? `${totalPool.toLocaleString()} referrers` : "the community"}
+                  </span>{" "}
+                  on the leaderboard
+                </p>
+                <p className="text-[10px] text-purple-200 mt-0.5">
+                  Share your link to earn your rank
+                </p>
+              </>
+            )}
+          </div>
+          <Star size={12} className="text-purple-300 flex-shrink-0" />
+        </div>
+      </Link>
+
+      {/* Copy link row */}
       <div className="flex items-center gap-2">
         <div className="flex-1 bg-white/10 rounded-lg px-3 py-1.5 min-w-0">
           {isLoading ? (
@@ -142,6 +213,7 @@ function ReferralWidget() {
           <span className="text-xs">{copied ? "Copied!" : "Copy"}</span>
         </Button>
       </div>
+
       {pendingEarnings > 0 && (
         <Link href="/referrals">
           <p className="text-[10px] text-emerald-300 mt-2 font-medium text-center animate-pulse">
@@ -153,36 +225,16 @@ function ReferralWidget() {
   );
 }
 
-function seededIntD(planId: number, salt: number, min: number, max: number) {
-  const seed = (planId * 31 + salt * 17) % 97;
-  return min + Math.floor((seed / 97) * (max - min));
-}
+function OpportunityInsightsWidget() {
+  const { data: metrics, isLoading } = usePlatformMetrics();
 
-function OpportunityInsightsWidget({ plans }: { plans: any[] }) {
-  const activePlans = plans.filter((p: any) => p.isActive);
-  if (!activePlans.length) return null;
-
-  let totalParticipants = 0;
-  let totalRaised = 0;
-  let mostPopular = activePlans[0];
-  let fastestGrowing = activePlans[0];
-  let maxPart = 0, maxGrowth = 0;
-
-  activePlans.forEach((p: any) => {
-    const participants  = seededIntD(p.id, 3, 120, 520);
-    const joinedToday   = seededIntD(p.id, 5, 3, 25);
-    const raisedPct     = seededIntD(p.id, 2, 48, 82);
-    const capitalTarget = seededIntD(p.id, 1, 80, 200) * 1000;
-    totalParticipants += participants;
-    totalRaised += Math.floor(capitalTarget * (raisedPct / 100));
-    if (participants > maxPart) { maxPart = participants; mostPopular = p; }
-    const rate = joinedToday / participants;
-    if (rate > maxGrowth) { maxGrowth = rate; fastestGrowing = p; }
-  });
-
-  const fmtRaised = totalRaised >= 1_000_000
-    ? `$${(totalRaised / 1_000_000).toFixed(1)}M`
-    : `$${(totalRaised / 1_000).toFixed(0)}K`;
+  const fmtRaised = metrics
+    ? metrics.totalRaised >= 1_000_000
+      ? `$${(metrics.totalRaised / 1_000_000).toFixed(1)}M`
+      : metrics.totalRaised >= 1_000
+        ? `$${(metrics.totalRaised / 1_000).toFixed(0)}K`
+        : `$${metrics.totalRaised.toFixed(0)}`
+    : "—";
 
   return (
     <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
@@ -198,9 +250,9 @@ function OpportunityInsightsWidget({ plans }: { plans: any[] }) {
 
       <div className="grid grid-cols-3 gap-2 mb-3">
         {[
-          { val: String(activePlans.length), lbl: "Active Funds" },
-          { val: totalParticipants.toLocaleString(), lbl: "Participants" },
-          { val: fmtRaised, lbl: "Allocated" },
+          { val: isLoading ? "—" : String(metrics?.activeOpportunities ?? 0), lbl: "Active Funds" },
+          { val: isLoading ? "—" : (metrics?.totalParticipants ?? 0).toLocaleString(), lbl: "Participants" },
+          { val: isLoading ? "—" : fmtRaised, lbl: "Allocated" },
         ].map(({ val, lbl }) => (
           <div key={lbl} className="bg-muted/40 border border-border rounded-xl p-2 text-center">
             <p className="font-bold text-foreground text-sm">{val}</p>
@@ -212,11 +264,21 @@ function OpportunityInsightsWidget({ plans }: { plans: any[] }) {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs py-1 border-b border-border/60">
           <span className="text-muted-foreground flex items-center gap-1"><span>⭐</span>Most Popular</span>
-          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">{mostPopular?.name}</span>
+          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">
+            {isLoading ? "—" : (metrics?.mostPopular?.name ?? "—")}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-xs py-1 border-b border-border/60">
+          <span className="text-muted-foreground flex items-center gap-1"><span>🏆</span>Top Funded</span>
+          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">
+            {isLoading ? "—" : (metrics?.topFunded?.name ?? "—")}
+          </span>
         </div>
         <div className="flex items-center justify-between text-xs py-1">
           <span className="text-muted-foreground flex items-center gap-1"><span>🚀</span>Fastest Growing</span>
-          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">{fastestGrowing?.name}</span>
+          <span className="font-semibold text-foreground truncate max-w-[55%] text-right">
+            {isLoading ? "—" : (metrics?.fastestGrowing?.name ?? "—")}
+          </span>
         </div>
       </div>
     </div>
@@ -231,36 +293,15 @@ export default function DashboardPage() {
   const { data: market } = useGetMarketPrices({
     query: { queryKey: getGetMarketPricesQueryKey(), staleTime: 60000 },
   });
-  const { data: activity } = useGetDashboardActivity({
-    query: { queryKey: getGetDashboardActivityQueryKey(), staleTime: 30000 },
-  });
   const { data: plans } = useGetInvestmentPlans({
-    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
+    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 30000, refetchInterval: 60000 },
   });
-  const { data: newsData } = useQuery({
-    queryKey: ["news", "dashboard"],
-    queryFn: async () => {
-      const res = await fetch("/api/news?limit=3", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-    staleTime: 120000,
-  });
-
   const stats = [
     { label: "Total Balance", value: summary ? formatUSDT(summary.totalBalance) : null, icon: DollarSign, color: "text-primary", bg: "bg-primary/10" },
     { label: "Active Opportunities", value: summary ? `${summary.activeInvestmentsCount}` : null, sub: summary ? formatUSDT(summary.activeInvestmentsValue) : null, icon: Activity, color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Today's Distribution", value: summary ? formatUSDT(summary.dailyEarnings) : null, icon: TrendingUp, color: "text-amber-500", bg: "bg-amber-500/10" },
     { label: "Total Distributions", value: summary ? formatUSDT(summary.totalEarnings) : null, icon: Zap, color: "text-purple-500", bg: "bg-purple-500/10" },
   ];
-
-  const categoryLabel: Record<string, string> = {
-    announcement: "Announcement", investment: "Investment", security: "Security", market: "Market",
-  };
-  const categoryColor: Record<string, string> = {
-    announcement: "bg-primary/10 text-primary", investment: "bg-emerald-500/10 text-emerald-600",
-    security: "bg-amber-500/10 text-amber-600", market: "bg-purple-500/10 text-purple-600",
-  };
 
   return (
     <AppLayout>
@@ -361,7 +402,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Opportunity Insights */}
-        {plans && plans.length > 0 && <OpportunityInsightsWidget plans={plans} />}
+        <OpportunityInsightsWidget />
 
         {/* Referral Widget */}
         <ReferralWidget />
@@ -377,59 +418,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* News section */}
-        {newsData && newsData.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-2.5">
-              <h3 className="font-semibold text-sm text-foreground flex items-center gap-1.5">
-                <Newspaper size={14} className="text-primary" />
-                Market Insights
-              </h3>
-              <Link href="/market-insights" className="text-xs text-primary font-medium flex items-center gap-0.5">
-                View all <ArrowRight size={11} />
-              </Link>
-            </div>
-            <div className="space-y-2.5">
-              {newsData.map((post: any) => (
-                <Link key={post.id} href={`/news/${post.id}`}>
-                  <div className="bg-card border border-border rounded-xl p-3.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                    <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <p className="font-semibold text-sm text-foreground leading-tight line-clamp-1">{post.title}</p>
-                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0", categoryColor[post.category] ?? "bg-muted text-muted-foreground")}>
-                        {categoryLabel[post.category] ?? post.category}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{post.excerpt}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1.5">{formatDateTime(post.publishedAt ?? post.createdAt)}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent activity */}
-        {activity && activity.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-sm text-foreground mb-2.5">Recent Activity</h3>
-            <div className="bg-card border border-border rounded-xl divide-y divide-border shadow-sm overflow-hidden">
-              {activity.slice(0, 6).map((item: any) => (
-                <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", activityTypeBg[item.type] ?? "bg-muted")}>
-                    <ArrowUpRight size={14} className={activityTypeColor[item.type] ?? "text-foreground"} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{item.description}</p>
-                    <p className="text-xs text-muted-foreground">{formatDateTime(item.createdAt)}</p>
-                  </div>
-                  <p className={cn("text-sm font-semibold flex-shrink-0", ["withdrawal", "investment", "transfer"].includes(item.type) ? "text-destructive" : "text-emerald-500")}>
-                    {["withdrawal", "investment", "transfer"].includes(item.type) ? "-" : "+"}{formatUSDT(item.amount)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </AppLayout>
   );

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, lte, lt, inArray, sum, count, or, sql } from "drizzle-orm";
 import {
   db,
   walletsTable,
@@ -7,6 +7,7 @@ import {
   transactionsTable,
   referralsTable,
   usersTable,
+  investmentPlansTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 
@@ -157,6 +158,123 @@ router.get("/dashboard/activity", requireAuth, async (req, res): Promise<void> =
       createdAt: t.createdAt,
     }))
   );
+});
+
+/**
+ * GET /api/platform/performance
+ *
+ * Returns monthly statistics reconciled with the canonical platform-metrics totals.
+ *
+ * Monthly Inflow  = real investment amounts from user_investments, per month.
+ *                   Any admin-set currentFunding surplus (plan override > actual
+ *                   investments) is added to the current month so that the column
+ *                   sum matches the Platform Capital figure shown in the hero.
+ *
+ * Monthly Distributions = completed earning/reinvest transactions, per month.
+ *                         Sum equals the Distributions Paid metric.
+ *
+ * Monthly Users   = new user registrations per month (real createdAt timestamps).
+ *                   Running cumulative total is also returned so the UI can
+ *                   choose either view.
+ */
+router.get("/platform/performance", requireAuth, async (req, res): Promise<void> => {
+  const year = new Date().getFullYear();
+  const currentMonthIdx = new Date().getMonth(); // 0-indexed
+  const yearStart = new Date(`${year}-01-01T00:00:00.000Z`);
+  const yearEnd   = new Date(`${year + 1}-01-01T00:00:00.000Z`);
+
+  const [
+    monthlyInvestmentsRes,
+    monthlyEarningsRes,
+    monthlyUsersRes,
+  ] = await Promise.all([
+    // Real investment amounts per month — actual capital deployed into plans
+    db.select({
+      month: sql<number>`extract(month from ${userInvestmentsTable.createdAt})`,
+      total: sum(userInvestmentsTable.amount),
+    })
+      .from(userInvestmentsTable)
+      .where(and(
+        gte(userInvestmentsTable.createdAt, yearStart),
+        lt(userInvestmentsTable.createdAt, yearEnd),
+      ))
+      .groupBy(sql`extract(month from ${userInvestmentsTable.createdAt})`),
+
+    // Completed distributions (earning + reinvest) per month
+    db.select({
+      month: sql<number>`extract(month from ${transactionsTable.createdAt})`,
+      total: sum(transactionsTable.amount),
+    })
+      .from(transactionsTable)
+      .where(and(
+        or(eq(transactionsTable.type, "earning"), eq(transactionsTable.type, "reinvest")),
+        eq(transactionsTable.status, "completed"),
+        gte(transactionsTable.createdAt, yearStart),
+        lt(transactionsTable.createdAt, yearEnd),
+      ))
+      .groupBy(sql`extract(month from ${transactionsTable.createdAt})`),
+
+    // New user registrations per month
+    db.select({
+      month: sql<number>`extract(month from ${usersTable.createdAt})`,
+      total: count(),
+    })
+      .from(usersTable)
+      .where(and(
+        gte(usersTable.createdAt, yearStart),
+        lt(usersTable.createdAt, yearEnd),
+      ))
+      .groupBy(sql`extract(month from ${usersTable.createdAt})`),
+  ]);
+
+  // ── Helper: sparse DB rows → 12-element numeric array ────────────────────
+  const toMonthlyAmounts = (rows: { month: number; total: string | null }[]): number[] => {
+    const arr = new Array(12).fill(0);
+    for (const r of rows) {
+      const idx = Math.round(Number(r.month)) - 1;
+      if (idx >= 0 && idx < 12) arr[idx] = parseFloat(r.total ?? "0");
+    }
+    return arr;
+  };
+
+  const toMonthlyCounts = (rows: { month: number; total: number }[]): number[] => {
+    const arr = new Array(12).fill(0);
+    for (const r of rows) {
+      const idx = Math.round(Number(r.month)) - 1;
+      if (idx >= 0 && idx < 12) arr[idx] = Number(r.total ?? 0);
+    }
+    return arr;
+  };
+
+  const monthlyInvestments = toMonthlyAmounts(monthlyInvestmentsRes as any);
+  const monthlyEarnings    = toMonthlyAmounts(monthlyEarningsRes as any);
+  const monthlyNewUsers    = toMonthlyCounts(monthlyUsersRes as any);
+
+  // NOTE: Admin-set currentFunding overrides are intentionally NOT injected into
+  // the monthly inflow array. The chart shows real, timestamped investment
+  // transactions only. The hero-card "Platform Capital" (platform-metrics endpoint)
+  // may differ and represents the admin-configured funding level.
+
+  // ── Cumulative user totals (running sum up to each month) ─────────────────
+  // Total registered users before this year (for the running baseline)
+  const [priorUsersRes] = await db.select({ c: count() })
+    .from(usersTable)
+    .where(lte(usersTable.createdAt, new Date(`${year}-01-01T00:00:00.000Z`)));
+  const priorUsers = Number(priorUsersRes?.c ?? 0);
+
+  const monthlyCumulativeUsers: number[] = [];
+  let running = priorUsers;
+  for (let i = 0; i < 12; i++) {
+    running += monthlyNewUsers[i];
+    monthlyCumulativeUsers.push(running);
+  }
+
+  res.json({
+    monthlyDeposits:         monthlyInvestments,   // investment inflow per month
+    monthlyEarnings:         monthlyEarnings,       // distributions paid per month
+    monthlyNewUsers:         monthlyNewUsers,        // new registrations per month
+    monthlyCumulativeUsers:  monthlyCumulativeUsers, // total users by end of each month
+  });
 });
 
 export default router;

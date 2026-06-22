@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { PieChart, Edit2, Save, X } from "lucide-react";
+import { PieChart, Edit2, Save, X, ArrowLeft, DollarSign, Users, Activity, TrendingUp } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { usePlatformMetrics, formatMetricCompact } from "@/hooks/usePlatformMetrics";
 
 const DEFAULT_ALLOCATIONS = [
   { label: "Digital Assets", pct: 35, color: "from-blue-500 to-indigo-600", bg: "bg-blue-500", track: "bg-blue-100 dark:bg-blue-900/30" },
@@ -47,11 +49,13 @@ function AllocationBar({ pct, color }: { pct: number; color: string }) {
 }
 
 export default function CapitalAllocationPage() {
+  const [, navigate] = useLocation();
   const { user } = useAuth();
   const isAdmin = (user as any)?.isAdmin;
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<typeof DEFAULT_ALLOCATIONS>([]);
+  const { data: metrics, isLoading: metricsLoading } = usePlatformMetrics();
 
   const { data: allocations = DEFAULT_ALLOCATIONS, isLoading } = useQuery({
     queryKey: ["capital-allocation"],
@@ -80,6 +84,15 @@ export default function CapitalAllocationPage() {
   return (
     <AppLayout title="Capital Allocation">
       <div className="px-4 pt-5 pb-24 space-y-5">
+
+        {/* Back button */}
+        <button
+          onClick={() => window.history.back()}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft size={16} />
+          <span>Back</span>
+        </button>
 
         {/* Header */}
         <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-primary/80 rounded-2xl p-5 text-white shadow-lg">
@@ -186,6 +199,56 @@ export default function CapitalAllocationPage() {
                       <div className={cn("h-full rounded-full bg-gradient-to-r", alloc.color ?? "from-primary to-blue-600")} style={{ width: `${alloc.pct}%` }} />
                     </div>
                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Platform Overview */}
+        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
+          <p className="font-semibold text-sm text-foreground flex items-center gap-2 mb-4">
+            <TrendingUp size={14} className="text-primary" />
+            Platform Overview
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              {
+                icon: DollarSign,
+                label: "Total Capital Raised",
+                value: metricsLoading ? "—" : formatMetricCompact(metrics?.totalRaised ?? 0),
+                color: "text-emerald-600",
+                bg: "bg-emerald-500/10",
+              },
+              {
+                icon: Users,
+                label: "Total Participants",
+                value: metricsLoading ? "—" : (metrics?.totalParticipants ?? 0).toLocaleString(),
+                color: "text-primary",
+                bg: "bg-primary/10",
+              },
+              {
+                icon: Activity,
+                label: "Active Opportunities",
+                value: metricsLoading ? "—" : String(metrics?.activeOpportunities ?? 0),
+                color: "text-purple-600",
+                bg: "bg-purple-500/10",
+              },
+              {
+                icon: TrendingUp,
+                label: "Avg Funding",
+                value: metricsLoading ? "—" : `${Math.round(metrics?.fundingPercentage ?? 0)}%`,
+                color: "text-amber-600",
+                bg: "bg-amber-500/10",
+              },
+            ].map(({ icon: Icon, label, value, color, bg }) => (
+              <div key={label} className="bg-muted/40 rounded-xl p-3 flex items-center gap-2.5">
+                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", bg)}>
+                  <Icon size={14} className={color} />
+                </div>
+                <div className="min-w-0">
+                  <p className={cn("font-bold text-sm", color)}>{value}</p>
+                  <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
                 </div>
               </div>
             ))}

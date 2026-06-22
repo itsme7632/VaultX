@@ -25,6 +25,7 @@ export const referralsTable = pgTable("referrals", {
     .notNull()
     .default("0"),
   status: text("status").notNull().default("active"),
+  referralSource: text("referral_source").default("direct"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

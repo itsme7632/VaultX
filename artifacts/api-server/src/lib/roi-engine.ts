@@ -65,6 +65,8 @@ export async function processAllInvestments(force = false): Promise<{ processed:
 
     if (!force && hoursSinceLast < 23.5) { skipped++; continue; }
 
+    // Maturity check: use the user's personal endDate, never the plan's closing date.
+    // Plan closing only blocks new entries — it must never shorten active investments.
     const endDate = new Date(inv.endDate);
     if (now > endDate) {
       if (inv.status === "active") {
@@ -76,42 +78,17 @@ export async function processAllInvestments(force = false): Promise<{ processed:
         await db.insert(notificationsTable).values({
           userId: inv.userId,
           type: "investment",
-          title: "Investment Matured",
-          message: `Your ${plan.name} investment has matured. Total earned: ${parseFloat(inv.totalEarned).toFixed(2)} USDT.`,
+          title: "Investment Matured 🎉",
+          message: `Your ${plan.name} investment has completed its full cycle. Total earned: ${parseFloat(inv.totalEarned).toFixed(2)} USDT. Visit Portfolio to claim your earnings.`,
         });
         matured++;
       }
       continue;
     }
 
-    const planEndDate = (plan as any).endDate ? new Date((plan as any).endDate) : null;
-    if (planEndDate && now > planEndDate) {
-      if ((plan as any).status !== "expired" && (plan as any).status !== "closed") {
-        await db
-          .update(investmentPlansTable)
-          .set({ status: "expired", isActive: false } as any)
-          .where(eq(investmentPlansTable.id, plan.id));
-      }
-      if (inv.status === "active") {
-        await db
-          .update(userInvestmentsTable)
-          .set({ status: "completed", updatedAt: now })
-          .where(eq(userInvestmentsTable.id, inv.id));
-
-        await db.insert(notificationsTable).values({
-          userId: inv.userId,
-          type: "investment",
-          title: "Investment Closed — Opportunity Expired",
-          message: `The ${plan.name} opportunity has closed. Your investment has been completed with a total earnings of ${parseFloat(inv.totalEarned).toFixed(2)} USDT.`,
-        });
-        matured++;
-      }
-      continue;
-    }
-
-    const minRate = parseFloat(plan.minRoiRate ?? "0.025");
-    const maxRate = parseFloat(plan.maxRoiRate ?? "0.030");
-    const dailyRate = randomRoi(minRate, maxRate);
+    // Use the rate locked in at investment creation — never the plan's current rate.
+    // This ensures admin changes to plan ROI never retroactively affect active investments.
+    const dailyRate = parseFloat(inv.dailyReturnRate);
 
     const principal = parseFloat(inv.amount);
     const earning = principal * dailyRate;

@@ -484,13 +484,13 @@ async function ensureAdminAccount(db: ReturnType<typeof drizzle<typeof schema>>)
     if (!taken) { displayId = candidate; break; }
   }
 
-  let referralCode = "VXADMIN01";
+  let referralCode = "WXADMIN01";
   const [refTaken] = await db
     .select({ id: usersTable.id })
     .from(usersTable)
     .where(eq(usersTable.referralCode, referralCode))
     .limit(1);
-  if (refTaken) referralCode = "VXADMIN" + Date.now().toString().slice(-4);
+  if (refTaken) referralCode = "WXADMIN" + Date.now().toString().slice(-4);
 
   const [admin] = await db
     .insert(usersTable)

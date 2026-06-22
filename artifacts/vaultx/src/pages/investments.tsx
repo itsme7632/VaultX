@@ -1,3 +1,4 @@
+import React from "react";
 import { TrendingUp, CheckCircle, ArrowRight, Clock, Star, Users, Target, Info, ChevronDown, ChevronUp, Zap, BarChart3, Calendar, Flame, Minus, TrendingDown } from "lucide-react";
 import {
   useGetInvestmentPlans, getGetInvestmentPlansQueryKey,
@@ -12,11 +13,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LiveCounter } from "@/components/LiveCounter";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { usePlatformMetrics, type PlanMetricsItem } from "@/hooks/usePlatformMetrics";
 
 /* ─── Shared constants ──────────────────────────────────────────────────── */
 
-const THEME_GRADIENT: Record<string, string> = {
+const THEME_GRADIENT_CSS: Record<string, string> = {
+  blue:   "linear-gradient(to bottom right, rgb(37 99 235), rgb(67 56 202))",
+  purple: "linear-gradient(to bottom right, rgb(147 51 234), rgb(91 33 182))",
+  green:  "linear-gradient(to bottom right, rgb(16 185 129), rgb(15 118 110))",
+  gold:   "linear-gradient(to bottom right, rgb(245 158 11), rgb(234 88 12))",
+  cyan:   "linear-gradient(to bottom right, rgb(6 182 212), rgb(29 78 216))",
+  rose:   "linear-gradient(to bottom right, rgb(244 63 94), rgb(190 24 93))",
+};
+
+function planGradientStyle(colorTheme?: string): React.CSSProperties {
+  return { background: THEME_GRADIENT_CSS[colorTheme ?? "blue"] ?? THEME_GRADIENT_CSS.blue };
+}
+
+const THEME_GRADIENT_TW: Record<string, string> = {
   blue:   "from-blue-600 to-indigo-700",
   purple: "from-purple-600 to-violet-800",
   green:  "from-emerald-500 to-teal-700",
@@ -26,7 +41,7 @@ const THEME_GRADIENT: Record<string, string> = {
 };
 
 function planGradient(colorTheme?: string) {
-  return THEME_GRADIENT[colorTheme ?? "blue"] ?? "from-blue-600 to-indigo-700";
+  return THEME_GRADIENT_TW[colorTheme ?? "blue"] ?? THEME_GRADIENT_TW.blue;
 }
 
 function planStatusBadge(status?: string) {
@@ -54,37 +69,34 @@ const BADGE_DISPLAY: Record<BadgeKey, { label: string; cls: string }> = {
 
 /* ─── Momentum Indicator ────────────────────────────────────────────────── */
 
-type MomentumLevel = "high" | "stable" | "cooling";
+type MomentumLevel = "trending" | "high" | "growing" | "stable";
 
 const MOMENTUM_CONFIG: Record<MomentumLevel, { label: string; icon: typeof Flame; bg: string; text: string; arrow: string }> = {
-  high:    { label: "High Momentum",  icon: Flame,       bg: "bg-orange-100 dark:bg-orange-950/40", text: "text-orange-600 dark:text-orange-400", arrow: "↑ Accelerating" },
-  stable:  { label: "Stable Demand",  icon: Minus,       bg: "bg-blue-100 dark:bg-blue-950/40",    text: "text-blue-600 dark:text-blue-400",   arrow: "→ Steady" },
-  cooling: { label: "Cooling Down",   icon: TrendingDown, bg: "bg-amber-100 dark:bg-amber-950/40",  text: "text-amber-600 dark:text-amber-400", arrow: "↓ Slowing" },
+  trending: { label: "🚀 Trending",         icon: Flame,      bg: "bg-purple-100 dark:bg-purple-950/40",  text: "text-purple-600 dark:text-purple-400",  arrow: "🚀 Trending" },
+  high:     { label: "🔥 High Momentum",    icon: Flame,      bg: "bg-orange-100 dark:bg-orange-950/40",  text: "text-orange-600 dark:text-orange-400",  arrow: "🔥 Accelerating" },
+  growing:  { label: "📈 Growing Interest", icon: TrendingUp, bg: "bg-emerald-100 dark:bg-emerald-950/40", text: "text-emerald-600 dark:text-emerald-400", arrow: "📈 Growing" },
+  stable:   { label: "⭐ Stable Demand",    icon: Minus,      bg: "bg-blue-100 dark:bg-blue-950/40",      text: "text-blue-600 dark:text-blue-400",      arrow: "⭐ Steady" },
 };
 
-function computeMomentum(joinedToday: number, joinedWeek: number): MomentumLevel {
-  if (joinedWeek <= 0) return "stable";
-  const ratio = joinedToday / joinedWeek;
-  if (ratio > 0.20) return "high";
-  if (ratio < 0.08) return "cooling";
+function computeMomentum(raisedPct: number): MomentumLevel {
+  if (raisedPct >= 76) return "trending";
+  if (raisedPct >= 51) return "high";
+  if (raisedPct >= 26) return "growing";
   return "stable";
 }
 
 function MomentumBadge({ level, compact = false }: { level: MomentumLevel; compact?: boolean }) {
   const cfg = MOMENTUM_CONFIG[level];
-  const Icon = cfg.icon;
   if (compact) {
     return (
       <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold", cfg.bg, cfg.text)}>
-        <Icon size={9} />
-        {level === "high" ? "🔥" : level === "stable" ? "⭐" : "⚠"} {cfg.label}
-        <span className="opacity-70 font-normal">({cfg.arrow})</span>
+        {cfg.label}
       </span>
     );
   }
   return (
     <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold", cfg.bg, cfg.text)}>
-      {level === "high" ? "🔥" : level === "stable" ? "⭐" : "⚠"} {cfg.arrow}
+      {cfg.arrow}
     </span>
   );
 }
@@ -96,41 +108,94 @@ function seededInt(planId: number, salt: number, min: number, max: number) {
   return min + Math.floor((seed / 97) * (max - min));
 }
 
+/**
+ * Auto-generate realistic participant count from capital raised.
+ * Uses a deterministic fraction per plan so values are stable across renders.
+ * Returns 0 when raised ≤ 0 — no participants can exist with zero capital.
+ * Scales:  $2K → 1-5,  $100K → 15-60,  $500K → 50-250,  $2M → 150-1000
+ */
+function autoParticipantsFromRaised(raised: number, planId: number): number {
+  if (raised <= 0) return 0;
+  const frac = ((planId * 31 + 7) % 97) / 97; // stable 0-1 per plan
+
+  const points = [
+    { r: 0,         min: 1,   max: 2 },
+    { r: 2000,      min: 1,   max: 5 },
+    { r: 100000,    min: 15,  max: 60 },
+    { r: 500000,    min: 50,  max: 250 },
+    { r: 2000000,   min: 150, max: 1000 },
+  ];
+
+  for (let i = 1; i < points.length; i++) {
+    if (raised <= points[i].r || i === points.length - 1) {
+      const prev = points[i - 1], curr = points[i];
+      const t = prev.r === curr.r ? 1 : Math.min(1, Math.max(0, (raised - prev.r) / (curr.r - prev.r)));
+      const minV = prev.min + t * (curr.min - prev.min);
+      const maxV = prev.max + t * (curr.max - prev.max);
+      return Math.max(1, Math.floor(minV + frac * (maxV - minV)));
+    }
+  }
+  return Math.floor(150 + frac * 850);
+}
+
 function autoStats(id: number) {
-  const participants   = seededInt(id, 3, 120, 520);
-  const raisedPct      = seededInt(id, 2, 48, 82);
-  const joinedToday    = seededInt(id, 5, 3, 25);
-  const joinedWeek     = seededInt(id, 6, 15, 85);
-  const capitalTargetK = seededInt(id, 1, 80, 200);
+  const raisedPct      = seededInt(id, 2, 30, 90);
+  const capitalTargetK = seededInt(id, 1, 80, 300);
+  const participants   = seededInt(id, 3, 80, 600);
+  // Activity scales with funding level — higher funded = more participant activity
+  const activityBase   = Math.max(2, Math.floor(raisedPct / 5));
+  const joinedToday    = activityBase + seededInt(id, 5, 1, 8);
+  const joinedWeek     = joinedToday * 4 + seededInt(id, 6, 5, 25);
   return { participants, raisedPct, joinedToday, joinedWeek, capitalTargetK };
 }
 
-/* ─── Badge auto-assignment (comparative across all plans) ─────────────── */
+/* ─── Badge auto-assignment (uses canonical platform metrics) ────────────── */
 
-function computeAutoBadges(plans: any[]): Record<number, BadgeKey> {
+function computeAutoBadges(plans: any[], metricsMap: Record<number, PlanMetricsItem> = {}): Record<number, BadgeKey> {
   if (!plans.length) return {};
 
-  const stats = plans.map(p => ({
-    id: p.id,
-    ...autoStats(p.id),
-  }));
+  // Use canonical stats from the platform-metrics endpoint (single source of truth)
+  const planData = plans.map(p => {
+    const m = metricsMap[p.id];
+    if (m) {
+      return {
+        id: p.id,
+        raisedPct: m.fundingPct,
+        participants: m.participants,
+        capitalRaised: m.capitalRaised,
+        joinedToday: m.joinedToday,
+        joinedWeek: m.joinedWeek,
+      };
+    }
+    // Fallback while metrics load: use real DB fields only
+    const fundingGoal   = p.fundingGoal != null ? Number(p.fundingGoal) : null;
+    const capitalRaised = p.currentFunding != null ? Number(p.currentFunding) : 0;
+    const raisedPct     = fundingGoal && fundingGoal > 0 ? (capitalRaised / fundingGoal) * 100 : 0;
+    const participants  = p.displayParticipantCount != null ? Number(p.displayParticipantCount)
+      : p.totalParticipants != null ? Number(p.totalParticipants) : 0;
+    const activityBase  = Math.max(1, Math.floor(raisedPct / 8));
+    const planSeed      = ((p.id * 31 + 7) % 97) / 97;
+    const joinedToday   = capitalRaised > 0 ? Math.max(1, Math.round(activityBase * (0.7 + planSeed * 0.6))) : 0;
+    const joinedWeek    = capitalRaised > 0 ? joinedToday * 4 + Math.floor(planSeed * 15) : 0;
+    return { id: p.id, raisedPct, participants, capitalRaised, joinedToday, joinedWeek };
+  });
 
   const badges: Record<number, BadgeKey> = {};
   const assigned = new Set<number>();
 
-  const assignTop = (sorted: typeof stats, badge: BadgeKey) => {
+  const assignTop = (sorted: typeof planData, badge: BadgeKey) => {
     const winner = sorted.find(s => !assigned.has(s.id));
     if (winner) { badges[winner.id] = badge; assigned.add(winner.id); }
   };
 
-  // 🔥 Trending = most joined today
-  assignTop([...stats].sort((a, b) => b.joinedToday - a.joinedToday), "trending");
-  // 🚀 Fast Growing = highest joinedToday-to-participants ratio
-  assignTop([...stats].sort((a, b) => (b.joinedToday / b.participants) - (a.joinedToday / a.participants)), "fast-growing");
-  // 🏆 Top Funded = highest raised %
-  assignTop([...stats].sort((a, b) => b.raisedPct - a.raisedPct), "top-funded");
+  // 🏆 Top Funded = highest funding percentage
+  assignTop([...planData].sort((a, b) => b.raisedPct - a.raisedPct), "top-funded");
+  // 🔥 Trending = most activity today
+  assignTop([...planData].sort((a, b) => b.joinedToday - a.joinedToday), "trending");
+  // 🚀 Fast Growing = highest growth rate (joinedWeek / participants)
+  assignTop([...planData].sort((a, b) => (b.joinedWeek / Math.max(1, b.participants)) - (a.joinedWeek / Math.max(1, a.participants))), "fast-growing");
   // ⭐ Popular = most total participants
-  assignTop([...stats].sort((a, b) => b.participants - a.participants), "popular");
+  assignTop([...planData].sort((a, b) => b.participants - a.participants), "popular");
 
   return badges;
 }
@@ -138,20 +203,16 @@ function computeAutoBadges(plans: any[]): Record<number, BadgeKey> {
 /* ─── Animated progress bar ─────────────────────────────────────────────── */
 
 function AnimatedBar({ pct, gradient, className }: { pct: number; gradient: string; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.width = "0%";
-    const t = setTimeout(() => { el.style.width = `${pct}%`; }, 80);
+    const t = setTimeout(() => { setWidth(pct); }, 80);
     return () => clearTimeout(t);
   }, [pct]);
   return (
     <div className={cn("rounded-full overflow-hidden bg-muted", className ?? "h-2.5")}>
       <div
-        ref={ref}
         className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-1000 ease-out", gradient)}
-        style={{ width: "0%" }}
+        style={{ width: `${width}%`, willChange: "width" }}
       />
     </div>
   );
@@ -159,26 +220,14 @@ function AnimatedBar({ pct, gradient, className }: { pct: number; gradient: stri
 
 /* ─── Opportunity Insights summary (top of page) ───────────────────────── */
 
-function OpportunityInsightsSummary({ plans, customStats, mode }: { plans: any[]; customStats: Record<string, any>; mode: string }) {
-  const activePlans = plans.filter(p => p.isActive);
-  if (!activePlans.length) return null;
+function OpportunityInsightsSummary() {
+  const { data: metrics, isLoading } = usePlatformMetrics();
 
-  let totalParticipants = 0;
-  let totalRaised = 0;
-  let totalTarget = 0;
-
-  activePlans.forEach(p => {
-    const custom = mode === "custom" && customStats[p.id];
-    const s = custom || autoStats(p.id);
-    const target = p.fundingGoal ?? (custom?.capitalTargetK ?? s.capitalTargetK) * 1000;
-    const raised = p.currentFunding ?? Math.floor(target * (s.raisedPct / 100));
-    const parts  = p.totalParticipants ?? s.participants;
-    totalParticipants += parts;
-    totalRaised += raised;
-    totalTarget += target;
-  });
-
-  const overallPct = totalTarget > 0 ? Math.round((totalRaised / totalTarget) * 100) : 0;
+  const overallPct = Math.round(metrics?.fundingPercentage ?? 0);
+  const totalRaised = metrics?.totalRaised ?? 0;
+  const totalTarget = metrics?.totalTarget ?? 0;
+  const fmtRaised = totalRaised >= 1_000_000 ? `$${(totalRaised / 1_000_000).toFixed(1)}M` : totalRaised >= 1_000 ? `$${(totalRaised / 1_000).toFixed(0)}K` : `$${totalRaised}`;
+  const fmtTarget = totalTarget >= 1_000_000 ? `$${(totalTarget / 1_000_000).toFixed(1)}M` : totalTarget >= 1_000 ? `$${(totalTarget / 1_000).toFixed(0)}K` : `$${totalTarget}`;
 
   return (
     <div className="bg-gradient-to-br from-slate-800 via-slate-700 to-primary/60 rounded-2xl p-4 text-white shadow-lg mb-4">
@@ -188,24 +237,22 @@ function OpportunityInsightsSummary({ plans, customStats, mode }: { plans: any[]
       </div>
       <div className="grid grid-cols-3 gap-2 mb-3">
         <div className="bg-white/10 rounded-xl py-2.5 text-center">
-          <p className="font-bold text-base">{activePlans.length}</p>
+          <p className="font-bold text-base">{isLoading ? "—" : String(metrics?.activeOpportunities ?? 0)}</p>
           <p className="text-[9px] text-white/60 mt-0.5">Active</p>
         </div>
         <div className="bg-white/10 rounded-xl py-2.5 text-center">
-          <p className="font-bold text-base">{totalParticipants.toLocaleString()}</p>
+          <p className="font-bold text-base">{isLoading ? "—" : (metrics?.totalParticipants ?? 0).toLocaleString()}</p>
           <p className="text-[9px] text-white/60 mt-0.5">Participants</p>
         </div>
         <div className="bg-white/10 rounded-xl py-2.5 text-center">
-          <p className="font-bold text-base">{overallPct}%</p>
+          <p className="font-bold text-base">{isLoading ? "—" : `${overallPct}%`}</p>
           <p className="text-[9px] text-white/60 mt-0.5">Avg Funded</p>
         </div>
       </div>
       <div className="flex items-center justify-between text-[10px] text-white/60 mb-1">
         <span>Platform Capital Raised</span>
         <span className="text-white font-semibold">
-          {totalRaised >= 1_000_000 ? `$${(totalRaised / 1_000_000).toFixed(1)}M` : totalRaised >= 1_000 ? `$${(totalRaised / 1_000).toFixed(0)}K` : `$${totalRaised}`}
-          {" / "}
-          {totalTarget >= 1_000_000 ? `$${(totalTarget / 1_000_000).toFixed(1)}M` : `$${(totalTarget / 1_000).toFixed(0)}K`}
+          {isLoading ? "—" : `${fmtRaised} / ${fmtTarget}`}
         </span>
       </div>
       <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -223,7 +270,7 @@ export default function InvestmentsPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const { data: plans, isLoading: plansLoading } = useGetInvestmentPlans({
-    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 300000 },
+    query: { queryKey: getGetInvestmentPlansQueryKey(), staleTime: 30000, refetchInterval: 60000 },
   });
 
   const { data: userInvestments, isLoading: uiLoading } = useGetUserInvestments({
@@ -235,6 +282,14 @@ export default function InvestmentsPage() {
     queryFn: () => fetch("/api/settings/public", { credentials: "include" }).then(r => r.json()),
     staleTime: 60000,
   });
+
+  // Canonical per-plan stats — single source of truth shared with Opportunity Insights
+  const { data: metrics } = usePlatformMetrics();
+  const metricsPlansMap = useMemo<Record<number, PlanMetricsItem>>(() => {
+    const m: Record<number, PlanMetricsItem> = {};
+    for (const p of (metrics?.plans ?? [])) m[p.id] = p;
+    return m;
+  }, [metrics]);
 
   const analyticsMode: string = settings?.opportunity_analytics_mode ?? "auto";
   const badgeOverrides: Record<string, BadgeKey> = (() => {
@@ -252,31 +307,59 @@ export default function InvestmentsPage() {
   const activeCount = userInvestments?.filter((i: any) => i.status === "active").length ?? 0;
   const activePlans = (plans ?? []).filter((p: any) => p.isActive);
 
-  // Compute auto badges then apply admin overrides
-  const autoBadges = computeAutoBadges(activePlans);
+  // Compute auto badges using canonical metrics (single source of truth)
+  const autoBadges = computeAutoBadges(activePlans, metricsPlansMap);
   const badges: Record<number, BadgeKey> = { ...autoBadges };
   Object.entries(badgeOverrides).forEach(([planId, badge]) => {
     if (badge) badges[Number(planId)] = badge;
   });
 
   const getPlanStats = (plan: any) => {
-    const custom = analyticsMode === "custom" && customStatsMap[String(plan.id)];
-    const base = autoStats(plan.id);
-    const joinedToday    = custom?.joinedToday ?? base.joinedToday;
-    const joinedWeek     = custom?.joinedWeek  ?? base.joinedWeek;
-    const participants   = plan.totalParticipants ?? custom?.participants ?? base.participants;
-    const capitalTarget  = plan.fundingGoal ?? (custom?.capitalTargetK ?? base.capitalTargetK) * 1000;
-    const capitalRaised  = plan.currentFunding ?? Math.floor(capitalTarget * ((custom?.raisedPct ?? base.raisedPct) / 100));
-    const raisedPct      = capitalTarget > 0 ? Math.round((capitalRaised / capitalTarget) * 100) : (custom?.raisedPct ?? base.raisedPct);
-    const capitalRemaining = capitalTarget - capitalRaised;
-    return { participants, raisedPct, joinedToday, joinedWeek, capitalTarget, capitalRaised, capitalRemaining };
+    // Always use canonical backend stats — single source of truth
+    const canonical = metricsPlansMap[plan.id];
+    if (canonical) {
+      return {
+        participants:     canonical.participants,
+        raisedPct:        Math.round(canonical.fundingPct),
+        raisedPctRaw:     canonical.fundingPct,
+        fundingDisplay:   canonical.fundingDisplay,
+        barPct:           canonical.barPct,
+        capitalTarget:    canonical.fundingGoal,
+        capitalRaised:    canonical.capitalRaised,
+        capitalRemaining: canonical.capitalRemaining,
+        joinedToday:      canonical.joinedToday,
+        joinedWeek:       canonical.joinedWeek,
+      };
+    }
+
+    // Fallback while metrics endpoint first loads
+    const capitalTarget   = plan.fundingGoal != null ? Number(plan.fundingGoal) : 0;
+    const capitalRaised   = plan.currentFunding != null ? Number(plan.currentFunding) : 0;
+    const displayOverride = plan.displayParticipantCount != null ? Number(plan.displayParticipantCount) : null;
+
+    let participants: number;
+    if (displayOverride !== null)  participants = displayOverride;
+    else if (capitalRaised <= 0)   participants = 0;
+    else                           participants = autoParticipantsFromRaised(capitalRaised, plan.id);
+
+    const raisedPctRaw   = capitalTarget > 0 ? Math.min(100, (capitalRaised / capitalTarget) * 100) : 0;
+    const raisedPct      = Math.round(raisedPctRaw);
+    const fundingDisplay = capitalRaised > 0 && raisedPct === 0 ? "< 1%" : `${raisedPct}%`;
+    const barPct         = capitalRaised > 0 ? Math.max(0.5, raisedPctRaw) : 0;
+    const capitalRemaining = Math.max(0, capitalTarget - capitalRaised);
+    const planSeed       = ((plan.id * 31 + 7) % 97) / 97;
+    const activityBase   = capitalRaised > 0 ? Math.max(1, Math.floor(raisedPctRaw / 8)) : 0;
+    const joinedToday    = capitalRaised > 0 ? Math.max(1, Math.round(activityBase * (0.7 + planSeed * 0.6))) : 0;
+    const joinedWeek     = capitalRaised > 0 ? joinedToday * 4 + Math.floor(planSeed * 15) : 0;
+
+    return { participants, raisedPct, raisedPctRaw, fundingDisplay, barPct, capitalTarget, capitalRaised, capitalRemaining, joinedToday, joinedWeek };
   };
 
   const getPlanMomentum = (plan: any, s: ReturnType<typeof getPlanStats>): MomentumLevel | null => {
     if (!momentumEnabled) return null;
     const override = momentumOverrides[String(plan.id)];
     if (momentumMode === "custom" && override) return override;
-    return computeMomentum(s.joinedToday, s.joinedWeek);
+    return computeMomentum(s.raisedPct);
   };
 
   return (
@@ -302,22 +385,43 @@ export default function InvestmentsPage() {
           <div>
             {/* Platform-wide insights summary */}
             {!plansLoading && (plans ?? []).length > 0 && (
-              <OpportunityInsightsSummary plans={plans ?? []} customStats={customStatsMap} mode={analyticsMode} />
+              <OpportunityInsightsSummary />
             )}
 
             <div className="space-y-4">
               {plansLoading ? (
                 [1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
               ) : [...(plans ?? [])].sort((a: any, b: any) => {
-                const aOrd = a.sortOrder ?? 999, bOrd = b.sortOrder ?? 999;
-                if (aOrd !== bOrd) return aOrd - bOrd;
-                return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
+                // 1. Featured plans first
+                const statusScore = (p: any) => {
+                  if (p.status === "featured" || p.isFeatured) return 4;
+                  if (p.status === "trending") return 3;
+                  if (p.status === "active" || p.status === "funding") return 2;
+                  return 0;
+                };
+                const scoreDiff = statusScore(b) - statusScore(a);
+                if (scoreDiff !== 0) return scoreDiff;
+                // 2. Highest funding %
+                const aStats = getPlanStats(a), bStats = getPlanStats(b);
+                if (bStats.raisedPct !== aStats.raisedPct) return bStats.raisedPct - aStats.raisedPct;
+                // 3. Highest capital raised
+                if (bStats.capitalRaised !== aStats.capitalRaised) return bStats.capitalRaised - aStats.capitalRaised;
+                // 4. Highest participant count
+                if (bStats.participants !== aStats.participants) return bStats.participants - aStats.participants;
+                // 5. Newest first
+                return b.id - a.id;
               }).map((plan: any) => {
                 const minRoi = plan.minRoiRate ?? 0.025;
                 const maxRoi = plan.maxRoiRate ?? 0.030;
                 const gradient = planGradient(plan.colorTheme);
                 const category = plan.category ?? "Strategic Capital";
-                const badge = badges[plan.id] ?? null;
+                const rawBadge = badges[plan.id] ?? null;
+                // Suppress auto-badge when it duplicates the status badge to avoid showing "🔥 Trending" twice
+                const statusExpressesBadge =
+                  (rawBadge === "trending" && plan.status === "trending") ||
+                  (rawBadge === "popular"  && plan.isPopular) ||
+                  (rawBadge === "top-funded" && plan.status === "featured");
+                const badge = statusExpressesBadge ? null : rawBadge;
                 const s = getPlanStats(plan);
                 const momentum = getPlanMomentum(plan, s);
                 const isExpanded = expandedId === plan.id;
@@ -340,18 +444,18 @@ export default function InvestmentsPage() {
                     )}
 
                     {/* Gradient header */}
-                    <div className={cn("bg-gradient-to-br p-5 text-white", gradient)}>
+                    <div className="p-5 text-white" style={planGradientStyle(plan.colorTheme)}>
                       <div className="flex items-center justify-between mb-2">
-                        <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold">
+                        <Badge className="bg-white/20 text-white border-white/30 text-[10px] font-semibold no-default-hover-elevate">
                           {category}
                         </Badge>
                         <div className="flex items-center gap-1.5">
                           {badge && badge !== "none" && (
-                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border", BADGE_DISPLAY[badge].cls, "bg-white/20 text-white border-white/30")}>
+                            <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full border bg-white/20 text-white border-white/30")}>
                               {BADGE_DISPLAY[badge].label}
                             </span>
                           )}
-                          <Badge className={cn("text-[10px] border", sb.cls)}>
+                          <Badge className={cn("text-[10px] border no-default-hover-elevate", sb.cls)}>
                             {sb.label}
                           </Badge>
                         </div>
@@ -404,23 +508,19 @@ export default function InvestmentsPage() {
                             </div>
                           </div>
                         </div>
-                        {/* Momentum badge — near participant count */}
-                        {momentum && (
-                          <MomentumBadge level={momentum} compact />
-                        )}
                       </div>
 
                       {/* Funding progress */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground font-medium">{s.raisedPct}% funded</span>
-                            {/* Momentum badge — near funding progress (compact arrow) */}
+                            <span className="text-xs text-muted-foreground font-medium">{s.fundingDisplay} funded</span>
+                            {/* Momentum badge — single instance, shown here only */}
                             {momentum && <MomentumBadge level={momentum} />}
                           </div>
                           <span className="text-xs font-bold text-foreground">{formatUSDT(s.capitalRaised)} / {formatUSDT(s.capitalTarget)}</span>
                         </div>
-                        <AnimatedBar pct={s.raisedPct} gradient={planGradient(plan.colorTheme)} />
+                        <AnimatedBar pct={s.barPct} gradient={planGradient(plan.colorTheme)} />
                         <p className="text-[10px] text-muted-foreground mt-1">{formatUSDT(s.capitalRemaining)} remaining to target</p>
                       </div>
 
@@ -440,7 +540,7 @@ export default function InvestmentsPage() {
                             { label: "Participants", value: s.participants.toLocaleString(), icon: Users },
                             { label: "Capital Target", value: formatUSDT(s.capitalTarget), icon: Target },
                             { label: "Capital Raised", value: formatUSDT(s.capitalRaised), icon: TrendingUp },
-                            { label: "Funding %", value: `${s.raisedPct}%`, icon: BarChart3 },
+                            { label: "Funding %", value: s.fundingDisplay, icon: BarChart3 },
                             { label: "Min. Entry", value: formatUSDT(plan.minAmount), icon: Target },
                             { label: "Status", value: sb.label, icon: Zap },
                           ].map(({ label, value, icon: Icon }) => (

@@ -336,6 +336,29 @@ const COLUMN_MIGRATIONS_SQL = [
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "sort_order" integer DEFAULT 0 NOT NULL`,
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "total_participant_limit" integer`,
   `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "is_popular" boolean DEFAULT false NOT NULL`,
+  `ALTER TABLE "investment_plans" ADD COLUMN IF NOT EXISTS "display_participant_count" integer`,
+  `ALTER TABLE "referrals" ADD COLUMN IF NOT EXISTS "referral_source" text DEFAULT 'direct'`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "withdrawal_password_hash" text`,
+
+  `CREATE TABLE IF NOT EXISTS "withdrawal_addresses" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "network" text NOT NULL,
+    "address" text NOT NULL,
+    "label" text DEFAULT '' NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "faqs" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "question" text NOT NULL,
+    "answer" text NOT NULL,
+    "category" text DEFAULT 'General' NOT NULL,
+    "is_active" boolean DEFAULT true NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
 ];
 
 const sslConfig =

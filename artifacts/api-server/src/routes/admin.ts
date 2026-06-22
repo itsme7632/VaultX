@@ -13,6 +13,7 @@ import {
   referralsTable,
   platformSettingsTable,
   adminActionLogsTable,
+  withdrawalAddressesTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -20,7 +21,11 @@ import { processAllInvestments } from "../lib/roi-engine";
 
 const router: IRouter = Router();
 
-function serializeUser(user: typeof usersTable.$inferSelect, wallet?: typeof walletsTable.$inferSelect | null) {
+function serializeUser(
+  user: typeof usersTable.$inferSelect,
+  wallet?: typeof walletsTable.$inferSelect | null,
+  withdrawalAddressCount?: number,
+) {
   return {
     id: user.id,
     displayId: user.displayId,
@@ -37,6 +42,8 @@ function serializeUser(user: typeof usersTable.$inferSelect, wallet?: typeof wal
     isAdmin: user.isAdmin,
     isActive: user.isActive,
     twoFaEnabled: user.twoFaEnabled,
+    hasWithdrawalPassword: !!user.withdrawalPasswordHash,
+    withdrawalAddressCount: withdrawalAddressCount ?? 0,
     withdrawalLocked: user.withdrawalLocked,
     transferLocked: user.transferLocked,
     whatsappLocked: user.whatsappLocked,
@@ -69,12 +76,23 @@ router.get("/admin/users", requireAdmin, async (req, res): Promise<void> => {
     .limit(parseInt(limit, 10))
     .offset(parseInt(offset, 10));
 
+  const userIds = results.map((r) => r.user.id);
+  const addrCounts: Record<number, number> = {};
+  if (userIds.length > 0) {
+    const rows = await db
+      .select({ userId: withdrawalAddressesTable.userId, c: count() })
+      .from(withdrawalAddressesTable)
+      .where(sql`${withdrawalAddressesTable.userId} = ANY(${sql.raw(`ARRAY[${userIds.join(",")}]::int[]`)})`)
+      .groupBy(withdrawalAddressesTable.userId);
+    rows.forEach((r) => { addrCounts[r.userId] = Number(r.c); });
+  }
+
   const total = search
     ? results.length
     : (await db.select({ c: count() }).from(usersTable))[0]?.c ?? 0;
 
   res.json({
-    items: results.map((r) => serializeUser(r.user, r.wallet)),
+    items: results.map((r) => serializeUser(r.user, r.wallet, addrCounts[r.user.id] ?? 0)),
     total,
   });
 });
@@ -850,6 +868,7 @@ function serializeAdminPlan(p: typeof investmentPlansTable.$inferSelect, stats?:
     totalParticipants: stats?.totalParticipants ?? 0,
     averageAllocation: stats?.averageAllocation ?? 0,
     totalParticipantLimit: (p as any).totalParticipantLimit ?? null,
+    displayParticipantCount: (p as any).displayParticipantCount ?? null,
     status: (p as any).status ?? "active",
     colorTheme: (p as any).colorTheme ?? "blue",
     autoCompoundAvailable: (p as any).autoCompoundAvailable ?? true,
@@ -901,7 +920,7 @@ router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
     durationDays, riskLevel, features, isActive, isFeatured, isPopular,
     category, bannerImageUrl, fundingGoal, status, colorTheme, autoCompoundAvailable,
-    startDate, endDate, sortOrder, totalParticipantLimit,
+    startDate, endDate, sortOrder, totalParticipantLimit, displayParticipantCount,
   } = req.body;
 
   if (!name || !description || !minAmount || !maxAmount || !durationDays) {
@@ -936,6 +955,7 @@ router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     endDate: endDate ? new Date(endDate) : null,
     sortOrder: sortOrder ?? 0,
     totalParticipantLimit: totalParticipantLimit !== undefined && totalParticipantLimit !== null ? parseInt(totalParticipantLimit, 10) : null,
+    displayParticipantCount: displayParticipantCount !== undefined && displayParticipantCount !== null ? parseInt(displayParticipantCount, 10) : null,
   } as any).returning();
 
   res.status(201).json(serializeAdminPlan(plan));
@@ -973,6 +993,7 @@ router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => 
     durationDays, riskLevel, features, isActive, isFeatured, isPopular,
     category, bannerImageUrl, fundingGoal, currentFunding, status, colorTheme,
     autoCompoundAvailable, startDate, endDate, sortOrder, totalParticipantLimit,
+    displayParticipantCount,
   } = req.body;
 
   const [existing] = await db.select().from(investmentPlansTable).where(eq(investmentPlansTable.id, id)).limit(1);
@@ -1008,6 +1029,7 @@ router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => 
     endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : (ex.endDate ?? null),
     sortOrder: sortOrder !== undefined ? sortOrder : (ex.sortOrder ?? 0),
     totalParticipantLimit: totalParticipantLimit !== undefined ? (totalParticipantLimit !== null ? parseInt(totalParticipantLimit, 10) : null) : (ex.totalParticipantLimit ?? null),
+    displayParticipantCount: displayParticipantCount !== undefined ? (displayParticipantCount !== null && displayParticipantCount !== "" ? parseInt(displayParticipantCount, 10) : null) : (ex.displayParticipantCount ?? null),
   } as any).where(eq(investmentPlansTable.id, id)).returning();
 
   res.json(serializeAdminPlan(updated));

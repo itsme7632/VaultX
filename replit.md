@@ -1,4 +1,4 @@
-# VaultX — Crypto Investment Platform
+# Wexora Global — Crypto Investment Platform
 
 A premium light-theme mobile-first crypto investment platform where users can invest, earn daily returns, manage wallets, refer friends, and track portfolio performance.
 
@@ -59,7 +59,7 @@ A premium light-theme mobile-first crypto investment platform where users can in
 - Premium fintech look inspired by Coinbase/Revolut: light theme, blue primary, emerald accent
 - Mobile-first, max-width `screen-sm` centered layout
 - No sidebar — bottom nav only
-- Test admin: email `admin@vaultx.com`, password `Admin123!`
+- Test admin: email `admin@wexoraglobal.com`, password `Admin123@`
 
 ## Gotchas
 

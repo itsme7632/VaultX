@@ -46,6 +46,7 @@ function serializePlan(p: typeof investmentPlansTable.$inferSelect, stats?: { to
     totalParticipants: stats?.totalParticipants ?? 0,
     averageAllocation: stats?.averageAllocation ?? 0,
     totalParticipantLimit: (p as any).totalParticipantLimit ?? null,
+    displayParticipantCount: (p as any).displayParticipantCount ?? null,
     status: (p as any).status ?? "active",
     colorTheme: (p as any).colorTheme ?? "blue",
     autoCompoundAvailable: (p as any).autoCompoundAvailable ?? true,
@@ -70,10 +71,10 @@ function computeInvestmentView(
   const progressPercent = Math.min(100, Math.max(0, (elapsed / totalDays) * 100));
   const amount = parseFloat(inv.amount);
   const dailyRate = parseFloat(inv.dailyReturnRate);
-  const minRoi = parseFloat(planMinRoi ?? "0.025");
-  const maxRoi = parseFloat(planMaxRoi ?? "0.030");
-  const projectedDailyMin = amount * minRoi;
-  const projectedDailyMax = amount * maxRoi;
+  // Projections use the locked-in dailyReturnRate, not the plan's current rates.
+  // This ensures projections remain accurate even if admin changes the plan ROI later.
+  const projectedDailyMin = amount * dailyRate;
+  const projectedDailyMax = amount * dailyRate;
   const projectedTotalMin = projectedDailyMin * totalDays;
   const projectedTotalMax = projectedDailyMax * totalDays;
 
@@ -294,116 +295,115 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
 router.post("/investments/:id/claim", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+  const userId = req.session.userId!;
 
-  const [investment] = await db
-    .select()
-    .from(userInvestmentsTable)
-    .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, req.session.userId!)))
-    .limit(1);
+  try {
+    // Atomic transaction with row-level lock prevents double-claim from concurrent requests
+    const outcome = await db.transaction(async (tx) => {
+      const [investment] = await tx
+        .select()
+        .from(userInvestmentsTable)
+        .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, userId)))
+        .for("update")
+        .limit(1);
 
-  if (!investment) {
-    res.status(404).json({ error: "Not found" });
-    return;
+      if (!investment) return { status: "not_found" as const };
+
+      const pending = parseFloat(investment.pendingEarnings);
+      if (pending <= 0) return { status: "no_earnings" as const };
+
+      await tx
+        .update(userInvestmentsTable)
+        .set({ pendingEarnings: "0" })
+        .where(eq(userInvestmentsTable.id, id));
+
+      await tx
+        .update(walletsTable)
+        .set({
+          balance: sql`CAST(balance AS numeric) + ${pending}`,
+          totalEarnings: sql`CAST(total_earnings AS numeric) + ${pending}`,
+        })
+        .where(eq(walletsTable.userId, userId));
+
+      await tx.insert(transactionsTable).values({
+        userId,
+        type: "earning",
+        amount: pending.toFixed(8),
+        status: "completed",
+        txId: generateTxId(),
+        note: `Earnings claimed from investment #${id}`,
+      });
+
+      return { status: "ok" as const, pending };
+    });
+
+    if (outcome.status === "not_found") { res.status(404).json({ error: "Not found" }); return; }
+    if (outcome.status === "no_earnings") { res.status(400).json({ error: "No earnings", message: "No pending earnings to claim" }); return; }
+
+    const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, userId)).limit(1);
+    res.json({ amountClaimed: outcome.pending, newBalance: parseFloat(wallet.balance) });
+  } catch {
+    res.status(500).json({ error: "Server error", message: "Failed to process claim" });
   }
-
-  const pending = parseFloat(investment.pendingEarnings);
-  if (pending <= 0) {
-    res.status(400).json({ error: "No earnings", message: "No pending earnings to claim" });
-    return;
-  }
-
-  // Only clear pendingEarnings — totalEarned is already updated by the ROI engine
-  await db
-    .update(userInvestmentsTable)
-    .set({ pendingEarnings: "0" })
-    .where(eq(userInvestmentsTable.id, id));
-
-  const [wallet] = await db
-    .select()
-    .from(walletsTable)
-    .where(eq(walletsTable.userId, req.session.userId!))
-    .limit(1);
-
-  const newBalance = parseFloat(wallet.balance) + pending;
-  const newTotalEarnings = parseFloat(wallet.totalEarnings) + pending;
-
-  await db
-    .update(walletsTable)
-    .set({
-      balance: newBalance.toFixed(8),
-      totalEarnings: newTotalEarnings.toFixed(8),
-    })
-    .where(eq(walletsTable.userId, req.session.userId!));
-
-  await db.insert(transactionsTable).values({
-    userId: req.session.userId!,
-    type: "earning",
-    amount: pending.toFixed(8),
-    status: "completed",
-    txId: generateTxId(),
-    note: `Earnings claimed from investment #${id}`,
-  });
-
-  res.json({ amountClaimed: pending, newBalance });
 });
 
 router.post("/investments/:id/reinvest", requireAuth, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
   const id = parseInt(raw, 10);
+  const userId = req.session.userId!;
 
-  const [result] = await db
-    .select({
-      inv: userInvestmentsTable,
-      planName: investmentPlansTable.name,
-      planMinRoi: investmentPlansTable.minRoiRate,
-      planMaxRoi: investmentPlansTable.maxRoiRate,
-    })
+  // Fetch plan metadata outside the transaction (read-only, no lock needed)
+  const [meta] = await db
+    .select({ planName: investmentPlansTable.name, planMinRoi: investmentPlansTable.minRoiRate, planMaxRoi: investmentPlansTable.maxRoiRate })
     .from(userInvestmentsTable)
     .leftJoin(investmentPlansTable, eq(userInvestmentsTable.planId, investmentPlansTable.id))
-    .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, req.session.userId!)))
+    .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, userId)))
     .limit(1);
 
-  if (!result) {
-    res.status(404).json({ error: "Not found" });
-    return;
+  if (!meta) { res.status(404).json({ error: "Not found" }); return; }
+
+  try {
+    // Atomic transaction with row-level lock prevents double-reinvest from concurrent requests
+    const outcome = await db.transaction(async (tx) => {
+      const [investment] = await tx
+        .select()
+        .from(userInvestmentsTable)
+        .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, userId)))
+        .for("update")
+        .limit(1);
+
+      if (!investment) return { status: "not_found" as const };
+
+      const pending = parseFloat(investment.pendingEarnings);
+      if (pending <= 0) return { status: "no_earnings" as const };
+
+      const newAmount = parseFloat(investment.amount) + pending;
+
+      const [updated] = await tx
+        .update(userInvestmentsTable)
+        .set({ amount: newAmount.toFixed(8), pendingEarnings: "0" })
+        .where(eq(userInvestmentsTable.id, id))
+        .returning();
+
+      await tx.insert(transactionsTable).values({
+        userId,
+        type: "reinvest",
+        amount: pending.toFixed(8),
+        status: "completed",
+        txId: generateTxId(),
+        note: `Reinvested ${pending.toFixed(2)} USDT into ${meta.planName ?? "investment"} #${id}`,
+      });
+
+      return { status: "ok" as const, updated };
+    });
+
+    if (outcome.status === "not_found") { res.status(404).json({ error: "Not found" }); return; }
+    if (outcome.status === "no_earnings") { res.status(400).json({ error: "No earnings", message: "No pending earnings to reinvest" }); return; }
+
+    res.json(computeInvestmentView(outcome.updated, meta.planName ?? "Plan", meta.planMinRoi ?? undefined, meta.planMaxRoi ?? undefined));
+  } catch {
+    res.status(500).json({ error: "Server error", message: "Failed to process reinvestment" });
   }
-
-  const pending = parseFloat(result.inv.pendingEarnings);
-  if (pending <= 0) {
-    res.status(400).json({ error: "No earnings", message: "No pending earnings to reinvest" });
-    return;
-  }
-
-  const newAmount = parseFloat(result.inv.amount) + pending;
-
-  // Only update amount and clear pendingEarnings — totalEarned already tracked by ROI engine
-  const [updated] = await db
-    .update(userInvestmentsTable)
-    .set({
-      amount: newAmount.toFixed(8),
-      pendingEarnings: "0",
-    })
-    .where(eq(userInvestmentsTable.id, id))
-    .returning();
-
-  await db.insert(transactionsTable).values({
-    userId: req.session.userId!,
-    type: "reinvest",
-    amount: pending.toFixed(8),
-    status: "completed",
-    txId: generateTxId(),
-    note: `Reinvested ${pending.toFixed(2)} USDT into ${result.planName ?? "investment"} #${id}`,
-  });
-
-
-  res.json(
-    computeInvestmentView(
-      updated,
-      result.planName ?? "Plan",
-      result.planMinRoi ?? undefined,
-      result.planMaxRoi ?? undefined,
-    ),
-  );
 });
 
 router.post("/investments/:id/compound", requireAuth, async (req, res): Promise<void> => {
