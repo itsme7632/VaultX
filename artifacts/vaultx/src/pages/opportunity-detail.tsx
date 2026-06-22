@@ -1,3 +1,4 @@
+import React from "react";
 import { ArrowRight, Users, Clock, TrendingUp, CheckCircle, Star, BarChart3, Target, Shield, Zap } from "lucide-react";
 import { useGetInvestmentPlans, getGetInvestmentPlansQueryKey } from "@workspace/api-client-react";
 import { useLocation, useParams } from "wouter";
@@ -10,7 +11,20 @@ import { cn } from "@/lib/utils";
 import { formatUSDT } from "@/lib/format";
 import { usePlatformMetrics } from "@/hooks/usePlatformMetrics";
 
-const THEME_GRADIENT: Record<string, string> = {
+const THEME_GRADIENT_CSS: Record<string, string> = {
+  blue:   "linear-gradient(to bottom right, rgb(37 99 235), rgb(67 56 202))",
+  purple: "linear-gradient(to bottom right, rgb(147 51 234), rgb(91 33 182))",
+  green:  "linear-gradient(to bottom right, rgb(16 185 129), rgb(15 118 110))",
+  gold:   "linear-gradient(to bottom right, rgb(245 158 11), rgb(234 88 12))",
+  cyan:   "linear-gradient(to bottom right, rgb(6 182 212), rgb(29 78 216))",
+  rose:   "linear-gradient(to bottom right, rgb(244 63 94), rgb(190 24 93))",
+};
+
+function planGradientStyle(colorTheme?: string): React.CSSProperties {
+  return { background: THEME_GRADIENT_CSS[colorTheme ?? "blue"] ?? THEME_GRADIENT_CSS.blue };
+}
+
+const THEME_GRADIENT_TW: Record<string, string> = {
   blue:   "from-blue-600 to-indigo-700",
   purple: "from-purple-600 to-violet-800",
   green:  "from-emerald-500 to-teal-700",
@@ -20,7 +34,7 @@ const THEME_GRADIENT: Record<string, string> = {
 };
 
 function planGradient(colorTheme?: string) {
-  return THEME_GRADIENT[colorTheme ?? "blue"] ?? "from-blue-600 to-indigo-700";
+  return THEME_GRADIENT_TW[colorTheme ?? "blue"] ?? THEME_GRADIENT_TW.blue;
 }
 
 function planStatusBadge(status?: string) {
@@ -146,7 +160,7 @@ export default function OpportunityDetailPage() {
       <div className="px-4 pt-5 pb-36 space-y-5">
 
         {/* Header card */}
-        <div className={cn("rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br text-white", gradient)}>
+        <div className="rounded-2xl overflow-hidden shadow-lg text-white" style={planGradientStyle(plan?.colorTheme)}>
           {plan.isFeatured && (
             <div className="bg-white/20 px-4 py-2 flex items-center gap-1.5 border-b border-white/20">
               <Star size={11} className="text-amber-300 fill-amber-300" />
