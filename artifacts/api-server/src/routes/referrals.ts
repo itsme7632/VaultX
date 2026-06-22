@@ -86,6 +86,8 @@ function growthPct(current: number, previous: number): number {
 }
 
 // ─── Community / hybrid stats endpoint ───────────────────────────────────────
+// All 7 community widgets (cards, chart, sources, leaderboard) read exclusively
+// from this single endpoint so they always share the same dataset.
 
 router.get("/referrals/community", requireAuth, async (req, res): Promise<void> => {
   const mode = await getSetting("referral_hybrid_mode", "auto");
@@ -169,30 +171,14 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
   const realWeeklyGrowthPct  = growthPct(realWeeklyChart[3],  realWeeklyChart[2]);
   const realMonthlyGrowthPct = growthPct(realMonthlyChart[5], realMonthlyChart[4]);
 
-  // ── Referral source breakdown (from tracked data) ──────────────────────────
-  const sourceRows = await db
-    .select({
-      source: referralsTable.referralSource,
-      total:  count(),
-    })
-    .from(referralsTable)
-    .groupBy(referralsTable.referralSource);
-
-  const sourceTotal = sourceRows.reduce((a, r) => a + Number(r.total), 0);
-  const referralSources = sourceTotal > 0
-    ? sourceRows
-        .map((r) => ({
-          source: r.source ?? "direct",
-          count:  Number(r.total),
-          pct:    Math.round((Number(r.total) / sourceTotal) * 100),
-        }))
-        .sort((a, b) => b.pct - a.pct)
-    : [];
+  // ── Referral source breakdown ──────────────────────────────────────────────
+  // referral_source column is not yet in schema — return empty array so the
+  // frontend falls back to its own display data. Will be populated once the
+  // column is added via migration.
+  const referralSources: { source: string; count: number; pct: number }[] = [];
 
   // ── Server-side audit consistency check ────────────────────────────────────
-  const totalFromRewards = realRewards;
   if (mode !== "disabled") {
-    // In hybrid mode, warn if demo inflation is extreme
     const HYBRID_INFLATION_THRESHOLD = 50;
     if (realTotal > 0 && DEMO_STATS.communityReferrals / realTotal > HYBRID_INFLATION_THRESHOLD) {
       console.warn(
@@ -236,7 +222,6 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
   const activeReferrers     = hasRealData ? realActiveReferrers + DEMO_STATS.activeReferrers : DEMO_STATS.activeReferrers;
   const rewardsDistributed  = hasRealData ? realRewards + DEMO_STATS.rewardsDistributed : DEMO_STATS.rewardsDistributed;
 
-  // Growth: use real if real data exists, else use demo
   const weeklyGrowthPct  = hasRealData ? realWeeklyGrowthPct  : DEMO_STATS.weeklyGrowthPct;
   const monthlyGrowthPct = hasRealData ? realMonthlyGrowthPct : DEMO_STATS.monthlyGrowthPct;
 
@@ -278,7 +263,6 @@ router.get("/referrals/community", requireAuth, async (req, res): Promise<void> 
     referralSources,
     mode,
     isHybrid: true,
-    // Transparency: expose what portion of stats is real
     realStats: {
       referrals:       realTotal,
       activeReferrers: realActiveReferrers,
@@ -422,9 +406,9 @@ router.get("/referrals/history", requireAuth, async (req, res): Promise<void> =>
     };
   });
 
-  // Audit consistency check: total from transactions should match sum of commission amounts
-  const txTotal    = txWithSource.reduce((a, t) => a + t.amount, 0);
-  const refTotal   = referrals.reduce((a, r) => a + parseFloat(r.ref.commissionAmount), 0);
+  // Audit: log when transaction total diverges from referral commission total
+  const txTotal  = txWithSource.reduce((a, t) => a + t.amount, 0);
+  const refTotal = referrals.reduce((a, r) => a + parseFloat(r.ref.commissionAmount), 0);
   if (Math.abs(txTotal - refTotal) > 0.01) {
     console.warn(
       `[Wexora Referral Audit] User #${req.session.userId}: ` +
@@ -440,7 +424,6 @@ router.get("/referrals/history", requireAuth, async (req, res): Promise<void> =>
       totalEarned: parseFloat(row.ref.commissionAmount),
       status: row.ref.status,
       joinedAt: row.ref.createdAt,
-      referralSource: row.ref.referralSource ?? "direct",
     })),
     transactions: txWithSource,
   });

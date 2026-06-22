@@ -24,6 +24,8 @@ async function claimReferralEarnings() {
   return data as { success: boolean; amountClaimed: number };
 }
 
+// ─── Community stats fetch — single endpoint for ALL 7 community widgets ─────
+
 async function fetchCommunity() {
   const res = await fetch("/api/referrals/community", { credentials: "include" });
   if (!res.ok) throw new Error("Failed to load community data");
@@ -130,13 +132,12 @@ export default function ReferralsPage() {
     staleTime: 60000,
   });
 
-  // Client-side consistency audit: log when community stats vs real stats diverge noticeably
+  // Client-side consistency audit: log when community stats vs real stats diverge
   useEffect(() => {
     if (!community || !stats) return;
     const real = community.realStats;
     if (!real) return;
     const personalTotal = (stats as any)?.totalReferrals ?? 0;
-    // If personal referrals exceed the community real count, something is wrong
     if (personalTotal > real.referrals) {
       console.warn(
         `[Wexora Referral Audit] Personal referral count (${personalTotal}) exceeds ` +
@@ -309,7 +310,7 @@ export default function ReferralsPage() {
           {[
             { label: "My Referrals", value: statsLoading ? "…" : (stats as any)?.totalReferrals ?? 0, icon: Users,      color: "text-primary" },
             { label: "Active",       value: statsLoading ? "…" : (stats as any)?.activeReferrals ?? 0, icon: TrendingUp,  color: "text-accent" },
-            { label: "My Earned",   value: statsLoading ? "…" : formatUSDT((stats as any)?.totalEarned ?? 0), icon: DollarSign, color: "text-purple-500" },
+            { label: "My Earned",    value: statsLoading ? "…" : formatUSDT((stats as any)?.totalEarned ?? 0), icon: DollarSign, color: "text-purple-500" },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-card border border-border rounded-xl p-3 text-center shadow-sm">
               <Icon size={16} className={cn("mx-auto mb-1.5", color)} />
@@ -515,6 +516,9 @@ export default function ReferralsPage() {
 
         {/* ══════════════════════════════════════════════════════════
             Tab: Community
+            All 7 widgets read from /api/referrals/community — same
+            dataset guarantees cards, chart, sources & leaderboard
+            are always consistent with each other.
         ═══════════════════════════════════════════════════════════ */}
         {tab === "community" && (
           <div className="space-y-4">
@@ -568,7 +572,7 @@ export default function ReferralsPage() {
               )}
             </div>
 
-            {/* Referral Analytics Charts */}
+            {/* Referral Growth Chart */}
             <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -678,12 +682,12 @@ export default function ReferralsPage() {
                       </div>
                       <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
                         <span className="text-xs font-bold text-purple-600">
-                          {row.username[0].toUpperCase()}
+                          {(row.username?.[0] ?? "?").toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground">
-                          {row.username}
+                          @{row.username}
                           {row.isReal && (
                             <span className="ml-1.5 text-[9px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 rounded-full px-1.5 py-0.5 font-bold">REAL</span>
                           )}
