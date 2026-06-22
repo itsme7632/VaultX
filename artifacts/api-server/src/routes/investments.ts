@@ -70,13 +70,17 @@ function computeInvestmentView(
   const daysRemaining = Math.max(0, Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
   const progressPercent = Math.min(100, Math.max(0, (elapsed / totalDays) * 100));
   const amount = parseFloat(inv.amount);
+  const pendingEarnings = parseFloat(inv.pendingEarnings);
   const dailyRate = parseFloat(inv.dailyReturnRate);
-  // Projections use the locked-in dailyReturnRate, not the plan's current rates.
-  // This ensures projections remain accurate even if admin changes the plan ROI later.
-  const projectedDailyMin = amount * dailyRate;
-  const projectedDailyMax = amount * dailyRate;
-  const projectedTotalMin = projectedDailyMin * totalDays;
-  const projectedTotalMax = projectedDailyMax * totalDays;
+  const minRoiRate = parseFloat(planMinRoi ?? "0.013");
+  const maxRoiRate = parseFloat(planMaxRoi ?? "0.017");
+  // currentValue compounds daily: original amount + unclaimed profits
+  const currentValue = amount + pendingEarnings;
+  // Projections use locked-in dailyReturnRate and currentValue as effective principal
+  const projectedDailyMin = currentValue * minRoiRate;
+  const projectedDailyMax = currentValue * maxRoiRate;
+  const projectedTotalMin = amount * minRoiRate * totalDays;
+  const projectedTotalMax = amount * maxRoiRate * totalDays;
 
   const lastRef = inv.lastEarningAt ? new Date(inv.lastEarningAt) : start;
   const nextPayoutAt = new Date(lastRef.getTime() + 24 * 60 * 60 * 1000);
@@ -86,11 +90,13 @@ function computeInvestmentView(
     planId: inv.planId,
     planName,
     amount,
-    pendingEarnings: parseFloat(inv.pendingEarnings),
+    originalAmount: amount,
+    currentValue,
+    pendingEarnings,
     totalEarned: parseFloat(inv.totalEarned),
     dailyReturnRate: dailyRate,
-    minRoiRate: minRoi,
-    maxRoiRate: maxRoi,
+    minRoiRate,
+    maxRoiRate,
     autoCompound: inv.autoCompound,
     startDate: inv.startDate,
     endDate: inv.endDate,
@@ -347,110 +353,6 @@ router.post("/investments/:id/claim", requireAuth, async (req, res): Promise<voi
   }
 });
 
-router.post("/investments/:id/reinvest", requireAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(raw, 10);
-  const userId = req.session.userId!;
-
-  // Fetch plan metadata outside the transaction (read-only, no lock needed)
-  const [meta] = await db
-    .select({ planName: investmentPlansTable.name, planMinRoi: investmentPlansTable.minRoiRate, planMaxRoi: investmentPlansTable.maxRoiRate })
-    .from(userInvestmentsTable)
-    .leftJoin(investmentPlansTable, eq(userInvestmentsTable.planId, investmentPlansTable.id))
-    .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, userId)))
-    .limit(1);
-
-  if (!meta) { res.status(404).json({ error: "Not found" }); return; }
-
-  try {
-    // Atomic transaction with row-level lock prevents double-reinvest from concurrent requests
-    const outcome = await db.transaction(async (tx) => {
-      const [investment] = await tx
-        .select()
-        .from(userInvestmentsTable)
-        .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, userId)))
-        .for("update")
-        .limit(1);
-
-      if (!investment) return { status: "not_found" as const };
-
-      const pending = parseFloat(investment.pendingEarnings);
-      if (pending <= 0) return { status: "no_earnings" as const };
-
-      const newAmount = parseFloat(investment.amount) + pending;
-
-      const [updated] = await tx
-        .update(userInvestmentsTable)
-        .set({ amount: newAmount.toFixed(8), pendingEarnings: "0" })
-        .where(eq(userInvestmentsTable.id, id))
-        .returning();
-
-      await tx.insert(transactionsTable).values({
-        userId,
-        type: "reinvest",
-        amount: pending.toFixed(8),
-        status: "completed",
-        txId: generateTxId(),
-        note: `Reinvested ${pending.toFixed(2)} USDT into ${meta.planName ?? "investment"} #${id}`,
-      });
-
-      return { status: "ok" as const, updated };
-    });
-
-    if (outcome.status === "not_found") { res.status(404).json({ error: "Not found" }); return; }
-    if (outcome.status === "no_earnings") { res.status(400).json({ error: "No earnings", message: "No pending earnings to reinvest" }); return; }
-
-    res.json(computeInvestmentView(outcome.updated, meta.planName ?? "Plan", meta.planMinRoi ?? undefined, meta.planMaxRoi ?? undefined));
-  } catch {
-    res.status(500).json({ error: "Server error", message: "Failed to process reinvestment" });
-  }
-});
-
-router.post("/investments/:id/compound", requireAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(raw, 10);
-
-  const [result] = await db
-    .select({
-      inv: userInvestmentsTable,
-      planName: investmentPlansTable.name,
-      planMinRoi: investmentPlansTable.minRoiRate,
-      planMaxRoi: investmentPlansTable.maxRoiRate,
-    })
-    .from(userInvestmentsTable)
-    .leftJoin(investmentPlansTable, eq(userInvestmentsTable.planId, investmentPlansTable.id))
-    .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, req.session.userId!)))
-    .limit(1);
-
-  if (!result) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
-
-  const pending = parseFloat(result.inv.pendingEarnings);
-  if (pending <= 0) {
-    res.status(400).json({ error: "No earnings", message: "No pending earnings to compound" });
-    return;
-  }
-
-  const newAmount = parseFloat(result.inv.amount) + pending;
-
-  // Only update amount, clear pending — totalEarned already tracked by ROI engine
-  const [updated] = await db
-    .update(userInvestmentsTable)
-    .set({ amount: newAmount.toFixed(8), pendingEarnings: "0" })
-    .where(eq(userInvestmentsTable.id, id))
-    .returning();
-
-  res.json(
-    computeInvestmentView(
-      updated,
-      result.planName ?? "Plan",
-      result.planMinRoi ?? undefined,
-      result.planMaxRoi ?? undefined,
-    ),
-  );
-});
 
 router.get("/investments/earnings-history", requireAuth, async (req, res): Promise<void> => {
   const { limit = "90" } = req.query as { limit?: string };
@@ -462,7 +364,7 @@ router.get("/investments/earnings-history", requireAuth, async (req, res): Promi
     .where(
       and(
         eq(transactionsTable.userId, userId),
-        inArray(transactionsTable.type, ["earning", "reinvest"]),
+        eq(transactionsTable.type, "earning"),
         eq(transactionsTable.status, "completed"),
       )
     )
@@ -480,41 +382,5 @@ router.get("/investments/earnings-history", requireAuth, async (req, res): Promi
   );
 });
 
-router.post("/investments/:id/toggle-compound", requireAuth, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(raw, 10);
-
-  const [result] = await db
-    .select({
-      inv: userInvestmentsTable,
-      planName: investmentPlansTable.name,
-      planMinRoi: investmentPlansTable.minRoiRate,
-      planMaxRoi: investmentPlansTable.maxRoiRate,
-    })
-    .from(userInvestmentsTable)
-    .leftJoin(investmentPlansTable, eq(userInvestmentsTable.planId, investmentPlansTable.id))
-    .where(and(eq(userInvestmentsTable.id, id), eq(userInvestmentsTable.userId, req.session.userId!)))
-    .limit(1);
-
-  if (!result) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
-
-  const [updated] = await db
-    .update(userInvestmentsTable)
-    .set({ autoCompound: !result.inv.autoCompound })
-    .where(eq(userInvestmentsTable.id, id))
-    .returning();
-
-  res.json(
-    computeInvestmentView(
-      updated,
-      result.planName ?? "Plan",
-      result.planMinRoi ?? undefined,
-      result.planMaxRoi ?? undefined,
-    ),
-  );
-});
 
 export default router;

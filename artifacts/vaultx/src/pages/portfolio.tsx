@@ -1,10 +1,10 @@
 import {
-  TrendingUp, Clock, RefreshCcw, ArrowDownLeft, Calendar, Target,
-  Zap, RotateCcw, CheckCircle, ChevronDown, ChevronUp, ArrowDownRight, BarChart2,
+  TrendingUp, Clock, ArrowDownLeft, Calendar, Target,
+  Zap, RotateCcw, CheckCircle, ChevronDown, ChevronUp, ArrowDownRight, BarChart2, Sparkles,
 } from "lucide-react";
 import {
   useGetUserInvestments, getGetUserInvestmentsQueryKey,
-  useClaimEarnings, useToggleAutoCompound,
+  useClaimEarnings,
   useGetDashboardSummary, getGetDashboardSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -19,22 +19,21 @@ import { cn } from "@/lib/utils";
 import { formatUSDT, formatDate } from "@/lib/format";
 
 function EarningsHistory() {
-  const [open, setOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const { data: history, isLoading } = useQuery({
     queryKey: ["earnings-history"],
     queryFn: () =>
       fetch("/api/investments/earnings-history?limit=90", { credentials: "include" })
         .then((r) => r.json()),
-    enabled: open,
+    enabled: isOpen,
     staleTime: 60000,
   });
 
   const rows: { id: number; type: string; amount: number; note: string; createdAt: string }[] =
     history ?? [];
 
-  const totalClaimed = rows.filter((r) => r.type === "earning").reduce((s, r) => s + r.amount, 0);
-  const totalReinvested = rows.filter((r) => r.type === "reinvest").reduce((s, r) => s + r.amount, 0);
+  const totalClaimed = rows.reduce((s, r) => s + r.amount, 0);
 
   const grouped: Record<string, typeof rows> = {};
   rows.forEach((r) => {
@@ -47,7 +46,7 @@ function EarningsHistory() {
     <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
       <button
         type="button"
-        onClick={() => setOpen((p) => !p)}
+        onClick={() => setIsOpen((p) => !p)}
         className="w-full flex items-center justify-between px-4 py-4 text-left"
       >
         <div className="flex items-center gap-2">
@@ -55,24 +54,18 @@ function EarningsHistory() {
             <BarChart2 size={15} className="text-primary" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-foreground">Distribution History</p>
-            <p className="text-[11px] text-muted-foreground">Day-by-day distribution &amp; reinvest history</p>
+            <p className="text-sm font-semibold text-foreground">Profit History</p>
+            <p className="text-[11px] text-muted-foreground">Day-by-day claimed profit history</p>
           </div>
         </div>
-        {open ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
+        {isOpen ? <ChevronUp size={16} className="text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground" />}
       </button>
 
-      {open && (
+      {isOpen && (
         <div className="border-t border-border">
-          <div className="grid grid-cols-2 gap-px bg-border">
-            <div className="bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3">
-              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Distributions Claimed</p>
-              <p className="font-bold text-emerald-600 text-sm mt-0.5">{formatUSDT(totalClaimed)}</p>
-            </div>
-            <div className="bg-blue-50 dark:bg-blue-950/20 px-4 py-3">
-              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Reinvested</p>
-              <p className="font-bold text-primary text-sm mt-0.5">{formatUSDT(totalReinvested)}</p>
-            </div>
+          <div className="bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3">
+            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Profits Claimed</p>
+            <p className="font-bold text-emerald-600 text-sm mt-0.5">{formatUSDT(totalClaimed)}</p>
           </div>
 
           {isLoading ? (
@@ -82,14 +75,12 @@ function EarningsHistory() {
           ) : rows.length === 0 ? (
             <div className="px-4 py-8 text-center">
               <RotateCcw size={20} className="text-muted-foreground mx-auto mb-2" />
-              <p className="text-xs text-muted-foreground">No distribution history yet</p>
+              <p className="text-xs text-muted-foreground">No profit history yet</p>
             </div>
           ) : (
             <div className="divide-y divide-border max-h-80 overflow-y-auto">
               {Object.entries(grouped).map(([day, dayRows]) => {
-                const dayClaimed = dayRows.filter((r) => r.type === "earning").reduce((s, r) => s + r.amount, 0);
-                const dayReinvested = dayRows.filter((r) => r.type === "reinvest").reduce((s, r) => s + r.amount, 0);
-                const dayTotal = dayClaimed + dayReinvested;
+                const dayTotal = dayRows.reduce((s, r) => s + r.amount, 0);
                 return (
                   <div key={day} className="px-4 py-3">
                     <div className="flex items-center justify-between mb-2">
@@ -99,23 +90,14 @@ function EarningsHistory() {
                     <div className="space-y-1.5">
                       {dayRows.map((r) => (
                         <div key={r.id} className="flex items-center gap-2">
-                          <div className={cn(
-                            "w-5 h-5 rounded-full flex items-center justify-center shrink-0",
-                            r.type === "earning" ? "bg-emerald-100" : "bg-blue-100"
-                          )}>
-                            {r.type === "earning"
-                              ? <ArrowDownRight size={10} className="text-emerald-600" />
-                              : <RefreshCcw size={10} className="text-primary" />
-                            }
+                          <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                            <ArrowDownRight size={10} className="text-emerald-600" />
                           </div>
                           <p className="text-[11px] text-muted-foreground flex-1 min-w-0 truncate">
-                            {r.type === "earning" ? "Distribution Claimed" : "Reinvested"}
-                            {r.note ? ` · ${r.note.replace(/Earnings claimed from |Distributions claimed from |Reinvested .+ into /i, "opp ")}` : ""}
+                            Profit Claimed
+                            {r.note ? ` · ${r.note.replace(/Earnings claimed from investment |Earnings claimed from /i, "opp ")}` : ""}
                           </p>
-                          <p className={cn(
-                            "text-[11px] font-semibold shrink-0",
-                            r.type === "earning" ? "text-emerald-600" : "text-primary"
-                          )}>
+                          <p className="text-[11px] font-semibold shrink-0 text-emerald-600">
                             +{formatUSDT(r.amount)}
                           </p>
                         </div>
@@ -135,7 +117,6 @@ function EarningsHistory() {
 export default function PortfolioPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [reinvesting, setReinvesting] = useState<number | null>(null);
 
   const { data: investments, isLoading } = useGetUserInvestments({
     query: { queryKey: getGetUserInvestmentsQueryKey(), staleTime: 15000, refetchInterval: 30000 },
@@ -146,7 +127,6 @@ export default function PortfolioPage() {
   });
 
   const claim = useClaimEarnings();
-  const toggleCompound = useToggleAutoCompound();
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: getGetUserInvestmentsQueryKey() });
@@ -156,56 +136,22 @@ export default function PortfolioPage() {
 
   const handleClaim = (id: number, amount: number) => {
     if (amount <= 0) {
-      toast({ title: "No distribution yet", description: "Distributions are credited once every 24 hours", variant: "destructive" });
+      toast({ title: "No profit yet", description: "Profits are credited once every 24 hours", variant: "destructive" });
       return;
     }
     claim.mutate({ id }, {
       onSuccess: () => {
-        toast({ title: "Distribution Claimed!", description: `${formatUSDT(amount)} added to your wallet` });
+        toast({ title: "Profit Claimed! 🎉", description: `${formatUSDT(amount)} added to your wallet. Your investment continues compounding.` });
         invalidate();
       },
       onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
     });
   };
 
-  const handleReinvest = async (id: number, amount: number) => {
-    if (amount <= 0) {
-      toast({ title: "No distribution yet", description: "Distributions are credited once every 24 hours", variant: "destructive" });
-      return;
-    }
-    setReinvesting(id);
-    try {
-      const res = await fetch(`/api/investments/${id}/reinvest`, { method: "POST", credentials: "include" });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message ?? "Failed to reinvest");
-      }
-      toast({ title: "Distribution Reinvested!", description: "Distribution added to your investment principal" });
-      invalidate();
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
-    } finally {
-      setReinvesting(null);
-    }
-  };
-
-  const handleToggleAutoReinvest = (id: number, current: boolean) => {
-    toggleCompound.mutate({ id }, {
-      onSuccess: () => {
-        toast({
-          title: current ? "Auto-Reinvest Disabled" : "Auto-Reinvest Enabled",
-          description: current
-            ? "Distributions will accumulate for manual claiming"
-            : "Distributions will automatically reinvest into principal",
-        });
-        invalidate();
-      },
-    });
-  };
-
   const activeInvestments = (investments ?? []).filter((i: any) => i.status === "active");
   const completedInvestments = (investments ?? []).filter((i: any) => i.status !== "active");
-  const totalValue = activeInvestments.reduce((acc: number, i: any) => acc + i.amount, 0);
+  const totalOriginal = activeInvestments.reduce((acc: number, i: any) => acc + i.amount, 0);
+  const totalCurrentValue = activeInvestments.reduce((acc: number, i: any) => acc + (i.currentValue ?? i.amount + i.pendingEarnings), 0);
   const totalPending = activeInvestments.reduce((acc: number, i: any) => acc + i.pendingEarnings, 0);
   const totalEarned = (investments ?? []).reduce((acc: number, i: any) => acc + i.totalEarned, 0);
 
@@ -216,10 +162,10 @@ export default function PortfolioPage() {
         {/* Summary grid */}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Active Capital", val: formatUSDT(totalValue), sub: `${activeInvestments.length} opportunit${activeInvestments.length !== 1 ? "ies" : "y"}`, color: "text-primary" },
-            { label: "Available Distribution", val: formatUSDT(totalPending), sub: "Ready to claim", color: "text-emerald-600" },
-            { label: "Total Distributions", val: formatUSDT(totalEarned), sub: "All time received", color: "text-purple-600" },
-            { label: "Today's Distribution", val: formatUSDT(summary?.dailyEarnings ?? 0), sub: "Est. per day", color: "text-amber-600" },
+            { label: "Original Capital", val: formatUSDT(totalOriginal), sub: `${activeInvestments.length} opportunit${activeInvestments.length !== 1 ? "ies" : "y"}`, color: "text-primary" },
+            { label: "Current Value", val: formatUSDT(totalCurrentValue), sub: "Incl. compounded profits", color: "text-blue-600" },
+            { label: "Available Profit", val: formatUSDT(totalPending), sub: "Ready to claim", color: "text-emerald-600" },
+            { label: "Total Earned", val: formatUSDT(totalEarned), sub: "All time profits", color: "text-purple-600" },
           ].map(({ label, val, sub, color }) => (
             <div key={label} className="bg-card border border-border rounded-xl p-3.5 shadow-sm">
               <p className="text-[11px] text-muted-foreground font-medium">{label}</p>
@@ -231,15 +177,17 @@ export default function PortfolioPage() {
 
         {/* Active opportunities */}
         {isLoading ? (
-          <div className="space-y-4">{[1, 2].map((i) => <Skeleton key={i} className="h-72 rounded-2xl" />)}</div>
+          <div className="space-y-4">{[1, 2].map((i) => <Skeleton key={i} className="h-80 rounded-2xl" />)}</div>
         ) : activeInvestments.length > 0 ? (
           <div className="space-y-4">
             <h3 className="font-semibold text-sm text-foreground">Your Active Opportunities</h3>
             {activeInvestments.map((inv: any) => {
               const minRoi = inv.minRoiRate ?? 0.013;
               const maxRoi = inv.maxRoiRate ?? 0.017;
-              const avgDailyEst = inv.amount * ((minRoi + maxRoi) / 2);
+              const currentValue = inv.currentValue ?? (inv.amount + inv.pendingEarnings);
+              const avgDailyEst = currentValue * ((minRoi + maxRoi) / 2);
               const hasPending = inv.pendingEarnings > 0;
+              const profitGrowth = inv.amount > 0 ? ((currentValue - inv.amount) / inv.amount) * 100 : 0;
 
               return (
                 <div key={inv.id} className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
@@ -261,30 +209,49 @@ export default function PortfolioPage() {
                   </div>
 
                   <div className="p-4 space-y-4">
-                    {/* Stats grid */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <div className="bg-muted/40 border border-border rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Capital Allocated</p>
-                        <p className="font-bold text-foreground text-sm mt-1">{formatUSDT(inv.amount)}</p>
+
+                    {/* Investment value breakdown */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-muted/40 border border-border rounded-xl p-2.5">
+                        <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wide">Original</p>
+                        <p className="font-bold text-foreground text-xs mt-1">{formatUSDT(inv.amount)}</p>
                       </div>
-                      <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800 rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Live Distribution</p>
+                      <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800 rounded-xl p-2.5">
+                        <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wide">Current Value</p>
+                        <p className="font-bold text-blue-600 text-xs mt-1">{formatUSDT(currentValue)}</p>
+                      </div>
+                      <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800 rounded-xl p-2.5">
+                        <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-wide">Available</p>
                         <div className="mt-1">
                           <LiveCounter
                             pendingEarnings={inv.pendingEarnings}
                             dailyRate={inv.dailyReturnRate}
-                            principal={inv.amount}
+                            principal={currentValue}
                             lastEarningAt={inv.lastEarningAt ?? null}
                             startDate={inv.startDate}
                           />
                         </div>
                       </div>
+                    </div>
+
+                    {/* Profit growth banner */}
+                    {profitGrowth > 0 && (
+                      <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl px-3.5 py-2">
+                        <Sparkles size={13} className="text-emerald-500 shrink-0" />
+                        <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">
+                          +{profitGrowth.toFixed(2)}% growth · Your profits are compounding automatically
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Stats grid */}
+                    <div className="grid grid-cols-2 gap-2.5">
                       <div className="bg-muted/40 border border-border rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Distributions</p>
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Total Earned</p>
                         <p className="font-semibold text-primary text-sm mt-1">{formatUSDT(inv.totalEarned)}</p>
                       </div>
                       <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3">
-                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Est. Daily Dist.</p>
+                        <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">Est. Daily Profit</p>
                         <p className="font-semibold text-amber-600 text-sm mt-1">{formatUSDT(avgDailyEst)}</p>
                       </div>
                     </div>
@@ -293,7 +260,7 @@ export default function PortfolioPage() {
                     <div className="flex items-center justify-between bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800 rounded-xl px-3.5 py-2.5">
                       <div className="flex items-center gap-2">
                         <Clock size={13} className="text-primary shrink-0" />
-                        <p className="text-xs text-muted-foreground">Next Distribution</p>
+                        <p className="text-xs text-muted-foreground">Next Profit Credit</p>
                       </div>
                       <PayoutCountdown nextPayoutAt={inv.nextPayoutAt} />
                     </div>
@@ -339,72 +306,31 @@ export default function PortfolioPage() {
                       <Zap size={16} className="text-primary/40" />
                     </div>
 
-                    {/* Auto-reinvest toggle */}
-                    <div className="flex items-center justify-between py-3 px-3.5 bg-muted/40 border border-border rounded-xl">
-                      <div className="flex-1 min-w-0 mr-3">
-                        <p className="text-xs font-semibold text-foreground">Auto-Reinvest</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {inv.autoCompound ? "Returns reinvest daily automatically" : "Returns accumulate for manual claiming"}
+                    {/* Single Claim Profit button */}
+                    <Button
+                      className={cn(
+                        "w-full h-12 text-sm font-semibold gap-2 rounded-xl",
+                        hasPending
+                          ? "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white"
+                          : "bg-muted text-muted-foreground opacity-60",
+                      )}
+                      onClick={() => handleClaim(inv.id, inv.pendingEarnings)}
+                      disabled={claim.isPending || !hasPending}
+                    >
+                      <ArrowDownLeft size={16} />
+                      {claim.isPending ? "Claiming…" : hasPending ? `Claim ${formatUSDT(inv.pendingEarnings)} Profit` : "Awaiting Next Profit Credit"}
+                    </Button>
+
+                    {/* Compounding notice */}
+                    <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800 rounded-xl px-3.5 py-2.5">
+                      <div className="flex items-start gap-2">
+                        <TrendingUp size={12} className="text-blue-500 mt-0.5 shrink-0" />
+                        <p className="text-[11px] text-blue-700 dark:text-blue-400 leading-relaxed">
+                          Your unclaimed profits compound daily — the longer you wait to claim, the larger your daily profit grows. Claiming resets your base to the original investment amount.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={inv.autoCompound}
-                        onClick={() => handleToggleAutoReinvest(inv.id, inv.autoCompound)}
-                        className={cn(
-                          "relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none",
-                          inv.autoCompound ? "bg-emerald-500" : "bg-muted-foreground/30",
-                        )}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={cn(
-                            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                            inv.autoCompound ? "translate-x-5" : "translate-x-0",
-                          )}
-                        />
-                      </button>
                     </div>
 
-                    {/* Claim / Reinvest buttons */}
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className={cn(
-                          "h-11 text-xs font-semibold gap-1.5 rounded-xl",
-                          hasPending
-                            ? "border-emerald-300 text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100"
-                            : "border-border text-muted-foreground opacity-60",
-                        )}
-                        onClick={() => handleClaim(inv.id, inv.pendingEarnings)}
-                        disabled={claim.isPending}
-                      >
-                        <ArrowDownLeft size={14} />
-                        Claim Distribution
-                      </Button>
-                      <Button
-                        size="sm"
-                        className={cn(
-                          "h-11 text-xs font-semibold gap-1.5 rounded-xl",
-                          hasPending
-                            ? "bg-primary hover:bg-primary/90 active:bg-primary/80"
-                            : "bg-muted text-muted-foreground opacity-60",
-                        )}
-                        onClick={() => handleReinvest(inv.id, inv.pendingEarnings)}
-                        disabled={reinvesting === inv.id}
-                      >
-                        <RefreshCcw size={14} className={reinvesting === inv.id ? "animate-spin" : ""} />
-                        {reinvesting === inv.id ? "Reinvesting…" : "Reinvest Distribution"}
-                      </Button>
-                    </div>
-
-                    {!hasPending && (
-                      <p className="text-center text-[11px] text-muted-foreground -mt-1">
-                        Distributions credited every 24 hours — keep growing!
-                      </p>
-                    )}
                   </div>
                 </div>
               );
@@ -420,7 +346,7 @@ export default function PortfolioPage() {
           </div>
         ) : null}
 
-        {/* Returns Breakdown */}
+        {/* Profit History */}
         <EarningsHistory />
 
         {/* Completed */}
@@ -436,7 +362,7 @@ export default function PortfolioPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground">{inv.planName}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatUSDT(inv.amount)} allocated · {formatUSDT(inv.totalEarned)} distributed
+                      {formatUSDT(inv.amount)} invested · {formatUSDT(inv.totalEarned)} earned
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-0.5">
                       {formatDate(inv.startDate)} – {formatDate(inv.endDate)}

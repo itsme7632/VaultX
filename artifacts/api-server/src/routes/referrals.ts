@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, count, sum, and, sql, gte } from "drizzle-orm";
-import { db, usersTable, referralsTable, walletsTable, transactionsTable, notificationsTable, platformSettingsTable } from "@workspace/db";
+import { db, usersTable, referralsTable, walletsTable, transactionsTable, notificationsTable, platformSettingsTable, referralSalaryTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
 
@@ -443,6 +443,56 @@ router.get("/referrals/history", requireAuth, async (req, res): Promise<void> =>
       joinedAt: row.ref.createdAt,
     })),
     transactions: txWithSource,
+  });
+});
+
+// ─── Referral Salary – user-facing ───────────────────────────────────────────
+
+router.get("/referrals/salary", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.session.userId!;
+  const [record] = await db
+    .select()
+    .from(referralSalaryTable)
+    .where(eq(referralSalaryTable.userId, userId))
+    .limit(1);
+
+  const [
+    enabled,
+    t1Vol,
+    t1Amt,
+    t2Vol,
+    t2Amt,
+  ] = await Promise.all([
+    getSetting("salary_program_enabled", "true"),
+    getSetting("salary_tier1_volume", "1500"),
+    getSetting("salary_tier1_amount", "100"),
+    getSetting("salary_tier2_volume", "3500"),
+    getSetting("salary_tier2_amount", "300"),
+  ]);
+
+  // Calculate current referral investment volume for this user
+  const volumeRows = await db.execute(
+    sql`SELECT COALESCE(SUM(CAST(ui.amount AS numeric)), 0) as volume
+        FROM referrals r
+        JOIN user_investments ui ON ui.user_id = r.referred_id AND ui.status = 'active'
+        WHERE r.referrer_id = ${userId}`
+  );
+  const currentVolume = parseFloat((volumeRows.rows[0] as any)?.volume ?? "0");
+
+  res.json({
+    programEnabled: enabled === "true",
+    currentVolume,
+    tiers: [
+      { tier: 1, requiredVolume: parseFloat(t1Vol), monthlySalary: parseFloat(t1Amt) },
+      { tier: 2, requiredVolume: parseFloat(t2Vol), monthlySalary: parseFloat(t2Amt) },
+    ],
+    currentTier: record?.currentTier ?? null,
+    monthlySalary: parseFloat(record?.monthlySalary ?? "0"),
+    nextPaymentDate: record?.nextPaymentDate ?? null,
+    totalSalaryPaid: parseFloat(record?.totalSalaryPaid ?? "0"),
+    isActive: record?.isActive ?? false,
+    qualifies1: currentVolume >= parseFloat(t1Vol),
+    qualifies2: currentVolume >= parseFloat(t2Vol),
   });
 });
 

@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq" | "referral-salary";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -110,6 +110,8 @@ export default function AdminPage() {
   const { data: aboutData, refetch: refetchAbout } = useQuery({ queryKey: ["admin-about"], queryFn: () => adminApi("/admin/about"), staleTime: 30000, enabled: tab === "about" });
   const { data: statisticsData, refetch: refetchStatistics } = useQuery({ queryKey: ["admin-statistics"], queryFn: () => adminApi("/admin/statistics"), staleTime: 30000, enabled: tab === "statistics" });
   const { data: ticketsData, refetch: refetchTickets } = useQuery({ queryKey: ["admin-tickets"], queryFn: () => adminApi("/support/tickets"), staleTime: 15000, enabled: tab === "tickets" });
+  const { data: salaryData, refetch: refetchSalary } = useQuery({ queryKey: ["admin-salary"], queryFn: () => adminApi("/admin/referral-salary"), staleTime: 30000, enabled: tab === "referral-salary" });
+  const { data: salarySettings, refetch: refetchSalarySettings } = useQuery({ queryKey: ["admin-salary-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "referral-salary" });
 
   const approveKyc = useAdminApproveKyc();
   const rejectKyc = useAdminRejectKyc();
@@ -313,6 +315,7 @@ export default function AdminPage() {
     { id: "settings", label: "Settings", icon: Settings },
     { id: "logs", label: "Logs", icon: FileText },
     { id: "faq" as Tab, label: "FAQ", icon: MessageSquare },
+    { id: "referral-salary" as Tab, label: "Referral Salary", icon: DollarSign },
   ];
 
   const STAT_CARDS = analytics ? [
@@ -1194,6 +1197,16 @@ export default function AdminPage() {
           )}
 
           {/* PERFORMANCE ADMIN */}
+          {/* REFERRAL SALARY */}
+          {tab === "referral-salary" && (
+            <ReferralSalaryTab
+              salaryData={salaryData as any[]}
+              salarySettings={salarySettings as Record<string, string>}
+              toast={toast}
+              onRefresh={() => { refetchSalary(); refetchSalarySettings(); }}
+            />
+          )}
+
           {tab === "performance" && (
             <div className="space-y-3">
               <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-2">
@@ -2920,6 +2933,230 @@ interface FaqItem {
 }
 
 const BLANK_FAQ = { question: "", answer: "", category: "General", isActive: true, sortOrder: 0 };
+
+function ReferralSalaryTab({ salaryData, salarySettings, toast, onRefresh }: {
+  salaryData: any[];
+  salarySettings: Record<string, string>;
+  toast: any;
+  onRefresh: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [overrideModal, setOverrideModal] = useState<any | null>(null);
+  const [overrideTier, setOverrideTier] = useState("");
+  const [overrideSalary, setOverrideSalary] = useState("");
+  const [overrideNotes, setOverrideNotes] = useState("");
+  const [settingsForm, setSettingsForm] = useState({
+    enabled: salarySettings?.salary_program_enabled !== "false",
+    tier1Volume: salarySettings?.salary_tier1_volume ?? "1500",
+    tier1Amount: salarySettings?.salary_tier1_amount ?? "100",
+    tier2Volume: salarySettings?.salary_tier2_volume ?? "3500",
+    tier2Amount: salarySettings?.salary_tier2_amount ?? "300",
+  });
+
+  useEffect(() => {
+    if (!salarySettings) return;
+    setSettingsForm({
+      enabled: salarySettings.salary_program_enabled !== "false",
+      tier1Volume: salarySettings.salary_tier1_volume ?? "1500",
+      tier1Amount: salarySettings.salary_tier1_amount ?? "100",
+      tier2Volume: salarySettings.salary_tier2_volume ?? "3500",
+      tier2Amount: salarySettings.salary_tier2_amount ?? "300",
+    });
+  }, [salarySettings]);
+
+  const saveSettings = async () => {
+    setSaving(true);
+    try {
+      await adminApi("/admin/referral-salary/settings", "PUT", {
+        enabled: settingsForm.enabled,
+        tier1Volume: settingsForm.tier1Volume,
+        tier1Amount: settingsForm.tier1Amount,
+        tier2Volume: settingsForm.tier2Volume,
+        tier2Amount: settingsForm.tier2Amount,
+      });
+      toast({ title: "Salary settings saved" });
+      onRefresh();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const recalculate = async () => {
+    setRecalculating(true);
+    try {
+      const r = await adminApi("/admin/referral-salary/recalculate", "POST");
+      toast({ title: "Recalculation complete", description: `Updated: ${r.updated} · Paid: ${r.paid}` });
+      onRefresh();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message, variant: "destructive" });
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
+  const saveOverride = async () => {
+    if (!overrideModal) return;
+    try {
+      await adminApi(`/admin/referral-salary/${overrideModal.userId}/override`, "PUT", {
+        tier: overrideTier ? parseInt(overrideTier) : null,
+        salary: overrideSalary || null,
+        notes: overrideNotes || null,
+      });
+      toast({ title: "Override saved" });
+      setOverrideModal(null);
+      onRefresh();
+    } catch (e: any) {
+      toast({ title: "Error", description: e?.message, variant: "destructive" });
+    }
+  };
+
+  const records: any[] = salaryData ?? [];
+  const activeCount = records.filter((r) => r.isActive).length;
+  const totalMonthly = records.filter((r) => r.isActive).reduce((s: number, r: any) => s + r.monthlySalary, 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Active Recipients", val: activeCount, color: "text-emerald-600" },
+          { label: "Monthly Liability", val: formatUSDT(totalMonthly), color: "text-amber-600" },
+          { label: "Total Participants", val: records.length, color: "text-primary" },
+        ].map(({ label, val, color }) => (
+          <div key={label} className="bg-card border border-border rounded-xl p-3 text-center shadow-sm">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+            <p className={cn("font-bold text-base mt-1", color)}>{val}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Settings */}
+      <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="font-semibold text-sm text-foreground">Salary Program Settings</p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{settingsForm.enabled ? "Enabled" : "Disabled"}</span>
+            <Switch checked={settingsForm.enabled} onCheckedChange={(v) => setSettingsForm((f) => ({ ...f, enabled: v }))} />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs font-medium text-foreground mb-1">Tier 1 Volume (USDT)</p>
+            <Input value={settingsForm.tier1Volume} onChange={(e) => setSettingsForm((f) => ({ ...f, tier1Volume: e.target.value }))} placeholder="1500" className="h-9 text-sm" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-foreground mb-1">Tier 1 Monthly Salary</p>
+            <Input value={settingsForm.tier1Amount} onChange={(e) => setSettingsForm((f) => ({ ...f, tier1Amount: e.target.value }))} placeholder="100" className="h-9 text-sm" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-foreground mb-1">Tier 2 Volume (USDT)</p>
+            <Input value={settingsForm.tier2Volume} onChange={(e) => setSettingsForm((f) => ({ ...f, tier2Volume: e.target.value }))} placeholder="3500" className="h-9 text-sm" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-foreground mb-1">Tier 2 Monthly Salary</p>
+            <Input value={settingsForm.tier2Amount} onChange={(e) => setSettingsForm((f) => ({ ...f, tier2Amount: e.target.value }))} placeholder="300" className="h-9 text-sm" />
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" className="flex-1 h-9 text-xs" onClick={saveSettings} disabled={saving}>
+            {saving ? "Saving…" : "Save Settings"}
+          </Button>
+          <Button size="sm" variant="outline" className="flex-1 h-9 text-xs gap-1.5" onClick={recalculate} disabled={recalculating}>
+            <RefreshCw size={12} className={recalculating ? "animate-spin" : ""} />
+            {recalculating ? "Recalculating…" : "Recalculate All"}
+          </Button>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3">
+          <p className="text-xs text-blue-700 dark:text-blue-400 leading-relaxed">
+            <strong>How it works:</strong> Tier 1 requires referrals with ≥{settingsForm.tier1Volume} USDT active investment volume → earns {settingsForm.tier1Amount} USDT/month. Tier 2 requires ≥{settingsForm.tier2Volume} USDT volume → earns {settingsForm.tier2Amount} USDT/month. Recalculated daily by the ROI engine.
+          </p>
+        </div>
+      </div>
+
+      {/* Records list */}
+      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <p className="font-semibold text-sm text-foreground">Salary Recipients</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Sorted by referral investment volume</p>
+        </div>
+        {records.length === 0 ? (
+          <div className="py-10 text-center">
+            <DollarSign size={24} className="text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">No salary records yet — run Recalculate All to populate</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {records.map((r: any) => (
+              <div key={r.userId} className="px-4 py-3 flex items-center gap-3">
+                <div className={cn(
+                  "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold",
+                  r.isActive ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"
+                )}>
+                  {r.isActive ? `T${r.currentTier}` : "—"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground">@{r.username}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {formatUSDT(r.currentVolume)} vol · {r.isActive ? `${formatUSDT(r.monthlySalary)}/mo` : "Not qualified"}
+                    {r.nextPaymentDate && r.isActive ? ` · Next: ${formatDate(r.nextPaymentDate)}` : ""}
+                  </p>
+                  {r.notes && <p className="text-[10px] text-amber-600 mt-0.5">{r.notes}</p>}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs font-semibold text-foreground">{formatUSDT(r.totalSalaryPaid)}</p>
+                  <p className="text-[10px] text-muted-foreground">total paid</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs shrink-0"
+                  onClick={() => {
+                    setOverrideModal(r);
+                    setOverrideTier(r.currentTier ? String(r.currentTier) : "");
+                    setOverrideSalary(r.monthlySalary ? String(r.monthlySalary) : "");
+                    setOverrideNotes(r.notes ?? "");
+                  }}
+                >
+                  Edit
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Override Modal */}
+      <Dialog open={overrideModal !== null} onOpenChange={(o) => { if (!o) setOverrideModal(null); }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Override: @{overrideModal?.username}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Tier (1 or 2, blank to remove)</Label>
+              <Input value={overrideTier} onChange={(e) => setOverrideTier(e.target.value)} placeholder="Leave blank to remove" className="h-9 mt-1 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs">Monthly Salary (USDT)</Label>
+              <Input value={overrideSalary} onChange={(e) => setOverrideSalary(e.target.value)} placeholder="Custom amount" className="h-9 mt-1 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs">Notes (visible to admin only)</Label>
+              <Input value={overrideNotes} onChange={(e) => setOverrideNotes(e.target.value)} placeholder="e.g. Manual override" className="h-9 mt-1 text-sm" />
+            </div>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1 h-9 text-sm" onClick={() => setOverrideModal(null)}>Cancel</Button>
+            <Button className="flex-1 h-9 text-sm" onClick={saveOverride}>Save Override</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 function FaqTab({ toast }: { toast: any }) {
   const queryClient = useQueryClient();

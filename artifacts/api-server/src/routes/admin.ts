@@ -14,6 +14,7 @@ import {
   platformSettingsTable,
   adminActionLogsTable,
   withdrawalAddressesTable,
+  referralSalaryTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -1113,6 +1114,90 @@ router.post("/admin/roi/trigger", requireAdmin, async (req, res): Promise<void> 
   } catch (err: any) {
     res.status(500).json({ error: "ROI processing failed", message: err?.message ?? String(err) });
   }
+});
+
+// ── Referral Salary Admin ─────────────────────────────────────────────────────
+
+router.get("/admin/referral-salary", requireAdmin, async (req, res): Promise<void> => {
+  const records = await db
+    .select({
+      salary: referralSalaryTable,
+      username: usersTable.username,
+      email: usersTable.email,
+    })
+    .from(referralSalaryTable)
+    .leftJoin(usersTable, eq(referralSalaryTable.userId, usersTable.id))
+    .orderBy(desc(referralSalaryTable.currentVolume));
+
+  res.json(records.map((r) => ({
+    id: r.salary.id,
+    userId: r.salary.userId,
+    username: r.username ?? "Unknown",
+    email: r.email ?? "",
+    currentVolume: parseFloat(r.salary.currentVolume),
+    currentTier: r.salary.currentTier,
+    monthlySalary: parseFloat(r.salary.monthlySalary),
+    nextPaymentDate: r.salary.nextPaymentDate,
+    totalSalaryPaid: parseFloat(r.salary.totalSalaryPaid),
+    isActive: r.salary.isActive,
+    lastCalculatedAt: r.salary.lastCalculatedAt,
+    notes: r.salary.notes,
+  })));
+});
+
+router.post("/admin/referral-salary/recalculate", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const { processReferralSalary } = await import("../lib/roi-engine");
+    const result = await processReferralSalary();
+    res.json({ success: true, updated: result.updated, paid: result.paid });
+  } catch (err: any) {
+    res.status(500).json({ error: "Recalculation failed", message: err?.message ?? String(err) });
+  }
+});
+
+router.put("/admin/referral-salary/settings", requireAdmin, async (req, res): Promise<void> => {
+  const { enabled, tier1Volume, tier1Amount, tier2Volume, tier2Amount } = req.body;
+  const updates: Record<string, string> = {};
+  if (enabled !== undefined) updates["salary_program_enabled"] = String(enabled);
+  if (tier1Volume !== undefined) updates["salary_tier1_volume"] = String(tier1Volume);
+  if (tier1Amount !== undefined) updates["salary_tier1_amount"] = String(tier1Amount);
+  if (tier2Volume !== undefined) updates["salary_tier2_volume"] = String(tier2Volume);
+  if (tier2Amount !== undefined) updates["salary_tier2_amount"] = String(tier2Amount);
+
+  for (const [key, value] of Object.entries(updates)) {
+    await db.insert(platformSettingsTable).values({ key, value })
+      .onConflictDoUpdate({ target: platformSettingsTable.key, set: { value, updatedAt: new Date() } });
+  }
+  res.json({ success: true });
+});
+
+router.put("/admin/referral-salary/:userId/override", requireAdmin, async (req, res): Promise<void> => {
+  const userId = parseInt(req.params.userId, 10);
+  const { tier, salary, notes } = req.body;
+
+  const existing = await db.select().from(referralSalaryTable).where(eq(referralSalaryTable.userId, userId)).limit(1);
+
+  if (existing.length === 0) {
+    await db.insert(referralSalaryTable).values({
+      userId,
+      currentTier: tier ?? null,
+      monthlySalary: salary ? String(salary) : "0",
+      isActive: tier !== null && tier !== undefined,
+      notes: notes ?? null,
+    });
+  } else {
+    await db.update(referralSalaryTable)
+      .set({
+        currentTier: tier ?? null,
+        monthlySalary: salary ? String(salary) : "0",
+        isActive: tier !== null && tier !== undefined,
+        notes: notes ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(referralSalaryTable.userId, userId));
+  }
+
+  res.json({ success: true });
 });
 
 router.get("/admin/settings", requireAdmin, async (req, res): Promise<void> => {

@@ -16,3 +16,4 @@ export * from "./admin-action-logs";
 export * from "./app_releases";
 export * from "./faqs";
 export * from "./withdrawal_addresses";
+export * from "./referral_salary";
