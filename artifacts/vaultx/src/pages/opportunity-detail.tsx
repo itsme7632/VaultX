@@ -97,8 +97,8 @@ export default function OpportunityDetailPage() {
 
   const gradient = planGradient(plan?.colorTheme);
   const category = plan?.category ?? "Strategic Capital";
-  const minRoi = plan?.minRoiRate ?? 0.025;
-  const maxRoi = plan?.maxRoiRate ?? 0.030;
+  const minRoi = plan?.minRoiRate ?? 0.013;
+  const maxRoi = plan?.maxRoiRate ?? 0.017;
   const sb = planStatusBadge(plan?.status);
 
   // Use canonical platform-metrics values (same source as opportunity cards)

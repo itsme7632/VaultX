@@ -45,8 +45,8 @@ export default function InvestPage() {
   const balance = wallet?.balance ?? 0;
   const amountNum = parseFloat(amount) || 0;
 
-  const minRoi = (plan?.minRoiRate as number) ?? 0.025;
-  const maxRoi = (plan?.maxRoiRate as number) ?? 0.030;
+  const minRoi = (plan?.minRoiRate as number) ?? 0.013;
+  const maxRoi = (plan?.maxRoiRate as number) ?? 0.017;
   const avgRoi = (minRoi + maxRoi) / 2;
   const dailyMin = plan ? amountNum * minRoi : 0;
   const dailyMax = plan ? amountNum * maxRoi : 0;

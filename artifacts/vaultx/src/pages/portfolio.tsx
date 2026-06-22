@@ -236,8 +236,8 @@ export default function PortfolioPage() {
           <div className="space-y-4">
             <h3 className="font-semibold text-sm text-foreground">Your Active Opportunities</h3>
             {activeInvestments.map((inv: any) => {
-              const minRoi = inv.minRoiRate ?? 0.025;
-              const maxRoi = inv.maxRoiRate ?? 0.030;
+              const minRoi = inv.minRoiRate ?? 0.013;
+              const maxRoi = inv.maxRoiRate ?? 0.017;
               const avgDailyEst = inv.amount * ((minRoi + maxRoi) / 2);
               const hasPending = inv.pendingEarnings > 0;
 

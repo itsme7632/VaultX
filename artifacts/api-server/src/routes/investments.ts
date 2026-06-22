@@ -29,8 +29,8 @@ function serializePlan(p: typeof investmentPlansTable.$inferSelect, stats?: { to
     minAmount: parseFloat(p.minAmount),
     maxAmount: parseFloat(p.maxAmount),
     dailyReturnRate: parseFloat(p.dailyReturnRate),
-    minRoiRate: parseFloat(p.minRoiRate ?? "0.025"),
-    maxRoiRate: parseFloat(p.maxRoiRate ?? "0.030"),
+    minRoiRate: parseFloat(p.minRoiRate ?? "0.013"),
+    maxRoiRate: parseFloat(p.maxRoiRate ?? "0.017"),
     durationDays: p.durationDays,
     riskLevel: p.riskLevel,
     features: p.features ?? [],
@@ -247,7 +247,7 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
   endDate.setDate(endDate.getDate() + plan.durationDays);
 
   const midRoi =
-    (parseFloat(plan.minRoiRate ?? "0.025") + parseFloat(plan.maxRoiRate ?? "0.030")) / 2;
+    (parseFloat(plan.minRoiRate ?? "0.013") + parseFloat(plan.maxRoiRate ?? "0.017")) / 2;
 
   const [investment] = await db
     .insert(userInvestmentsTable)

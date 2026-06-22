@@ -913,7 +913,7 @@ export default function AdminPage() {
               </div>
 
               <div className="flex gap-2">
-                <Button className="flex-1 h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.025, maxRoiRate: 0.030, durationDays: 30, features: [], isActive: true, isFeatured: false, isPopular: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompoundAvailable: false, fundingGoal: null, currentFunding: 0, totalParticipantLimit: null })}>
+                <Button className="flex-1 h-10 text-sm" onClick={() => setPlanModal({ name: "", description: "", category: "", minAmount: "", maxAmount: "", minRoiRate: 0.013, maxRoiRate: 0.017, durationDays: 30, features: [], isActive: true, isFeatured: false, isPopular: false, status: "active", colorTheme: "blue", sortOrder: 0, autoCompoundAvailable: false, fundingGoal: null, currentFunding: 0, totalParticipantLimit: null })}>
                   <Plus size={15} className="mr-1.5" />Add Opportunity
                 </Button>
                 {plans?.length > 0 && (
@@ -1492,8 +1492,8 @@ export default function AdminPage() {
                 { label: "Category", field: "category", type: "text", placeholder: "e.g. Digital Assets" },
                 { label: "Min Amount (USDT)", field: "minAmount", type: "number", placeholder: "100" },
                 { label: "Max Amount (USDT)", field: "maxAmount", type: "number", placeholder: "10000" },
-                { label: "Min Daily ROI (e.g. 0.025)", field: "minRoiRate", type: "number", placeholder: "0.025" },
-                { label: "Max Daily ROI (e.g. 0.030)", field: "maxRoiRate", type: "number", placeholder: "0.030" },
+                { label: "Min Daily ROI (e.g. 0.013)", field: "minRoiRate", type: "number", placeholder: "0.013" },
+                { label: "Max Daily ROI (e.g. 0.017)", field: "maxRoiRate", type: "number", placeholder: "0.017" },
                 { label: "Duration (days)", field: "durationDays", type: "number", placeholder: "30" },
                 { label: "Sort Order", field: "sortOrder", type: "number", placeholder: "0" },
                 { label: "Banner URL (optional)", field: "bannerImageUrl", type: "text", placeholder: "https://..." },

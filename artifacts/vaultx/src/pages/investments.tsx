@@ -411,8 +411,8 @@ export default function InvestmentsPage() {
                 // 5. Newest first
                 return b.id - a.id;
               }).map((plan: any) => {
-                const minRoi = plan.minRoiRate ?? 0.025;
-                const maxRoi = plan.maxRoiRate ?? 0.030;
+                const minRoi = plan.minRoiRate ?? 0.013;
+                const maxRoi = plan.maxRoiRate ?? 0.017;
                 const gradient = planGradient(plan.colorTheme);
                 const category = plan.category ?? "Strategic Capital";
                 const rawBadge = badges[plan.id] ?? null;
@@ -654,7 +654,7 @@ export default function InvestmentsPage() {
                       <div>
                         <p className="text-xs text-muted-foreground">Daily ROI</p>
                         <p className="font-semibold text-primary text-sm">
-                          {((inv.minRoiRate ?? 0.025) * 100).toFixed(1)}% – {((inv.maxRoiRate ?? 0.030) * 100).toFixed(1)}%
+                          {((inv.minRoiRate ?? 0.013) * 100).toFixed(1)}% – {((inv.maxRoiRate ?? 0.017) * 100).toFixed(1)}%
                         </p>
                       </div>
                       <div>

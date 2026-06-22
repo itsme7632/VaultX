@@ -33,14 +33,14 @@ function getOpportunities() {
     {
       name: "Digital Asset Allocation",
       description: "A diversified approach to digital asset investment, allocating capital across top-tier crypto assets for steady, low-risk daily returns.",
-      minAmount: "500.00000000",
+      minAmount: "100.00000000",
       maxAmount: "9999.00000000",
-      dailyReturnRate: "0.027500",
-      minRoiRate: "0.025000",
-      maxRoiRate: "0.030000",
+      dailyReturnRate: "0.015000",
+      minRoiRate: "0.013000",
+      maxRoiRate: "0.017000",
       durationDays: 30,
       riskLevel: "low",
-      features: ["Daily ROI 2.5%–3.0%", "30-day term", "Auto-compounding available", "Instant activation", "24/7 support"],
+      features: ["Daily ROI 1.3%–1.7%", "30-day term", "Auto-compounding available", "Instant activation", "24/7 support"],
       isActive: true,
       isFeatured: false,
       category: "DeFi",
@@ -56,14 +56,14 @@ function getOpportunities() {
     {
       name: "AI Infrastructure",
       description: "Capitalise on the AI revolution by investing in infrastructure-backed crypto assets powering next-generation artificial intelligence networks.",
-      minAmount: "5000.00000000",
+      minAmount: "100.00000000",
       maxAmount: "49999.00000000",
-      dailyReturnRate: "0.028500",
-      minRoiRate: "0.027000",
-      maxRoiRate: "0.032000",
+      dailyReturnRate: "0.015000",
+      minRoiRate: "0.013000",
+      maxRoiRate: "0.017000",
       durationDays: 45,
       riskLevel: "medium",
-      features: ["Daily ROI 2.7%–3.2%", "45-day term", "Auto-compounding available", "Priority support", "Referral bonus eligible"],
+      features: ["Daily ROI 1.3%–1.7%", "45-day term", "Auto-compounding available", "Priority support", "Referral bonus eligible"],
       isActive: true,
       isFeatured: true,
       category: "Technology",
@@ -79,14 +79,14 @@ function getOpportunities() {
     {
       name: "Technology Expansion",
       description: "High-growth opportunity targeting emerging blockchain technologies and Layer-2 scaling solutions driving the next wave of crypto adoption.",
-      minAmount: "10000.00000000",
+      minAmount: "100.00000000",
       maxAmount: "99999.00000000",
-      dailyReturnRate: "0.030000",
-      minRoiRate: "0.028000",
-      maxRoiRate: "0.035000",
+      dailyReturnRate: "0.015000",
+      minRoiRate: "0.013000",
+      maxRoiRate: "0.017000",
       durationDays: 60,
       riskLevel: "medium",
-      features: ["Daily ROI 2.8%–3.5%", "60-day term", "Auto-compounding available", "Dedicated support", "Performance reports"],
+      features: ["Daily ROI 1.3%–1.7%", "60-day term", "Auto-compounding available", "Dedicated support", "Performance reports"],
       isActive: true,
       isFeatured: false,
       category: "Growth",
@@ -102,14 +102,14 @@ function getOpportunities() {
     {
       name: "Market Liquidity Program",
       description: "Earn consistent returns by providing liquidity to top-tier decentralised exchanges and market-making protocols with institutional-grade strategies.",
-      minAmount: "1000.00000000",
+      minAmount: "100.00000000",
       maxAmount: "24999.00000000",
-      dailyReturnRate: "0.026500",
-      minRoiRate: "0.025000",
-      maxRoiRate: "0.028000",
+      dailyReturnRate: "0.015000",
+      minRoiRate: "0.013000",
+      maxRoiRate: "0.017000",
       durationDays: 30,
       riskLevel: "low",
-      features: ["Daily ROI 2.5%–2.8%", "30-day term", "Auto-compounding available", "Flexible entry", "Liquidity rewards"],
+      features: ["Daily ROI 1.3%–1.7%", "30-day term", "Auto-compounding available", "Flexible entry", "Liquidity rewards"],
       isActive: true,
       isFeatured: false,
       category: "Liquidity",
@@ -125,14 +125,14 @@ function getOpportunities() {
     {
       name: "Strategic Growth Allocation",
       description: "For serious investors seeking maximum returns. Our flagship high-yield strategy combines quant trading with on-chain yield generation.",
-      minAmount: "25000.00000000",
+      minAmount: "100.00000000",
       maxAmount: "500000.00000000",
-      dailyReturnRate: "0.031500",
-      minRoiRate: "0.030000",
-      maxRoiRate: "0.035000",
+      dailyReturnRate: "0.015000",
+      minRoiRate: "0.013000",
+      maxRoiRate: "0.017000",
       durationDays: 90,
       riskLevel: "high",
-      features: ["Daily ROI 3.0%–3.5%", "90-day term", "Auto-compounding available", "Dedicated account manager", "VIP withdrawals", "Weekly performance reports"],
+      features: ["Daily ROI 1.3%–1.7%", "90-day term", "Auto-compounding available", "Dedicated account manager", "VIP withdrawals", "Weekly performance reports"],
       isActive: true,
       isFeatured: false,
       category: "Premium",
@@ -311,10 +311,10 @@ async function seedNews(db: ReturnType<typeof drizzle<typeof schema>>) {
       content: `We're thrilled to welcome you to Wexora, the next-generation crypto investment platform designed to help you grow your wealth with confidence.
 
 **What is Wexora?**
-Wexora is a secure, transparent crypto investment platform that delivers consistent daily returns of 2.5%–3.5% through our proprietary trading algorithms and market strategies.
+Wexora is a secure, transparent crypto investment platform that delivers consistent daily returns of 1.3%–1.7% through our proprietary trading algorithms and market strategies.
 
 **Why choose Wexora?**
-- **Daily ROI**: Earn 2.5%–3.5% every single day on your invested capital
+- **Daily ROI**: Earn 1.3%–1.7% every single day on your invested capital
 - **Multiple Opportunities**: Choose from five curated investment opportunities
 - **Instant Deposits**: Multiple crypto networks accepted (USDT TRC20, ERC20, BTC, ETH, BNB)
 - **Fast Withdrawals**: Processed within 24–48 hours
@@ -329,45 +329,45 @@ Wexora is a secure, transparent crypto investment platform that delivers consist
 5. Watch your earnings grow daily!
 
 Start your journey to financial freedom with Wexora today.`,
-      excerpt: "Welcome to Wexora — the secure crypto investment platform delivering 2.5%–3.5% daily ROI. Learn about our opportunities, features, and how to get started.",
+      excerpt: "Welcome to Wexora — the secure crypto investment platform delivering 1.3%–1.7% daily ROI. Learn about our opportunities, features, and how to get started.",
       category: "announcement",
       isFeatured: true,
       isPublished: true,
       publishedAt: now,
     },
     {
-      title: "Five New Investment Opportunities Launched — Up to 3.5% Daily ROI",
+      title: "Five New Investment Opportunities Launched — Up to 1.7% Daily ROI",
       content: `We're excited to announce five curated investment opportunities, each designed for a different investor profile.
 
 **Investment Opportunities:**
 
 🔵 **Digital Asset Allocation** (Low Risk)
-- Minimum: $500 | Maximum: $9,999
-- Daily ROI: 2.5%–3.0%
+- Minimum: $100 | Maximum: $9,999
+- Daily ROI: 1.3%–1.7%
 - Duration: 30 days
 
 🟣 **AI Infrastructure** (Medium Risk) — FEATURED
-- Minimum: $5,000 | Maximum: $49,999
-- Daily ROI: 2.7%–3.2%
+- Minimum: $100 | Maximum: $49,999
+- Daily ROI: 1.3%–1.7%
 - Duration: 45 days
 
 🟢 **Technology Expansion** (Medium Risk) — TRENDING
-- Minimum: $10,000 | Maximum: $99,999
-- Daily ROI: 2.8%–3.5%
+- Minimum: $100 | Maximum: $99,999
+- Daily ROI: 1.3%–1.7%
 - Duration: 60 days
 
 🩵 **Market Liquidity Program** (Low Risk) — FUNDING
-- Minimum: $1,000 | Maximum: $24,999
-- Daily ROI: 2.5%–2.8%
+- Minimum: $100 | Maximum: $24,999
+- Daily ROI: 1.3%–1.7%
 - Duration: 30 days
 
 🏆 **Strategic Growth Allocation** (High Returns)
-- Minimum: $25,000 | Maximum: $500,000
-- Daily ROI: 3.0%–3.5%
+- Minimum: $100 | Maximum: $500,000
+- Daily ROI: 1.3%–1.7%
 - Duration: 90 days
 
 Invest wisely, invest with Wexora.`,
-      excerpt: "Wexora launches five curated investment opportunities with up to 3.5% daily ROI and auto-compounding support.",
+      excerpt: "Wexora launches five curated investment opportunities with up to 1.7% daily ROI and auto-compounding support.",
       category: "investment",
       isFeatured: false,
       isPublished: true,
@@ -670,7 +670,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       type: "earning",
       amount: "55.00000000",
       status: "completed",
-      note: "Daily ROI 2.75% from Digital Asset Allocation",
+      note: "Daily ROI 1.5% from Digital Asset Allocation",
       createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
     } as any,
     {
@@ -678,7 +678,7 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       type: "earning",
       amount: "142.50000000",
       status: "completed",
-      note: "Daily ROI 2.85% from AI Infrastructure",
+      note: "Daily ROI 1.5% from AI Infrastructure",
       createdAt: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
     } as any,
     {
@@ -706,21 +706,21 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
       userId: demo.id,
       type: "investment",
       title: "Investment Started",
-      message: "Your 2000 USDT investment in Digital Asset Allocation has started. Expected daily ROI: 2.75%",
+      message: "Your 2000 USDT investment in Digital Asset Allocation has started. Expected daily ROI: 1.5%",
       isRead: true,
     },
     {
       userId: demo.id,
       type: "earning",
       title: "Daily ROI Credited",
-      message: "+197.50 USDT (2.85% ROI) credited to your AI Infrastructure investment.",
+      message: "+30.00 USDT (1.5% ROI) credited to your AI Infrastructure investment.",
       isRead: false,
     },
     {
       userId: demo.id,
       type: "announcement",
       title: "Welcome to Wexora!",
-      message: "Thank you for joining Wexora. Your account is fully verified. Start investing today and earn daily returns of 2.5%–3.5%.",
+      message: "Thank you for joining Wexora. Your account is fully verified. Start investing today and earn daily returns of 1.3%–1.7%.",
       isRead: false,
     },
   ]);

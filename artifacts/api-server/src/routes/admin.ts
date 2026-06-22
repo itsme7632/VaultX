@@ -851,8 +851,8 @@ function serializeAdminPlan(p: typeof investmentPlansTable.$inferSelect, stats?:
     minAmount: parseFloat(p.minAmount),
     maxAmount: parseFloat(p.maxAmount),
     dailyReturnRate: parseFloat(p.dailyReturnRate),
-    minRoiRate: parseFloat(p.minRoiRate ?? "0.025"),
-    maxRoiRate: parseFloat(p.maxRoiRate ?? "0.030"),
+    minRoiRate: parseFloat(p.minRoiRate ?? "0.013"),
+    maxRoiRate: parseFloat(p.maxRoiRate ?? "0.017"),
     durationDays: p.durationDays,
     riskLevel: p.riskLevel,
     features: p.features ?? [],
@@ -928,7 +928,7 @@ router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     return;
   }
 
-  const midRoi = ((parseFloat(minRoiRate ?? "0.025") + parseFloat(maxRoiRate ?? "0.030")) / 2);
+  const midRoi = ((parseFloat(minRoiRate ?? "0.013") + parseFloat(maxRoiRate ?? "0.017")) / 2);
 
   const [plan] = await db.insert(investmentPlansTable).values({
     name,
@@ -936,8 +936,8 @@ router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
     minAmount: minAmount.toString(),
     maxAmount: maxAmount.toString(),
     dailyReturnRate: (dailyReturnRate ?? midRoi).toString(),
-    minRoiRate: (minRoiRate ?? 0.025).toString(),
-    maxRoiRate: (maxRoiRate ?? 0.030).toString(),
+    minRoiRate: (minRoiRate ?? 0.013).toString(),
+    maxRoiRate: (maxRoiRate ?? 0.017).toString(),
     durationDays: parseInt(durationDays, 10),
     riskLevel: riskLevel ?? "medium",
     features: features ?? [],

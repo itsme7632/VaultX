@@ -22,10 +22,10 @@ export const investmentPlansTable = pgTable("investment_plans", {
   }).notNull(),
   minRoiRate: numeric("min_roi_rate", { precision: 10, scale: 6 })
     .notNull()
-    .default("0.025"),
+    .default("0.013"),
   maxRoiRate: numeric("max_roi_rate", { precision: 10, scale: 6 })
     .notNull()
-    .default("0.030"),
+    .default("0.017"),
   durationDays: integer("duration_days").notNull(),
   riskLevel: text("risk_level").notNull().default("medium"),
   features: text("features").array().notNull().default([]),
