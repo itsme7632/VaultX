@@ -71,6 +71,7 @@ app.use(
 // frontend can detect maintenance status and know if the user is an admin.
 const MAINTENANCE_EXEMPT = new Set([
   "/api/health",
+  "/api/healthz",
   "/api/settings/public",
   "/api/auth/me",
   "/api/auth/login",
