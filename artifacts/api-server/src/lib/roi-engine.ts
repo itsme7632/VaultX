@@ -86,9 +86,9 @@ export async function processAllInvestments(force = false): Promise<{ processed:
       continue;
     }
 
-    const minRate = parseFloat(plan.minRoiRate ?? "0.025");
-    const maxRate = parseFloat(plan.maxRoiRate ?? "0.030");
-    const dailyRate = randomRoi(minRate, maxRate);
+    // Use the rate locked in at investment creation — never the plan's current rate.
+    // This ensures admin changes to plan ROI never retroactively affect active investments.
+    const dailyRate = parseFloat(inv.dailyReturnRate);
 
     const principal = parseFloat(inv.amount);
     const earning = principal * dailyRate;
