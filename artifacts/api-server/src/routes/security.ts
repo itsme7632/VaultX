@@ -137,11 +137,30 @@ router.get("/security/addresses", requireAuth, async (req, res): Promise<void> =
 });
 
 router.post("/security/addresses", requireAuth, async (req, res): Promise<void> => {
-  const { network, address, label } = req.body;
+  const { network, address, label, twoFaCode } = req.body;
 
   if (!network || !address || address.trim().length < 10) {
     res.status(400).json({ error: "Invalid", message: "Network and a valid address (min 10 chars) are required" });
     return;
+  }
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+
+  if (user.twoFaEnabled && user.twoFaSecret) {
+    if (!twoFaCode) {
+      res.status(400).json({ error: "2FA required", message: "Authenticator code is required to add a withdrawal address" });
+      return;
+    }
+    const codeValid = speakeasy.totp.verify({
+      secret: user.twoFaSecret,
+      encoding: "base32",
+      token: String(twoFaCode),
+      window: 1,
+    });
+    if (!codeValid) {
+      res.status(400).json({ error: "Invalid 2FA code", message: "Authenticator code is incorrect or expired" });
+      return;
+    }
   }
 
   const existing = await db
@@ -185,6 +204,27 @@ router.delete("/security/addresses/:id", requireAuth, async (req, res): Promise<
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid ID" });
     return;
+  }
+
+  const { twoFaCode } = req.body ?? {};
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+
+  if (user.twoFaEnabled && user.twoFaSecret) {
+    if (!twoFaCode) {
+      res.status(400).json({ error: "2FA required", message: "Authenticator code is required to remove a withdrawal address" });
+      return;
+    }
+    const codeValid = speakeasy.totp.verify({
+      secret: user.twoFaSecret,
+      encoding: "base32",
+      token: String(twoFaCode),
+      window: 1,
+    });
+    if (!codeValid) {
+      res.status(400).json({ error: "Invalid 2FA code", message: "Authenticator code is incorrect or expired" });
+      return;
+    }
   }
 
   const [addr] = await db

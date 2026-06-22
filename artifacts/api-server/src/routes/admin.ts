@@ -455,6 +455,10 @@ router.post("/admin/withdrawals/:id/approve", requireAdmin, async (req, res): Pr
     res.status(404).json({ error: "Transaction not found" });
     return;
   }
+  if (tx.status !== "pending") {
+    res.status(400).json({ error: "Already processed", message: "This withdrawal has already been processed" });
+    return;
+  }
 
   await db.update(transactionsTable).set({ status: "completed", txHash: txHash || null, updatedAt: new Date() }).where(eq(transactionsTable.id, id));
 
@@ -484,20 +488,27 @@ router.post("/admin/withdrawals/:id/reject", requireAdmin, async (req, res): Pro
     res.status(404).json({ error: "Transaction not found" });
     return;
   }
+  if (tx.status !== "pending") {
+    res.status(400).json({ error: "Already processed", message: "This withdrawal has already been processed" });
+    return;
+  }
 
   await db.update(transactionsTable).set({ status: "failed", updatedAt: new Date() }).where(eq(transactionsTable.id, id));
 
   const [wallet] = await db.select().from(walletsTable).where(eq(walletsTable.userId, tx.userId)).limit(1);
   if (wallet) {
-    const refundBalance = parseFloat(wallet.balance) + parseFloat(tx.amount);
+    const netAmount = parseFloat(tx.amount);
+    const feeAmount = parseFloat((tx.fee as string) ?? "0");
+    const refundBalance = parseFloat(wallet.balance) + netAmount + feeAmount;
     await db.update(walletsTable).set({ balance: refundBalance.toFixed(8) }).where(eq(walletsTable.userId, tx.userId));
   }
 
+  const grossAmount = parseFloat(tx.amount) + parseFloat((tx.fee as string) ?? "0");
   await db.insert(notificationsTable).values({
     userId: tx.userId,
     type: "transaction",
     title: "Withdrawal Rejected",
-    message: `Your withdrawal of ${parseFloat(tx.amount).toFixed(2)} USDT was rejected. ${reason ? `Reason: ${reason}` : "Please contact support."} The amount has been refunded.`,
+    message: `Your withdrawal of ${grossAmount.toFixed(2)} USDT was rejected. ${reason ? `Reason: ${reason}` : "Please contact support."} The full amount has been refunded to your wallet.`,
   });
 
   res.json({ success: true });
