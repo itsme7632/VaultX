@@ -44,9 +44,11 @@ export default function SecurityPage() {
 
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [wdPwForm, setWdPwForm] = useState({ password: "", confirmPassword: "", currentPassword: "", newPassword: "", newConfirm: "" });
-  const [addrForm, setAddrForm] = useState({ network: "TRC20", address: "", label: "" });
+  const [addrForm, setAddrForm] = useState({ network: "TRC20", address: "", label: "", twoFaCode: "" });
   const [addingAddress, setAddingAddress] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleteTwoFaCode, setDeleteTwoFaCode] = useState("");
   const [savingWdPw, setSavingWdPw] = useState(false);
 
   const changePassword = useChangePassword();
@@ -135,14 +137,18 @@ export default function SecurityPage() {
       toast({ title: "Invalid address", description: "Address must be at least 10 characters", variant: "destructive" });
       return;
     }
+    if (has2FA && !addrForm.twoFaCode) {
+      toast({ title: "2FA required", description: "Enter your authenticator code", variant: "destructive" });
+      return;
+    }
     setAddingAddress(true);
     try {
       await apiFetch("/security/addresses", {
         method: "POST",
-        body: JSON.stringify(addrForm),
+        body: JSON.stringify({ network: addrForm.network, address: addrForm.address, label: addrForm.label, twoFaCode: addrForm.twoFaCode }),
       });
       toast({ title: "Address added!" });
-      setAddrForm({ network: "TRC20", address: "", label: "" });
+      setAddrForm({ network: "TRC20", address: "", label: "", twoFaCode: "" });
       refetchStatus();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -151,11 +157,16 @@ export default function SecurityPage() {
     }
   };
 
-  const handleDeleteAddress = async (id: number) => {
+  const handleDeleteAddress = async (id: number, twoFaCode?: string) => {
     setDeletingId(id);
     try {
-      await apiFetch(`/security/addresses/${id}`, { method: "DELETE" });
+      await apiFetch(`/security/addresses/${id}`, {
+        method: "DELETE",
+        body: JSON.stringify({ twoFaCode }),
+      });
       toast({ title: "Address removed" });
+      setDeleteConfirmId(null);
+      setDeleteTwoFaCode("");
       refetchStatus();
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -353,23 +364,71 @@ export default function SecurityPage() {
               {savedAddresses.length > 0 && (
                 <div className="divide-y divide-border">
                   {savedAddresses.map((addr: any) => (
-                    <div key={addr.id} className="px-4 py-3 flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{addr.network}</span>
-                          {addr.label && <span className="text-xs text-muted-foreground">{addr.label}</span>}
+                    <div key={addr.id} className="px-4 py-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{addr.network}</span>
+                            {addr.label && <span className="text-xs text-muted-foreground">{addr.label}</span>}
+                          </div>
+                          <p className="font-mono text-xs text-foreground break-all leading-relaxed">{addr.maskedAddress}</p>
                         </div>
-                        <p className="font-mono text-xs text-foreground break-all leading-relaxed">{addr.maskedAddress}</p>
+                        <button
+                          onClick={() => {
+                            if (deleteConfirmId === addr.id) {
+                              setDeleteConfirmId(null);
+                              setDeleteTwoFaCode("");
+                            } else {
+                              setDeleteConfirmId(addr.id);
+                              setDeleteTwoFaCode("");
+                            }
+                          }}
+                          disabled={deletingId === addr.id}
+                          className="p-2 rounded-xl hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors shrink-0 mt-0.5"
+                        >
+                          {deletingId === addr.id
+                            ? <div className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+                            : <Trash2 size={14} />}
+                        </button>
                       </div>
-                      <button
-                        onClick={() => handleDeleteAddress(addr.id)}
-                        disabled={deletingId === addr.id}
-                        className="p-2 rounded-xl hover:bg-red-50 text-muted-foreground hover:text-red-500 transition-colors shrink-0 mt-0.5"
-                      >
-                        {deletingId === addr.id
-                          ? <div className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
-                          : <Trash2 size={14} />}
-                      </button>
+                      {deleteConfirmId === addr.id && (
+                        <div className="mt-2 bg-red-50 border border-red-200 rounded-xl p-3 space-y-2">
+                          <p className="text-xs font-semibold text-red-700">Confirm removal</p>
+                          {has2FA ? (
+                            <>
+                              <p className="text-[11px] text-red-600">Enter your authenticator code to remove this address.</p>
+                              <Input
+                                value={deleteTwoFaCode}
+                                onChange={e => setDeleteTwoFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                placeholder="6-digit code"
+                                inputMode="numeric"
+                                maxLength={6}
+                                className="h-9 text-sm text-center tracking-widest font-mono rounded-lg"
+                              />
+                            </>
+                          ) : (
+                            <p className="text-[11px] text-red-600">This will permanently remove the address.</p>
+                          )}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 h-8 text-xs border-red-200 text-red-600"
+                              onClick={() => { setDeleteConfirmId(null); setDeleteTwoFaCode(""); }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="flex-1 h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                              disabled={deletingId === addr.id || (has2FA && deleteTwoFaCode.length !== 6)}
+                              onClick={() => handleDeleteAddress(addr.id, deleteTwoFaCode || undefined)}
+                            >
+                              {deletingId === addr.id ? "Removing…" : "Remove"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -409,10 +468,24 @@ export default function SecurityPage() {
                       className="h-11 text-sm rounded-xl mt-1"
                     />
                   </div>
+                  {has2FA && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Authenticator Code <span className="text-red-500">*</span></Label>
+                      <Input
+                        value={addrForm.twoFaCode}
+                        onChange={e => setAddrForm(f => ({ ...f, twoFaCode: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
+                        placeholder="6-digit code from your app"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className="h-11 text-sm text-center tracking-widest font-mono rounded-xl mt-1"
+                      />
+                      <p className="text-[10px] text-muted-foreground mt-1">Required to protect your withdrawal destinations.</p>
+                    </div>
+                  )}
                   <Button
                     className="w-full h-11 text-sm font-semibold rounded-xl"
                     onClick={handleAddAddress}
-                    disabled={addingAddress || addrForm.address.trim().length < 10}
+                    disabled={addingAddress || addrForm.address.trim().length < 10 || (has2FA && addrForm.twoFaCode.length !== 6)}
                   >
                     {addingAddress ? "Adding…" : <><Plus size={14} className="mr-1.5" />Add Address</>}
                   </Button>
