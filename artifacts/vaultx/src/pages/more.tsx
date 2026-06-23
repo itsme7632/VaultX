@@ -2,7 +2,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Info, Lock, FileText, Download, Headphones,
-  ChevronRight, Shield, Smartphone, PieChart, TrendingUp, BarChart3, HelpCircle,
+  ChevronRight, Shield, Smartphone, PieChart, TrendingUp, BarChart3, HelpCircle, Users,
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,23 @@ export default function MorePage() {
 
   const platformName = settings?.platform_name || "Wexora";
   const appVersion = appInfo?.version ? `v${appInfo.version}` : "v2.0";
+
+  const communityItems = [
+    {
+      icon: Users,
+      label: "Community Hub",
+      description: "Chat, announcements, leaderboards and support",
+      href: "/community",
+      gradient: "from-violet-500 to-purple-600",
+    },
+    {
+      icon: Users,
+      label: "Referral Program",
+      description: "Invite friends and earn 5% commission on their profits",
+      href: "/referrals",
+      gradient: "from-emerald-500 to-teal-600",
+    },
+  ];
 
   const platformItems = [
     {
@@ -114,6 +131,29 @@ export default function MorePage() {
         </div>
 
         <div className="px-4 pt-5 max-w-screen-sm mx-auto space-y-5">
+
+          {/* Community section */}
+          <div>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 px-1">Community & Referrals</p>
+            <div className="space-y-3">
+              {communityItems.map(({ icon: Icon, label, description, href, gradient }) => (
+                <button
+                  key={href}
+                  onClick={() => setLocation(href)}
+                  className="w-full flex items-center gap-4 bg-card border border-border rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-primary/30 active:scale-[0.98] transition-all text-left"
+                >
+                  <div className={cn("w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br shadow-sm shrink-0", gradient)}>
+                    <Icon size={20} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">{label}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
+                  </div>
+                  <ChevronRight size={16} className="text-muted-foreground shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Platform tools section */}
           <div>

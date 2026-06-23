@@ -7,7 +7,7 @@ const tabs = [
   { href: "/wallet", icon: Wallet, label: "Wallet" },
   { href: "/investments", icon: TrendingUp, label: "Invest" },
   { href: "/portfolio", icon: PieChart, label: "Portfolio" },
-  { href: "/referrals", icon: Users, label: "Referrals" },
+  { href: "/community", icon: Users, label: "Community" },
 ];
 
 export function BottomNav() {

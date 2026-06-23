@@ -13,6 +13,7 @@ import {
   platformSettingsTable,
   newsPostsTable,
   notificationsTable,
+  communityChannelsTable,
 } from "./schema";
 import { eq, count, or } from "drizzle-orm";
 
@@ -728,6 +729,33 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
   console.log("[seed] Demo user seeded ✓ (demo@wexoraglobal.com / Demo@12345)");
 }
 
+async function seedCommunityChannels(db: ReturnType<typeof drizzle<typeof schema>>) {
+  const channels = [
+    { name: "Announcements", type: "announcement", description: "Official announcements from the Wexora team", isLocked: false, sortOrder: 0 },
+    { name: "General Chat", type: "chat", description: "Open discussion for all Wexora members", isLocked: false, sortOrder: 1 },
+    { name: "Community Support", type: "support", description: "Get help from fellow community members", isLocked: false, sortOrder: 2 },
+  ];
+
+  for (const ch of channels) {
+    await db.insert(communityChannelsTable).values(ch as any).onConflictDoNothing();
+  }
+  console.log("[seed] Community channels verified ✓");
+}
+
+async function ensureSalarySettings(db: ReturnType<typeof drizzle<typeof schema>>) {
+  const defaults = [
+    { key: "salary_program_enabled", value: "true" },
+    { key: "salary_tier1_volume", value: "1500" },
+    { key: "salary_tier1_amount", value: "100" },
+    { key: "salary_tier2_volume", value: "3500" },
+    { key: "salary_tier2_amount", value: "300" },
+  ];
+  for (const s of defaults) {
+    await db.insert(platformSettingsTable).values(s).onConflictDoNothing();
+  }
+  console.log("[seed] Salary settings verified ✓");
+}
+
 export async function runSeed(): Promise<void> {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL must be set");
@@ -740,9 +768,11 @@ export async function runSeed(): Promise<void> {
     await ensureOpportunities(db);
     await seedDepositNetworks(db);
     await seedPlatformSettings(db);
+    await ensureSalarySettings(db);
     await seedNews(db);
     await ensureAdminAccount(db);
     await seedDemoUser(db);
+    await seedCommunityChannels(db);
     console.log("[seed] Database seeding complete ✓");
   } finally {
     await pool.end();

@@ -44,6 +44,7 @@ import MorePage from "@/pages/more";
 import PrivacyPolicyPage from "@/pages/privacy";
 import TermsPage from "@/pages/terms";
 import FaqPage from "@/pages/faq";
+import CommunityPage from "@/pages/community";
 
 setBaseUrl(null);
 
@@ -158,6 +159,9 @@ function Router() {
       </Route>
       <Route path="/referrals">
         <ProtectedRoute><ReferralsPage /></ProtectedRoute>
+      </Route>
+      <Route path="/community">
+        <ProtectedRoute><CommunityPage /></ProtectedRoute>
       </Route>
       <Route path="/notifications">
         <ProtectedRoute><NotificationsPage /></ProtectedRoute>
