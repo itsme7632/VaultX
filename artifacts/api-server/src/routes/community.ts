@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { eq, and, desc, sql, count, sum, lt, isNull, or } from "drizzle-orm";
+import { eq, and, desc, sql, count, sum, lt, isNull, or, inArray } from "drizzle-orm";
 import {
   db,
   usersTable,
@@ -205,28 +205,42 @@ router.get("/community/channels/:id/messages", requireAuth, async (req: Request,
     return;
   }
 
-  const messageIds = messages.map((m: any) => m.id);
-  const reactionRows = await db.execute(sql`
-    SELECT message_id AS "messageId", user_id AS "userId", emoji
-    FROM community_reactions
-    WHERE message_id = ANY(${messageIds}::int[])
-  `);
+  const messageIds = messages.map((m: any) => m.id as number);
 
-  const replyToIds = [...new Set(messages.filter((m: any) => m.replyToId).map((m: any) => m.replyToId))];
+  // Use inArray (not sql`ANY(${array}::int[])`) — the latter generates invalid
+  // parameterised SQL: ANY(($1,$2)::int[]) which Postgres rejects.
+  const rawReactions = messageIds.length > 0
+    ? await db
+        .select({
+          messageId: communityReactionsTable.messageId,
+          userId: communityReactionsTable.userId,
+          emoji: communityReactionsTable.emoji,
+        })
+        .from(communityReactionsTable)
+        .where(inArray(communityReactionsTable.messageId, messageIds))
+    : [];
+
+  const replyToIds = [...new Set(
+    messages.filter((m: any) => m.replyToId).map((m: any) => m.replyToId as number)
+  )];
   let replyRows = new Map<number, any>();
   if (replyToIds.length > 0) {
-    const replyData = await db.execute(sql`
-      SELECT m.id, m.content, m.is_deleted AS "isDeleted", u.username
-      FROM community_messages m
-      JOIN users u ON m.user_id = u.id
-      WHERE m.id = ANY(${replyToIds}::int[])
-    `);
-    for (const r of replyData.rows as any[]) {
+    const replyData = await db
+      .select({
+        id: communityMessagesTable.id,
+        content: communityMessagesTable.content,
+        isDeleted: communityMessagesTable.isDeleted,
+        username: usersTable.username,
+      })
+      .from(communityMessagesTable)
+      .innerJoin(usersTable, eq(usersTable.id, communityMessagesTable.userId))
+      .where(inArray(communityMessagesTable.id, replyToIds));
+    for (const r of replyData) {
       replyRows.set(r.id, r);
     }
   }
 
-  const shaped = await buildMessageShape(messages, userId, reactionRows.rows as any[], replyRows);
+  const shaped = await buildMessageShape(messages, userId, rawReactions as any[], replyRows);
   res.json(shaped.reverse());
 });
 
