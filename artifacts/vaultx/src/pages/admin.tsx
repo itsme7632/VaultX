@@ -83,7 +83,7 @@ export default function AdminPage() {
   const [planSearch, setPlanSearch] = useState("");
   const [planStatusFilter, setPlanStatusFilter] = useState<string>("all");
   const [planCategoryFilter, setPlanCategoryFilter] = useState<string>("all");
-  const [planSortBy, setPlanSortBy] = useState<string>("sortOrder");
+  const [planSortBy, setPlanSortBy] = useState<string>("minAmount");
   const [wdTxHash, setWdTxHash] = useState("");
   const [userDetail, setUserDetail] = useState<any>(null);
   const [userDetailLoading, setUserDetailLoading] = useState(false);
@@ -348,12 +348,27 @@ export default function AdminPage() {
       <div className="pb-24">
         {/* Tabs (horizontal scroll) */}
         <div className="flex gap-1 overflow-x-auto px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setTab(id)}
-              className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all", tab === id ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted")}>
-              <Icon size={12} />{label}
-            </button>
-          ))}
+          {tabs.map(({ id, label, icon: Icon }) => {
+            const badge =
+              id === "withdrawals" ? (analytics?.pendingWithdrawals ?? 0) :
+              id === "deposits"    ? ((analytics as any)?.pendingDeposits ?? 0) :
+              id === "kyc"        ? (analytics?.pendingKyc ?? 0) :
+              0;
+            return (
+              <button key={id} onClick={() => setTab(id)}
+                className={cn("relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all", tab === id ? "bg-primary text-white" : "text-muted-foreground hover:bg-muted")}>
+                <Icon size={12} />{label}
+                {badge > 0 && (
+                  <span className={cn(
+                    "ml-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center leading-none",
+                    tab === id ? "bg-white text-primary" : "bg-red-500 text-white"
+                  )}>
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         <div className="px-4 pt-4">
@@ -912,6 +927,7 @@ export default function AdminPage() {
                   <Select value={planSortBy} onValueChange={setPlanSortBy}>
                     <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="minAmount" className="text-xs">Min Amount ↑</SelectItem>
                       <SelectItem value="sortOrder" className="text-xs">Sort Order</SelectItem>
                       <SelectItem value="name" className="text-xs">Name A→Z</SelectItem>
                       <SelectItem value="capitalRaised" className="text-xs">Capital Raised ↓</SelectItem>
@@ -975,6 +991,7 @@ export default function AdminPage() {
                   }
                   filtered = [...filtered].sort((a: any, b: any) => {
                     switch (planSortBy) {
+                      case "minAmount": return parseFloat(a.minAmount ?? 0) - parseFloat(b.minAmount ?? 0);
                       case "name": return (a.name ?? "").localeCompare(b.name ?? "");
                       case "capitalRaised": return (b.currentFunding ?? 0) - (a.currentFunding ?? 0);
                       case "participants": return (b.totalParticipants ?? 0) - (a.totalParticipants ?? 0);
