@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag, Lock, Copy, AlertTriangle } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag, Lock, Copy, AlertTriangle, Megaphone, Eye, EyeOff, Pin, Calendar, ToggleLeft, ToggleRight, Users2 } from "lucide-react";
 
 function opportunityStatusBadge(status: string) {
   switch (status) {
@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq" | "referral-salary";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq" | "referral-salary" | "announcements";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -323,6 +323,7 @@ export default function AdminPage() {
     { id: "logs", label: "Logs", icon: FileText },
     { id: "faq" as Tab, label: "FAQ", icon: MessageSquare },
     { id: "referral-salary" as Tab, label: "Referral Salary", icon: DollarSign },
+    { id: "announcements" as Tab, label: "Announcements", icon: Megaphone },
   ];
 
   const STAT_CARDS = analytics ? [
@@ -1264,6 +1265,11 @@ export default function AdminPage() {
           {/* FAQ */}
           {tab === "faq" && (
             <FaqTab toast={toast} />
+          )}
+
+          {/* ANNOUNCEMENTS */}
+          {tab === "announcements" && (
+            <AnnouncementsTab toast={toast} />
           )}
 
           {/* PERFORMANCE ADMIN */}
@@ -3556,6 +3562,403 @@ function FaqTab({ toast }: { toast: any }) {
               disabled={remove.isPending}
             >
               {remove.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── Announcements Admin Tab ────────────────────────────────────────────────────
+
+interface AnnouncementItem {
+  id: number;
+  title: string;
+  content: string;
+  isActive: boolean;
+  priority: number;
+  showToNewUsers: boolean;
+  showToExistingUsers: boolean;
+  isPinned: boolean;
+  scheduledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const BLANK_ANN = {
+  title: "",
+  content: "",
+  isActive: false,
+  priority: 0,
+  showToNewUsers: true,
+  showToExistingUsers: true,
+  isPinned: false,
+  scheduledAt: "",
+};
+
+const EXAMPLE_CONTENT = `🎉 Welcome to Wexora Global
+
+We are pleased to introduce our investment platform.
+
+✅ Daily ROI Opportunities
+✅ Referral Rewards
+✅ Monthly Salary Program
+✅ Community Hub Access
+✅ Secure Wallet System
+
+Important Notes:
+
+• Deposits require admin approval.
+• Withdrawals are processed manually.
+• Keep your account secure.
+• Never share your password.
+
+Thank you for being part of Wexora.
+
+— Wexora Team`;
+
+function AnnouncementsTab({ toast }: { toast: any }) {
+  const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [editing, setEditing] = useState<AnnouncementItem | null>(null);
+  const [form, setForm] = useState({ ...BLANK_ANN });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [popupSettings, setPopupSettings] = useState({
+    announcement_popup_enabled: "true",
+    announcement_popup_frequency_hours: "24",
+    announcement_popup_every_login: "false",
+  });
+
+  const { data: items = [], isLoading } = useQuery<AnnouncementItem[]>({
+    queryKey: ["admin-announcements"],
+    queryFn: () => adminApi("/admin/announcements"),
+    staleTime: 10000,
+  });
+
+  const { data: allSettings } = useQuery<Record<string, string>>({
+    queryKey: ["admin-settings-ann"],
+    queryFn: () => adminApi("/admin/settings"),
+    staleTime: 30000,
+  });
+
+  useEffect(() => {
+    if (allSettings) {
+      setPopupSettings({
+        announcement_popup_enabled: allSettings.announcement_popup_enabled ?? "true",
+        announcement_popup_frequency_hours: allSettings.announcement_popup_frequency_hours ?? "24",
+        announcement_popup_every_login: allSettings.announcement_popup_every_login ?? "false",
+      });
+    }
+  }, [allSettings]);
+
+  const saveMutation = useMutation({
+    mutationFn: (data: typeof BLANK_ANN) =>
+      editing
+        ? adminApi(`/admin/announcements/${editing.id}`, "PUT", data)
+        : adminApi("/admin/announcements", "POST", data),
+    onSuccess: () => {
+      toast({ title: editing ? "Announcement updated" : "Announcement created" });
+      setDialogOpen(false);
+      setEditing(null);
+      setForm({ ...BLANK_ANN });
+      queryClient.invalidateQueries({ queryKey: ["admin-announcements"] });
+    },
+    onError: (e: any) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: (id: number) => adminApi(`/admin/announcements/${id}/toggle`, "PATCH"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-announcements"] }),
+    onError: (e: any) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => adminApi(`/admin/announcements/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast({ title: "Announcement deleted" });
+      setDeleteId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-announcements"] });
+    },
+    onError: (e: any) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const forceShowMutation = useMutation({
+    mutationFn: (id: number) => adminApi(`/admin/announcements/${id}/force-show`, "POST"),
+    onSuccess: () => toast({ title: "Views cleared — popup will re-show for all users" }),
+    onError: (e: any) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  const saveSettingsMutation = useMutation({
+    mutationFn: (settings: Record<string, string>) => adminApi("/admin/settings", "PUT", settings),
+    onSuccess: () => {
+      toast({ title: "Popup settings saved" });
+      setSettingsOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["admin-settings-ann"] });
+    },
+    onError: (e: any) => toast({ title: e.message, variant: "destructive" }),
+  });
+
+  function openCreate() {
+    setEditing(null);
+    setForm({ ...BLANK_ANN });
+    setDialogOpen(true);
+  }
+
+  function openEdit(item: AnnouncementItem) {
+    setEditing(item);
+    setForm({
+      title: item.title,
+      content: item.content,
+      isActive: item.isActive,
+      priority: item.priority,
+      showToNewUsers: item.showToNewUsers,
+      showToExistingUsers: item.showToExistingUsers,
+      isPinned: item.isPinned,
+      scheduledAt: item.scheduledAt ? item.scheduledAt.slice(0, 16) : "",
+    });
+    setDialogOpen(true);
+  }
+
+  function handleSave() {
+    if (!form.title.trim()) { toast({ title: "Title is required", variant: "destructive" }); return; }
+    if (!form.content.trim()) { toast({ title: "Content is required", variant: "destructive" }); return; }
+    saveMutation.mutate({ ...form });
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h2 className="text-sm font-bold text-foreground">Announcement Popups</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Manage popup announcements shown to users after login</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => setSettingsOpen(true)}>
+            <Settings size={12} />Popup Settings
+          </Button>
+          <Button size="sm" className="h-8 text-xs gap-1.5" onClick={openCreate}>
+            <Plus size={12} />New Announcement
+          </Button>
+        </div>
+      </div>
+
+      {/* Disabled banner */}
+      {popupSettings.announcement_popup_enabled === "false" && (
+        <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2">
+          <AlertTriangle size={13} className="text-amber-500 shrink-0" />
+          <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+            Announcement popup is <strong>disabled</strong>. Enable it in Popup Settings.
+          </p>
+        </div>
+      )}
+
+      {/* List */}
+      {isLoading ? (
+        <div className="space-y-3">{[1,2].map(i => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>
+      ) : items.length === 0 ? (
+        <div className="bg-card border border-border rounded-2xl p-8 text-center">
+          <Megaphone size={32} className="mx-auto text-muted-foreground mb-3 opacity-40" />
+          <p className="text-sm font-semibold text-foreground">No announcements yet</p>
+          <p className="text-xs text-muted-foreground mt-1">Create your first popup announcement.</p>
+          <Button size="sm" className="mt-4 h-8 text-xs gap-1.5" onClick={openCreate}>
+            <Plus size={12} />Create Announcement
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item) => (
+            <div key={item.id} className={cn(
+              "bg-card border rounded-2xl p-4 shadow-sm",
+              item.isActive ? "border-emerald-200 dark:border-emerald-800" : "border-border",
+              item.isPinned && "ring-1 ring-primary/30"
+            )}>
+              <div className="flex items-start gap-3">
+                <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", item.isActive ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-muted")}>
+                  <Megaphone size={15} className={item.isActive ? "text-emerald-600" : "text-muted-foreground"} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                    <span className="text-sm font-semibold text-foreground">{item.title}</span>
+                    {item.isPinned && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                        <Pin size={9} />Pinned
+                      </span>
+                    )}
+                    <span className={cn(
+                      "text-[10px] font-semibold px-1.5 py-0.5 rounded-full border",
+                      item.isActive ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400" : "bg-muted text-muted-foreground border-border"
+                    )}>
+                      {item.isActive ? "Active" : "Inactive"}
+                    </span>
+                    {item.scheduledAt && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                        <Calendar size={9} />Scheduled
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.content}</p>
+                  <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Users2 size={9} />
+                      {item.showToNewUsers && item.showToExistingUsers ? "All users" : item.showToNewUsers ? "New users only" : item.showToExistingUsers ? "Existing users only" : "Hidden from all"}
+                    </span>
+                    <span>Priority: {item.priority}</span>
+                    <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => { setEditing(item); setForm({ title: item.title, content: item.content, isActive: item.isActive, priority: item.priority, showToNewUsers: item.showToNewUsers, showToExistingUsers: item.showToExistingUsers, isPinned: item.isPinned, scheduledAt: item.scheduledAt ? item.scheduledAt.slice(0, 16) : "" }); setPreviewOpen(true); }} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Preview">
+                    <Eye size={13} />
+                  </button>
+                  <button onClick={() => openEdit(item)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Edit">
+                    <Edit2 size={13} />
+                  </button>
+                  <button onClick={() => toggleMutation.mutate(item.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title={item.isActive ? "Deactivate" : "Activate"}>
+                    {item.isActive ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                  <button onClick={() => forceShowMutation.mutate(item.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors" title="Force re-show to all users">
+                    <RefreshCw size={13} />
+                  </button>
+                  <button onClick={() => setDeleteId(item.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors" title="Delete">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) { setDialogOpen(false); setEditing(null); } }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit Announcement" : "Create Announcement"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div>
+              <Label className="text-xs font-semibold mb-1.5 block">Title *</Label>
+              <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="🎉 Welcome to Wexora Global" className="h-9 text-sm" />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <Label className="text-xs font-semibold">Content *</Label>
+                <button type="button" className="text-[10px] text-primary underline" onClick={() => setForm(f => ({ ...f, content: EXAMPLE_CONTENT }))}>Load example</button>
+              </div>
+              <Textarea value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} placeholder="Announcement content... Supports emojis ✅, bullet points •, numbered lists, [links](url)" className="text-sm min-h-[180px] resize-y font-mono" />
+              <p className="text-[10px] text-muted-foreground mt-1">Supports emojis, bullets (• - *), numbered lists, [links](url), and line breaks.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold mb-1.5 block">Priority (higher = first)</Label>
+                <Input type="number" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: parseInt(e.target.value) || 0 }))} className="h-9 text-sm" min={0} />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold mb-1.5 block">Schedule (optional)</Label>
+                <Input type="datetime-local" value={form.scheduledAt} onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))} className="h-9 text-sm" />
+              </div>
+            </div>
+            <div className="bg-muted/50 rounded-xl p-3 space-y-2.5">
+              <p className="text-xs font-semibold text-foreground">Display Settings</p>
+              {([
+                { key: "isActive" as const, label: "Active (show to users)", desc: "Popup will be shown when active" },
+                { key: "isPinned" as const, label: "Pinned (highest priority)", desc: "Always shown before other announcements" },
+                { key: "showToNewUsers" as const, label: "Show to new users", desc: "Accounts created less than 24 hours ago" },
+                { key: "showToExistingUsers" as const, label: "Show to existing users", desc: "Accounts older than 24 hours" },
+              ]).map(({ key, label, desc }) => (
+                <div key={key} className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{label}</p>
+                    <p className="text-[10px] text-muted-foreground">{desc}</p>
+                  </div>
+                  <Switch checked={Boolean(form[key])} onCheckedChange={v => setForm(f => ({ ...f, [key]: v }))} />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="outline" className="flex-1 h-9 text-sm" onClick={() => setPreviewOpen(true)} type="button">
+                <Eye size={13} className="mr-1.5" />Preview
+              </Button>
+              <Button className="flex-1 h-9 text-sm" onClick={handleSave} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Saving…" : editing ? "Update" : "Create"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl">
+          <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-border">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Megaphone size={18} className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-primary mb-0.5">Wexora Global</p>
+              <h2 className="text-base font-bold text-foreground leading-tight">{form.title || "Announcement Title"}</h2>
+            </div>
+            <button onClick={() => setPreviewOpen(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="px-5 py-4 text-sm text-foreground leading-relaxed max-h-[50vh] overflow-y-auto whitespace-pre-wrap">
+            {form.content || "Announcement content preview will appear here..."}
+          </div>
+          <div className="px-5 pb-5 pt-4 border-t border-border space-y-2">
+            <Button className="w-full h-11 font-semibold text-sm rounded-xl" onClick={() => setPreviewOpen(false)}>I Understand</Button>
+            <Button variant="outline" className="w-full h-10 text-sm rounded-xl gap-2" onClick={() => setPreviewOpen(false)}>
+              <MessageSquare size={14} />View Community
+            </Button>
+            <p className="text-center text-[10px] text-muted-foreground pt-1">Preview — actions have no effect here.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm */}
+      <Dialog open={deleteId !== null} onOpenChange={(o) => { if (!o) setDeleteId(null); }}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader><DialogTitle>Delete Announcement?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This cannot be undone. All view records will also be removed.</p>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1 h-9 text-sm" onClick={() => setDeleteId(null)}>Cancel</Button>
+            <Button variant="destructive" className="flex-1 h-9 text-sm" onClick={() => deleteId !== null && deleteMutation.mutate(deleteId)} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Popup Settings */}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Popup Settings</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Enable Announcement Popup</p>
+                <p className="text-xs text-muted-foreground">Show announcement popups to users</p>
+              </div>
+              <Switch checked={popupSettings.announcement_popup_enabled === "true"} onCheckedChange={v => setPopupSettings(s => ({ ...s, announcement_popup_enabled: v ? "true" : "false" }))} />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold mb-1.5 block">Popup Frequency (hours)</Label>
+              <Input type="number" min={1} value={popupSettings.announcement_popup_frequency_hours} onChange={e => setPopupSettings(s => ({ ...s, announcement_popup_frequency_hours: e.target.value }))} className="h-9 text-sm" />
+              <p className="text-[10px] text-muted-foreground mt-1">How often to re-show the popup. Default: 24 hours.</p>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Show On Every Login</p>
+                <p className="text-xs text-muted-foreground">Show popup every time the user logs in (ignores frequency)</p>
+              </div>
+              <Switch checked={popupSettings.announcement_popup_every_login === "true"} onCheckedChange={v => setPopupSettings(s => ({ ...s, announcement_popup_every_login: v ? "true" : "false" }))} />
+            </div>
+            <Button className="w-full h-9 text-sm" onClick={() => saveSettingsMutation.mutate(popupSettings)} disabled={saveSettingsMutation.isPending}>
+              {saveSettingsMutation.isPending ? "Saving…" : "Save Settings"}
             </Button>
           </div>
         </DialogContent>

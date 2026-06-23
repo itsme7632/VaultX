@@ -45,6 +45,7 @@ import PrivacyPolicyPage from "@/pages/privacy";
 import TermsPage from "@/pages/terms";
 import FaqPage from "@/pages/faq";
 import CommunityPage from "@/pages/community";
+import { AnnouncementPopup } from "@/components/AnnouncementPopup";
 
 setBaseUrl(null);
 
@@ -454,6 +455,7 @@ function AppContent() {
           <AuthProvider>
             <MaintenanceGate>
               <Router />
+              <AnnouncementPopup />
             </MaintenanceGate>
           </AuthProvider>
         </WouterRouter>
