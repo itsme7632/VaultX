@@ -1,4 +1,4 @@
-import { eq, and, count, sql, sum, gte } from "drizzle-orm";
+import { eq, and, count, sql, sum, gte, notInArray } from "drizzle-orm";
 import {
   db,
   userInvestmentsTable,
@@ -48,6 +48,9 @@ export async function processReferralSalary(): Promise<{ updated: number; paid: 
   let updated = 0;
   let paid = 0;
 
+  // Track which referrers appear in volume data (even if below tier threshold)
+  const processedReferrerIds: number[] = [];
+
   for (const row of volumeRows) {
     const volume = parseFloat(row.volume ?? "0");
     let tier: number | null = null;
@@ -55,6 +58,8 @@ export async function processReferralSalary(): Promise<{ updated: number; paid: 
 
     if (volume >= tier2Volume) { tier = 2; salary = tier2Amount; }
     else if (volume >= tier1Volume) { tier = 1; salary = tier1Amount; }
+
+    processedReferrerIds.push(row.referrerId);
 
     // Upsert salary record
     const existing = await db
@@ -78,6 +83,7 @@ export async function processReferralSalary(): Promise<{ updated: number; paid: 
       const record = existing[0];
       const wasActive = record.isActive && record.currentTier !== null;
       const isNowActive = tier !== null;
+      // Only set a new payment date if they're newly qualifying; preserve existing date otherwise
       const nextPayment = isNowActive && !wasActive
         ? new Date(now.getTime() + 30 * 86_400_000)
         : record.nextPaymentDate;
@@ -88,7 +94,7 @@ export async function processReferralSalary(): Promise<{ updated: number; paid: 
           currentTier: tier,
           monthlySalary: salary.toFixed(8),
           isActive: isNowActive,
-          nextPaymentDate: nextPayment,
+          nextPaymentDate: isNowActive ? nextPayment : null,
           lastCalculatedAt: now,
         })
         .where(eq(referralSalaryTable.userId, row.referrerId));
@@ -96,12 +102,24 @@ export async function processReferralSalary(): Promise<{ updated: number; paid: 
     updated++;
   }
 
-  // Deactivate users whose referral volume dropped to 0 (not in volumeRows)
-  await db.update(referralSalaryTable)
-    .set({ currentTier: null, monthlySalary: "0", isActive: false, currentVolume: "0", lastCalculatedAt: now })
-    .where(eq(referralSalaryTable.isActive, true));
+  // Deactivate only users who are no longer in the active referral volume query
+  // (i.e. all their referrals' investments have expired/been withdrawn).
+  // IMPORTANT: Do NOT include processedReferrerIds here — those were just updated above.
+  if (processedReferrerIds.length > 0) {
+    await db.update(referralSalaryTable)
+      .set({ currentTier: null, monthlySalary: "0", isActive: false, currentVolume: "0", nextPaymentDate: null, lastCalculatedAt: now })
+      .where(and(
+        eq(referralSalaryTable.isActive, true),
+        notInArray(referralSalaryTable.userId, processedReferrerIds),
+      ));
+  } else {
+    // No active referral volume at all — deactivate everyone
+    await db.update(referralSalaryTable)
+      .set({ currentTier: null, monthlySalary: "0", isActive: false, currentVolume: "0", nextPaymentDate: null, lastCalculatedAt: now })
+      .where(eq(referralSalaryTable.isActive, true));
+  }
 
-  // Process due salary payouts
+  // Process due salary payouts — only runs for truly active (qualified) records
   const dueSalaries = await db
     .select()
     .from(referralSalaryTable)

@@ -483,8 +483,8 @@ router.get("/referrals/salary", requireAuth, async (req, res): Promise<void> => 
     programEnabled: enabled === "true",
     currentVolume,
     tiers: [
-      { tier: 1, requiredVolume: parseFloat(t1Vol), monthlySalary: parseFloat(t1Amt) },
-      { tier: 2, requiredVolume: parseFloat(t2Vol), monthlySalary: parseFloat(t2Amt) },
+      { tier: 1, minVolume: parseFloat(t1Vol), salary: parseFloat(t1Amt) },
+      { tier: 2, minVolume: parseFloat(t2Vol), salary: parseFloat(t2Amt) },
     ],
     currentTier: record?.currentTier ?? null,
     monthlySalary: parseFloat(record?.monthlySalary ?? "0"),
