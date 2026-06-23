@@ -28,7 +28,7 @@ function AnnouncementBanner() {
   );
 }
 
-export function AppLayout({ children, title }: { children: ReactNode; title?: string }) {
+export function AppLayout({ children, title, noPad }: { children: ReactNode; title?: string; noPad?: boolean }) {
   const { isApp } = useAppMode();
 
   useEffect(() => {
@@ -40,10 +40,10 @@ export function AppLayout({ children, title }: { children: ReactNode; title?: st
   }, [isApp]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className={`bg-background flex flex-col ${noPad ? "h-dvh" : "min-h-screen"}`}>
       <TopBar title={title} />
       <AnnouncementBanner />
-      <main className="flex-1 pb-24 max-w-screen-sm mx-auto w-full">
+      <main className={`flex-1 max-w-screen-sm mx-auto w-full ${noPad ? "min-h-0 overflow-hidden flex flex-col pb-20" : "pb-24"}`}>
         {children}
       </main>
       <BottomNav />

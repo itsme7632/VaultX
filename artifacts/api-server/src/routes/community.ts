@@ -182,6 +182,13 @@ router.get("/community/channels/:id/messages", requireAuth, async (req: Request,
 
   await ensureMember(userId);
 
+  const [channelRow] = await db
+    .select({ type: communityChannelsTable.type })
+    .from(communityChannelsTable)
+    .where(eq(communityChannelsTable.id, channelId))
+    .limit(1);
+  const isAnnouncementChannel = channelRow?.type === "announcement";
+
   const rows = await db.execute(sql`
     SELECT
       m.id, m.channel_id AS "channelId", m.user_id AS "userId",
@@ -199,7 +206,12 @@ router.get("/community/channels/:id/messages", requireAuth, async (req: Request,
     LIMIT ${limit}
   `);
 
-  const messages = rows.rows as any[];
+  const allRows = rows.rows as any[];
+  // For announcement channels, exclude soft-deleted messages (legacy entries);
+  // hard-deleted ones are already gone from the DB.
+  const messages = isAnnouncementChannel
+    ? allRows.filter((m: any) => !m.isDeleted)
+    : allRows;
   if (!messages.length) {
     res.json([]);
     return;
@@ -458,7 +470,14 @@ router.post("/community/messages/:id/report", requireAuth, async (req: Request, 
 router.delete("/community/messages/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const messageId = parseInt(req.params.id, 10);
   const userId = req.session.userId!;
-  const isAdmin = req.session.isAdmin ?? false;
+
+  // Always check isAdmin from DB — session can be stale after promotion
+  const [userRow] = await db
+    .select({ isAdmin: usersTable.isAdmin })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+  const isAdmin = userRow?.isAdmin ?? false;
   const role = await getUserRole(userId, isAdmin);
 
   const [msg] = await db
@@ -474,13 +493,36 @@ router.delete("/community/messages/:id", requireAuth, async (req: Request, res: 
     return;
   }
 
-  await db.update(communityMessagesTable)
-    .set({ isDeleted: true, deletedBy: userId })
-    .where(eq(communityMessagesTable.id, messageId));
+  // Get channel type to decide hard vs soft delete
+  const [channelRow] = await db
+    .select({ type: communityChannelsTable.type })
+    .from(communityChannelsTable)
+    .where(eq(communityChannelsTable.id, msg.channelId))
+    .limit(1);
+  const isAnnouncement = channelRow?.type === "announcement";
+
+  // Always clean up pin record to prevent orphaned pins
+  await db
+    .delete(communityPinnedPostsTable)
+    .where(eq(communityPinnedPostsTable.messageId, messageId));
 
   await db.insert(communityMembersTable).values({ userId, communityRole: "member" }).onConflictDoNothing();
 
-  broadcastToChannel(msg.channelId, { type: "delete", messageId });
+  if (isAnnouncement) {
+    // Hard delete: remove from DB entirely — no "[Message removed]" in Announcements
+    await db
+      .delete(communityMessagesTable)
+      .where(eq(communityMessagesTable.id, messageId));
+    broadcastToChannel(msg.channelId, { type: "delete", messageId, hardDelete: true });
+  } else {
+    // Soft delete: mark as deleted, show "[Message removed]" in Chat/Support
+    await db
+      .update(communityMessagesTable)
+      .set({ isDeleted: true, deletedBy: userId })
+      .where(eq(communityMessagesTable.id, messageId));
+    broadcastToChannel(msg.channelId, { type: "delete", messageId, hardDelete: false });
+  }
+
   res.json({ success: true });
 });
 
