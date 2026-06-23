@@ -29,7 +29,7 @@ export default function MorePage() {
     {
       icon: Users,
       label: "Community Hub",
-      description: "Chat, announcements, leaderboards and support",
+      description: "Chat, announcements and community support",
       href: "/community",
       gradient: "from-violet-500 to-purple-600",
     },

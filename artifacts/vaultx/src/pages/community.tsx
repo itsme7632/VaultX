@@ -7,11 +7,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { formatUSDT } from "@/lib/format";
+
 import {
-  Megaphone, MessageCircle, Trophy, Headphones,
+  Megaphone, MessageCircle, Headphones,
   Send, Trash2, Pin, Flag, Reply, X, ChevronRight,
-  Crown, Shield, Star, TrendingUp, DollarSign, Users,
+  Shield,
   AlertCircle, RefreshCw, CornerDownRight, Wifi, WifiOff,
 } from "lucide-react";
 
@@ -44,14 +44,7 @@ interface MessageShape {
   createdAt: string;
 }
 
-interface LeaderboardData {
-  referrers: { rank: number; username: string; displayId: string | null; totalReferrals: number; totalEarned: number }[];
-  investors: { rank: number; username: string; displayId: string | null; totalInvested: number; planCount: number }[];
-  salaryEarners: { rank: number; username: string; displayId: string | null; totalPaid: number; currentTier: number | null }[];
-}
-
-type Tab = "announcements" | "chat" | "leaderboard" | "support";
-type LeaderTab = "referrers" | "investors" | "salary";
+type Tab = "announcements" | "chat" | "support";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -335,9 +328,11 @@ function ChatPane({
       ws.send(JSON.stringify({ type: "join", channelId: channel.id }));
     };
 
-    ws.onclose = () => {
+    ws.onclose = (evt) => {
       setWsConnected(false);
       if (isUnmounted.current) return;
+      // Don't reconnect on auth failure — session has expired or is invalid
+      if (evt.code === 4001) return;
       // Exponential back-off: 1 s → 2 s → 4 s → 8 s → 16 s → capped at 30 s
       const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30_000);
       reconnectAttempts.current = Math.min(reconnectAttempts.current + 1, 6);
@@ -602,137 +597,6 @@ function ChatPane({
   );
 }
 
-// ─── Leaderboard pane ─────────────────────────────────────────────────────────
-
-function LeaderboardPane() {
-  const [lbTab, setLbTab] = useState<LeaderTab>("referrers");
-
-  const { data, isLoading } = useQuery<LeaderboardData>({
-    queryKey: ["community-leaderboard"],
-    queryFn: () => apiGet("/api/community/leaderboard"),
-    staleTime: 60000,
-  });
-
-  const lbTabs: { key: LeaderTab; label: string; icon: typeof TrendingUp }[] = [
-    { key: "referrers", label: "Referrers", icon: Users },
-    { key: "investors", label: "Investors", icon: TrendingUp },
-    { key: "salary", label: "Salary", icon: DollarSign },
-  ];
-
-  const rankIcon = (rank: number) => {
-    if (rank === 1) return <Crown size={14} className="text-amber-500" />;
-    if (rank === 2) return <Star size={14} className="text-slate-400" />;
-    if (rank === 3) return <Star size={14} className="text-amber-700" />;
-    return <span className="text-[11px] font-bold text-muted-foreground w-4 text-center">{rank}</span>;
-  };
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="border-b border-border shrink-0">
-        <div className="flex">
-          {lbTabs.map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setLbTab(key)}
-              className={cn(
-                "flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors border-b-2",
-                lbTab === key
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Icon size={14} />
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {isLoading && (
-          <div className="flex items-center justify-center h-32">
-            <RefreshCw size={18} className="animate-spin text-muted-foreground" />
-          </div>
-        )}
-
-        {!isLoading && lbTab === "referrers" && (
-          <div className="divide-y divide-border/50">
-            {(data?.referrers ?? []).length === 0 && (
-              <div className="py-12 text-center text-sm text-muted-foreground">No referral data yet.</div>
-            )}
-            {(data?.referrers ?? []).map((r) => (
-              <div key={r.rank} className="flex items-center gap-3 px-4 py-3">
-                <div className="w-6 flex items-center justify-center shrink-0">{rankIcon(r.rank)}</div>
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-800/30 flex items-center justify-center text-xs font-bold text-blue-600">
-                  {r.username.slice(0, 1).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">@{r.username}</p>
-                  {r.displayId && <p className="text-[10px] text-muted-foreground">{r.displayId}</p>}
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-bold text-foreground">{r.totalReferrals} refs</p>
-                  <p className="text-[10px] text-emerald-600">{formatUSDT(r.totalEarned)} earned</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!isLoading && lbTab === "investors" && (
-          <div className="divide-y divide-border/50">
-            {(data?.investors ?? []).length === 0 && (
-              <div className="py-12 text-center text-sm text-muted-foreground">No investor data yet.</div>
-            )}
-            {(data?.investors ?? []).map((r) => (
-              <div key={r.rank} className="flex items-center gap-3 px-4 py-3">
-                <div className="w-6 flex items-center justify-center shrink-0">{rankIcon(r.rank)}</div>
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-800/30 flex items-center justify-center text-xs font-bold text-purple-600">
-                  {r.username.slice(0, 1).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">@{r.username}</p>
-                  {r.displayId && <p className="text-[10px] text-muted-foreground">{r.displayId}</p>}
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-bold text-foreground">{formatUSDT(r.totalInvested)}</p>
-                  <p className="text-[10px] text-muted-foreground">{r.planCount} plan{r.planCount !== 1 ? "s" : ""}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {!isLoading && lbTab === "salary" && (
-          <div className="divide-y divide-border/50">
-            {(data?.salaryEarners ?? []).length === 0 && (
-              <div className="py-12 text-center text-sm text-muted-foreground">No salary earners yet.</div>
-            )}
-            {(data?.salaryEarners ?? []).map((r) => (
-              <div key={r.rank} className="flex items-center gap-3 px-4 py-3">
-                <div className="w-6 flex items-center justify-center shrink-0">{rankIcon(r.rank)}</div>
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-800/30 flex items-center justify-center text-xs font-bold text-amber-600">
-                  {r.username.slice(0, 1).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground">@{r.username}</p>
-                  {r.displayId && <p className="text-[10px] text-muted-foreground">{r.displayId}</p>}
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="text-xs font-bold text-amber-600">{formatUSDT(r.totalPaid)}</p>
-                  {r.currentTier && (
-                    <p className="text-[10px] text-muted-foreground">Tier {r.currentTier}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // ─── Support pane ─────────────────────────────────────────────────────────────
 
 function SupportPane({ channel, currentUserId, isAdmin }: {
@@ -826,7 +690,6 @@ export default function CommunityPage() {
   const tabs: { key: Tab; label: string; icon: typeof Megaphone }[] = [
     { key: "announcements", label: "Announcements", icon: Megaphone },
     { key: "chat", label: "Chat", icon: MessageCircle },
-    { key: "leaderboard", label: "Leaderboard", icon: Trophy },
     { key: "support", label: "Support", icon: Headphones },
   ];
 
@@ -901,12 +764,6 @@ export default function CommunityPage() {
                 <p className="text-sm text-muted-foreground">Chat channel unavailable.</p>
               </div>
             )}
-          </div>
-        )}
-
-        {!channelsLoading && tab === "leaderboard" && (
-          <div className="h-full">
-            <LeaderboardPane />
           </div>
         )}
 

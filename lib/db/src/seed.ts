@@ -730,6 +730,15 @@ async function seedDemoUser(db: ReturnType<typeof drizzle<typeof schema>>) {
 }
 
 async function seedCommunityChannels(db: ReturnType<typeof drizzle<typeof schema>>) {
+  // Guard: only seed if no channels exist at all.
+  // onConflictDoNothing() alone doesn't prevent duplicates because the table
+  // has no unique constraint on name/type — only on the auto-increment PK.
+  const existing = await db.select().from(communityChannelsTable).limit(1);
+  if (existing.length > 0) {
+    console.log("[seed] Community channels already seeded — skipping ✓");
+    return;
+  }
+
   const channels = [
     { name: "Announcements", type: "announcement", description: "Official announcements from the Wexora team", isLocked: false, sortOrder: 0 },
     { name: "General Chat", type: "chat", description: "Open discussion for all Wexora members", isLocked: false, sortOrder: 1 },
@@ -737,9 +746,9 @@ async function seedCommunityChannels(db: ReturnType<typeof drizzle<typeof schema
   ];
 
   for (const ch of channels) {
-    await db.insert(communityChannelsTable).values(ch as any).onConflictDoNothing();
+    await db.insert(communityChannelsTable).values(ch as any);
   }
-  console.log("[seed] Community channels verified ✓");
+  console.log("[seed] Community channels seeded ✓");
 }
 
 async function ensureSalarySettings(db: ReturnType<typeof drizzle<typeof schema>>) {

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   Shield, FileCheck, User, Bell, BellOff, ChevronRight, LogOut,
-  Globe, Moon, Sun, Languages,
+  Globe, Moon, Sun, Languages, Users,
 } from "lucide-react";
 import { useLogout } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -156,6 +156,14 @@ export default function SettingsPage() {
         <Section title="Account">
           <Item icon={User} label="Profile" description="Name, email, avatar" onClick={() => setLocation("/profile")} testId="settings-profile" />
           <Item icon={Shield} label="Security" description="Password, 2FA, sessions" onClick={() => setLocation("/security")} testId="settings-security" />
+          <Item
+            icon={Users}
+            label="Referrals"
+            description="Invite friends and earn 5% commission"
+            onClick={() => setLocation("/referrals")}
+            iconBg="bg-emerald-500/10"
+            iconColor="text-emerald-600"
+          />
           {kycEnabled && (
             <Item
               icon={FileCheck}

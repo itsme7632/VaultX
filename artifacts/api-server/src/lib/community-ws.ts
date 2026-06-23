@@ -61,11 +61,35 @@ export function broadcastToChannel(channelId: number, payload: object, excludeUs
 }
 
 export function setupCommunityWS(server: Server): void {
-  const wss = new WebSocketServer({ server, path: "/ws/community" });
+  // Use noServer mode so we can intercept the HTTP upgrade event manually.
+  // This allows us to accept both path forms:
+  //   /ws/community        — direct connection (no proxy prefix)
+  //   /api/ws/community    — when Replit proxy does NOT strip the /api prefix for WS upgrades
+  // Without this, one of the two paths would always fail with a 404, causing
+  // the client to reconnect indefinitely and show "Reconnecting…".
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (req, socket, head) => {
+    const rawUrl = req.url ?? "";
+    // Strip query string for path matching
+    const pathname = rawUrl.split("?")[0];
+    if (pathname === "/ws/community" || pathname === "/api/ws/community") {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req);
+      });
+    } else {
+      // Unknown WS path — close cleanly
+      socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+      socket.destroy();
+    }
+  });
 
   wss.on("connection", async (ws, req) => {
     const userId = await getUserIdFromCookie(req.headers.cookie ?? "");
-    if (!userId) { ws.close(4001, "Unauthorized"); return; }
+    if (!userId) {
+      ws.close(4001, "Unauthorized");
+      return;
+    }
 
     onlineUsers.set(userId, (onlineUsers.get(userId) ?? 0) + 1);
     const myChannels = new Set<number>();
