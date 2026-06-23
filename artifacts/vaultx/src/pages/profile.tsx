@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Camera, Edit3, Check, X, Shield, FileCheck, Copy, CheckCircle } from "lucide-react";
+import { Edit3, Check, X, Shield, FileCheck, Copy, CheckCircle, Lock } from "lucide-react";
 import { useUpdateUserProfile, getGetMeQueryKey } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -42,14 +41,11 @@ export default function ProfilePage() {
 
   const [form, setForm] = useState({
     fullName: user?.fullName ?? "",
-    whatsapp: user?.whatsapp ?? "",
-    country: user?.country ?? "",
-    avatarUrl: user?.avatarUrl ?? "",
   });
 
   const handleSave = () => {
     updateProfile.mutate(
-      { data: form },
+      { data: { fullName: form.fullName } },
       {
         onSuccess: () => {
           toast({ title: "Profile updated" });
@@ -70,14 +66,6 @@ export default function ProfilePage() {
 
   const initials = user?.fullName?.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() ?? "W";
   const kyc = kycBadge(user?.kycStatus ?? "none");
-
-  const fields = kycEnabled ? [
-    { label: "Full Name", key: "fullName" as const },
-    { label: "WhatsApp", key: "whatsapp" as const },
-    { label: "Country", key: "country" as const },
-  ] : [
-    { label: "Full Name", key: "fullName" as const },
-  ];
 
   return (
     <AppLayout title="Profile">
@@ -133,7 +121,7 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <h3 className="font-semibold text-sm text-foreground">Personal Information</h3>
             {!editing ? (
-              <Button variant="ghost" size="sm" className="h-7 text-xs text-primary gap-1" onClick={() => setEditing(true)} data-testid="button-edit-profile">
+              <Button variant="ghost" size="sm" className="h-7 text-xs text-primary gap-1" onClick={() => { setForm({ fullName: user?.fullName ?? "" }); setEditing(true); }} data-testid="button-edit-profile">
                 <Edit3 size={12} /> Edit
               </Button>
             ) : (
@@ -148,27 +136,57 @@ export default function ProfilePage() {
             )}
           </div>
           <div className="divide-y divide-border">
-            {fields.map(({ label, key }) => (
-              <div key={key} className="px-4 py-3">
-                <p className="text-xs text-muted-foreground mb-1">{label}</p>
-                {editing ? (
-                  <Input
-                    value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    className="h-9 text-sm"
-                    data-testid={`input-${key}`}
-                  />
-                ) : (
-                  <p className="text-sm font-medium text-foreground">{(user as any)?.[key] || "—"}</p>
-                )}
-              </div>
-            ))}
+            {/* Full Name — editable */}
+            <div className="px-4 py-3">
+              <p className="text-xs text-muted-foreground mb-1">Full Name</p>
+              {editing ? (
+                <Input
+                  value={form.fullName}
+                  onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+                  className="h-9 text-sm"
+                  data-testid="input-fullName"
+                />
+              ) : (
+                <p className="text-sm font-medium text-foreground">{user?.fullName || "—"}</p>
+              )}
+            </div>
+
+            {/* WhatsApp — locked/read-only */}
             {kycEnabled && (
               <div className="px-4 py-3">
-                <p className="text-xs text-muted-foreground mb-1">Email</p>
+                <div className="flex items-center gap-1 mb-1">
+                  <p className="text-xs text-muted-foreground">WhatsApp</p>
+                  <Lock size={9} className="text-muted-foreground/60" />
+                </div>
+                <p className="text-sm font-medium text-foreground">{(user as any)?.whatsapp || "—"}</p>
+                {editing && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Contact support to change your WhatsApp number.</p>
+                )}
+              </div>
+            )}
+
+            {/* Country — locked/read-only */}
+            {kycEnabled && (
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-1 mb-1">
+                  <p className="text-xs text-muted-foreground">Country</p>
+                  <Lock size={9} className="text-muted-foreground/60" />
+                </div>
+                <p className="text-sm font-medium text-foreground">{(user as any)?.country || "—"}</p>
+              </div>
+            )}
+
+            {/* Email — read-only */}
+            {kycEnabled && (
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-1 mb-1">
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <Lock size={9} className="text-muted-foreground/60" />
+                </div>
                 <p className="text-sm font-medium text-foreground">{user?.email}</p>
               </div>
             )}
+
             {kycEnabled && (
               <div className="px-4 py-3">
                 <p className="text-xs text-muted-foreground mb-1">Member since</p>

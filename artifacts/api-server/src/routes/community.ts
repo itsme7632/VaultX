@@ -235,7 +235,16 @@ router.get("/community/channels/:id/messages", requireAuth, async (req: Request,
 router.post("/community/channels/:id/messages", requireAuth, async (req: Request, res: Response): Promise<void> => {
   const channelId = parseInt(req.params.id, 10);
   const userId = req.session.userId!;
-  const isAdmin = req.session.isAdmin ?? false;
+
+  // Always check DB for isAdmin so newly-promoted admins work without re-login
+  const [dbUser] = await db
+    .select({ isAdmin: usersTable.isAdmin })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+  const isAdmin = dbUser?.isAdmin ?? false;
+  // Sync session so future middleware checks are also correct
+  if (isAdmin && !req.session.isAdmin) req.session.isAdmin = true;
 
   const [channel] = await db
     .select()

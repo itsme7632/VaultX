@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   Bell, User, Shield, Settings, LayoutDashboard, LogOut,
-  ChevronRight, Download, HeadphonesIcon, Sun, Moon,
+  ChevronRight, Download, HeadphonesIcon, Sun, Moon, Users,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "@/lib/theme";
@@ -91,7 +91,8 @@ export function TopBar({ title }: { title?: string }) {
   const menuItems = [
     { icon: User,            label: "Profile",           href: "/profile" },
     { icon: Shield,          label: "Security",          href: "/security" },
-    { icon: HeadphonesIcon,  label: "Customer Support",  href: "/support" },
+    { icon: Users,           label: "Referrals",         href: "/referrals" },
+    { icon: HeadphonesIcon,  label: "Support",           href: "/support" },
     { icon: Download,        label: "Download App",      href: "/download-app" },
     { icon: Settings,        label: "Settings",          href: "/settings" },
     ...(user?.isAdmin ? [{ icon: LayoutDashboard, label: "Admin Panel", href: "/admin" }] : []),

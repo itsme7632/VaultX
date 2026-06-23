@@ -235,6 +235,22 @@ router.post("/auth/logout", requireAuth, async (req, res): Promise<void> => {
   });
 });
 
+router.post("/auth/refresh-session", requireAuth, async (req, res): Promise<void> => {
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, req.session.userId!))
+    .limit(1);
+
+  if (!user) {
+    res.status(401).json({ error: "Not found" });
+    return;
+  }
+
+  req.session.isAdmin = user.isAdmin;
+  res.json({ isAdmin: user.isAdmin });
+});
+
 router.get("/auth/me", requireAuth, async (req, res): Promise<void> => {
   const [user] = await db
     .select()
