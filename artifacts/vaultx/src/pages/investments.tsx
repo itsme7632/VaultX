@@ -401,15 +401,12 @@ export default function InvestmentsPage() {
                 };
                 const scoreDiff = statusScore(b) - statusScore(a);
                 if (scoreDiff !== 0) return scoreDiff;
-                // 2. Highest funding %
-                const aStats = getPlanStats(a), bStats = getPlanStats(b);
-                if (bStats.raisedPct !== aStats.raisedPct) return bStats.raisedPct - aStats.raisedPct;
-                // 3. Highest capital raised
-                if (bStats.capitalRaised !== aStats.capitalRaised) return bStats.capitalRaised - aStats.capitalRaised;
-                // 4. Highest participant count
-                if (bStats.participants !== aStats.participants) return bStats.participants - aStats.participants;
-                // 5. Newest first
-                return b.id - a.id;
+                // 2. Min amount ascending (lowest entry barrier first)
+                const aMin = parseFloat(a.minAmount ?? a.min_amount ?? 0);
+                const bMin = parseFloat(b.minAmount ?? b.min_amount ?? 0);
+                if (aMin !== bMin) return aMin - bMin;
+                // 3. ID ascending as stable tiebreaker
+                return a.id - b.id;
               }).map((plan: any) => {
                 const minRoi = plan.minRoiRate ?? 0.013;
                 const maxRoi = plan.maxRoiRate ?? 0.017;

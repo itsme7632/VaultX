@@ -123,7 +123,7 @@ router.get("/investments/plans", async (_req, res): Promise<void> => {
         inArray(investmentPlansTable.status as any, VISIBLE_STATUSES),
       ),
     )
-    .orderBy((investmentPlansTable as any).sortOrder, investmentPlansTable.id);
+    .orderBy(investmentPlansTable.minAmount, investmentPlansTable.id);
 
   if (plans.length === 0) {
     res.json([]);

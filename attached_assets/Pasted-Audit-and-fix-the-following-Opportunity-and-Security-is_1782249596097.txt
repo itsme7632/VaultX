@@ -1,0 +1,143 @@
+Audit and fix the following Opportunity and Security issues.
+
+ISSUE #1 – Opportunity Sorting
+
+Current behavior:
+Investment opportunities are not displayed in logical order.
+
+Required fix:
+Sort all active investment plans by Minimum Investment amount ascending.
+
+Example order:
+
+$50 Starter Plan
+$100 Basic Plan
+$250 Growth Plan
+$500 Premium Plan
+$1000 Elite Plan
+
+Users should always see lower entry plans first.
+
+Apply sorting on:
+
+- Invest page
+- Opportunity listings
+- Admin preview
+- API responses
+
+Default order:
+minAmount ASC
+
+---
+
+ISSUE #2 – Participant Count Override Save Error
+
+Current error:
+
+Unexpected token '<', "<!DOCTYPE"... is not valid JSON
+
+This usually indicates the frontend expects JSON but the backend is returning HTML due to a failed route, redirect, exception, or invalid API response.
+
+Audit:
+
+- Opportunity save endpoint
+- Participant Count Override field
+- Form validation
+- API response format
+- Database insert/update queries
+
+Requirements:
+
+- Participant Count Override should save correctly.
+- Accept integer values only.
+- Blank value should auto-calculate participants.
+- API must always return JSON.
+- Never return HTML to JSON requests.
+
+Add proper error handling:
+
+{
+"success": false,
+"message": "Descriptive error"
+}
+
+instead of server HTML pages.
+
+---
+
+ISSUE #3 – 2FA Withdrawal Logic
+
+Current behavior:
+2FA is being treated as mandatory.
+
+Required behavior:
+
+2FA should be OPTIONAL.
+
+Withdrawal Security Flow:
+
+1. User enters withdrawal password.
+
+IF withdrawal password is correct:
+→ Process withdrawal normally.
+
+IF withdrawal password is incorrect:
+→ Ask for 2FA code as secondary verification.
+
+OR
+
+Admin setting:
+
+Enable:
+"Require 2FA For Withdrawals"
+
+Options:
+
+- Always Require
+- Optional (Default)
+- Disabled
+
+Default setting:
+Optional
+
+---
+
+ISSUE #4 – Admin Settings
+
+Create new Security Settings section:
+
+Withdrawal Security
+
+- Enable Withdrawal Password
+- Enable Optional 2FA
+- Require 2FA For All Withdrawals
+- Disable 2FA
+
+Only Super Admin can modify these settings.
+
+---
+
+ISSUE #5 – Full Audit
+
+Verify:
+
+✓ Opportunity creation
+✓ Opportunity editing
+✓ Opportunity sorting
+✓ Participant override saving
+✓ Start date
+✓ End date
+✓ ROI settings
+✓ Plan visibility
+✓ Featured plans
+✓ Popular plans
+✓ Trending badge
+✓ Auto compound settings
+✓ Withdrawal security logic
+
+Generate a final audit report listing:
+
+- Issues found
+- Issues fixed
+- Remaining warnings
+- Database migrations applied

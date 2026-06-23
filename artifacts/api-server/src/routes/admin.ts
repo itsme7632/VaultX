@@ -789,7 +789,7 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
     db.select({ s: sum(userInvestmentsTable.amount) }).from(userInvestmentsTable).where(eq(userInvestmentsTable.status, "active")),
     db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "completed"), gte(transactionsTable.createdAt, todayStart))),
     db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "withdrawal"), eq(transactionsTable.status, "completed"), gte(transactionsTable.createdAt, todayStart))),
-    db.select().from(investmentPlansTable).orderBy((investmentPlansTable as any).sortOrder, investmentPlansTable.id),
+    db.select().from(investmentPlansTable).orderBy(investmentPlansTable.minAmount, investmentPlansTable.id),
     db.select({
       planId: userInvestmentsTable.planId,
       activeCount: count(),
@@ -895,7 +895,7 @@ router.get("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
   const plans = await db
     .select()
     .from(investmentPlansTable)
-    .orderBy((investmentPlansTable as any).sortOrder, investmentPlansTable.id);
+    .orderBy(investmentPlansTable.minAmount, investmentPlansTable.id);
 
   if (plans.length === 0) {
     res.json([]);
@@ -928,49 +928,60 @@ router.get("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
 });
 
 router.post("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
-  const {
-    name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
-    durationDays, riskLevel, features, isActive, isFeatured, isPopular,
-    category, bannerImageUrl, fundingGoal, status, colorTheme, autoCompoundAvailable,
-    startDate, endDate, sortOrder, totalParticipantLimit, displayParticipantCount,
-  } = req.body;
+  try {
+    const {
+      name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
+      durationDays, riskLevel, features, isActive, isFeatured, isPopular,
+      category, bannerImageUrl, fundingGoal, status, colorTheme, autoCompoundAvailable,
+      startDate, endDate, sortOrder, totalParticipantLimit, displayParticipantCount,
+    } = req.body;
 
-  if (!name || !description || !minAmount || !maxAmount || !durationDays) {
-    res.status(400).json({ error: "Name, description, amounts, and duration required" });
-    return;
+    if (!name || !description || !minAmount || !maxAmount || !durationDays) {
+      res.status(400).json({ error: "Name, description, amounts, and duration required" });
+      return;
+    }
+
+    const midRoi = ((parseFloat(minRoiRate ?? "0.013") + parseFloat(maxRoiRate ?? "0.017")) / 2);
+
+    const safeInt = (v: any) => {
+      if (v === undefined || v === null || v === "") return null;
+      const n = parseInt(String(v), 10);
+      return isNaN(n) ? null : n;
+    };
+
+    const [plan] = await db.insert(investmentPlansTable).values({
+      name,
+      description,
+      minAmount: minAmount.toString(),
+      maxAmount: maxAmount.toString(),
+      dailyReturnRate: (dailyReturnRate ?? midRoi).toString(),
+      minRoiRate: (minRoiRate ?? 0.013).toString(),
+      maxRoiRate: (maxRoiRate ?? 0.017).toString(),
+      durationDays: parseInt(durationDays, 10),
+      riskLevel: riskLevel ?? "medium",
+      features: features ?? [],
+      isActive: isActive ?? true,
+      isFeatured: isFeatured ?? false,
+      isPopular: isPopular ?? false,
+      category: category ?? "General",
+      bannerImageUrl: bannerImageUrl ?? null,
+      fundingGoal: fundingGoal !== undefined && fundingGoal !== null ? fundingGoal.toString() : null,
+      currentFunding: "0",
+      status: status ?? "active",
+      colorTheme: colorTheme ?? "blue",
+      autoCompoundAvailable: autoCompoundAvailable ?? true,
+      startDate: startDate ? new Date(startDate) : null,
+      endDate: endDate ? new Date(endDate) : null,
+      sortOrder: sortOrder ?? 0,
+      totalParticipantLimit: safeInt(totalParticipantLimit),
+      displayParticipantCount: safeInt(displayParticipantCount),
+    } as any).returning();
+
+    res.status(201).json(serializeAdminPlan(plan));
+  } catch (err: any) {
+    console.error("Create plan error:", err);
+    res.status(500).json({ success: false, message: err?.message ?? "Failed to create plan" });
   }
-
-  const midRoi = ((parseFloat(minRoiRate ?? "0.013") + parseFloat(maxRoiRate ?? "0.017")) / 2);
-
-  const [plan] = await db.insert(investmentPlansTable).values({
-    name,
-    description,
-    minAmount: minAmount.toString(),
-    maxAmount: maxAmount.toString(),
-    dailyReturnRate: (dailyReturnRate ?? midRoi).toString(),
-    minRoiRate: (minRoiRate ?? 0.013).toString(),
-    maxRoiRate: (maxRoiRate ?? 0.017).toString(),
-    durationDays: parseInt(durationDays, 10),
-    riskLevel: riskLevel ?? "medium",
-    features: features ?? [],
-    isActive: isActive ?? true,
-    isFeatured: isFeatured ?? false,
-    isPopular: isPopular ?? false,
-    category: category ?? "General",
-    bannerImageUrl: bannerImageUrl ?? null,
-    fundingGoal: fundingGoal !== undefined && fundingGoal !== null ? fundingGoal.toString() : null,
-    currentFunding: "0",
-    status: status ?? "active",
-    colorTheme: colorTheme ?? "blue",
-    autoCompoundAvailable: autoCompoundAvailable ?? true,
-    startDate: startDate ? new Date(startDate) : null,
-    endDate: endDate ? new Date(endDate) : null,
-    sortOrder: sortOrder ?? 0,
-    totalParticipantLimit: totalParticipantLimit !== undefined && totalParticipantLimit !== null ? parseInt(totalParticipantLimit, 10) : null,
-    displayParticipantCount: displayParticipantCount !== undefined && displayParticipantCount !== null ? parseInt(displayParticipantCount, 10) : null,
-  } as any).returning();
-
-  res.status(201).json(serializeAdminPlan(plan));
 });
 
 router.put("/admin/plans/reorder", requireAdmin, async (req, res): Promise<void> => {
@@ -998,53 +1009,68 @@ router.put("/admin/plans/reorder", requireAdmin, async (req, res): Promise<void>
 });
 
 router.put("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => {
-  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const id = parseInt(raw, 10);
-  const {
-    name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
-    durationDays, riskLevel, features, isActive, isFeatured, isPopular,
-    category, bannerImageUrl, fundingGoal, currentFunding, status, colorTheme,
-    autoCompoundAvailable, startDate, endDate, sortOrder, totalParticipantLimit,
-    displayParticipantCount,
-  } = req.body;
+  try {
+    const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const id = parseInt(raw, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid plan ID" });
+      return;
+    }
+    const {
+      name, description, minAmount, maxAmount, dailyReturnRate, minRoiRate, maxRoiRate,
+      durationDays, riskLevel, features, isActive, isFeatured, isPopular,
+      category, bannerImageUrl, fundingGoal, currentFunding, status, colorTheme,
+      autoCompoundAvailable, startDate, endDate, sortOrder, totalParticipantLimit,
+      displayParticipantCount,
+    } = req.body;
 
-  const [existing] = await db.select().from(investmentPlansTable).where(eq(investmentPlansTable.id, id)).limit(1);
-  if (!existing) {
-    res.status(404).json({ error: "Plan not found" });
-    return;
+    const [existing] = await db.select().from(investmentPlansTable).where(eq(investmentPlansTable.id, id)).limit(1);
+    if (!existing) {
+      res.status(404).json({ error: "Plan not found" });
+      return;
+    }
+
+    const ex = existing as any;
+
+    const safeInt = (v: any) => {
+      if (v === undefined || v === null || v === "") return null;
+      const n = parseInt(String(v), 10);
+      return isNaN(n) ? null : n;
+    };
+
+    const [updated] = await db.update(investmentPlansTable).set({
+      name: name ?? existing.name,
+      description: description ?? existing.description,
+      minAmount: minAmount !== undefined ? minAmount.toString() : existing.minAmount,
+      maxAmount: maxAmount !== undefined ? maxAmount.toString() : existing.maxAmount,
+      dailyReturnRate: dailyReturnRate !== undefined ? dailyReturnRate.toString() : existing.dailyReturnRate,
+      minRoiRate: minRoiRate !== undefined ? minRoiRate.toString() : existing.minRoiRate,
+      maxRoiRate: maxRoiRate !== undefined ? maxRoiRate.toString() : existing.maxRoiRate,
+      durationDays: durationDays !== undefined ? parseInt(durationDays, 10) : existing.durationDays,
+      riskLevel: riskLevel ?? existing.riskLevel,
+      features: features !== undefined ? features : existing.features,
+      isActive: isActive !== undefined ? isActive : existing.isActive,
+      isFeatured: isFeatured !== undefined ? isFeatured : existing.isFeatured,
+      isPopular: isPopular !== undefined ? isPopular : (ex.isPopular ?? false),
+      category: category !== undefined ? category : (ex.category ?? "General"),
+      bannerImageUrl: bannerImageUrl !== undefined ? bannerImageUrl : (ex.bannerImageUrl ?? null),
+      fundingGoal: fundingGoal !== undefined ? (fundingGoal !== null ? fundingGoal.toString() : null) : (ex.fundingGoal ?? null),
+      currentFunding: currentFunding !== undefined ? currentFunding.toString() : (ex.currentFunding ?? "0"),
+      status: status !== undefined ? status : (ex.status ?? "active"),
+      colorTheme: colorTheme !== undefined ? colorTheme : (ex.colorTheme ?? "blue"),
+      autoCompoundAvailable: autoCompoundAvailable !== undefined ? autoCompoundAvailable : (ex.autoCompoundAvailable ?? true),
+      startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : (ex.startDate ?? null),
+      endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : (ex.endDate ?? null),
+      sortOrder: sortOrder !== undefined ? sortOrder : (ex.sortOrder ?? 0),
+      totalParticipantLimit: totalParticipantLimit !== undefined ? safeInt(totalParticipantLimit) : (ex.totalParticipantLimit ?? null),
+      displayParticipantCount: displayParticipantCount !== undefined ? safeInt(displayParticipantCount) : (ex.displayParticipantCount ?? null),
+    } as any).where(eq(investmentPlansTable.id, id)).returning();
+
+    res.json(serializeAdminPlan(updated));
+  } catch (err: any) {
+    console.error("Update plan error:", err);
+    res.status(500).json({ success: false, message: err?.message ?? "Failed to update plan" });
   }
-
-  const ex = existing as any;
-
-  const [updated] = await db.update(investmentPlansTable).set({
-    name: name ?? existing.name,
-    description: description ?? existing.description,
-    minAmount: minAmount !== undefined ? minAmount.toString() : existing.minAmount,
-    maxAmount: maxAmount !== undefined ? maxAmount.toString() : existing.maxAmount,
-    dailyReturnRate: dailyReturnRate !== undefined ? dailyReturnRate.toString() : existing.dailyReturnRate,
-    minRoiRate: minRoiRate !== undefined ? minRoiRate.toString() : existing.minRoiRate,
-    maxRoiRate: maxRoiRate !== undefined ? maxRoiRate.toString() : existing.maxRoiRate,
-    durationDays: durationDays !== undefined ? parseInt(durationDays, 10) : existing.durationDays,
-    riskLevel: riskLevel ?? existing.riskLevel,
-    features: features !== undefined ? features : existing.features,
-    isActive: isActive !== undefined ? isActive : existing.isActive,
-    isFeatured: isFeatured !== undefined ? isFeatured : existing.isFeatured,
-    isPopular: isPopular !== undefined ? isPopular : (ex.isPopular ?? false),
-    category: category !== undefined ? category : (ex.category ?? "General"),
-    bannerImageUrl: bannerImageUrl !== undefined ? bannerImageUrl : (ex.bannerImageUrl ?? null),
-    fundingGoal: fundingGoal !== undefined ? (fundingGoal !== null ? fundingGoal.toString() : null) : (ex.fundingGoal ?? null),
-    currentFunding: currentFunding !== undefined ? currentFunding.toString() : (ex.currentFunding ?? "0"),
-    status: status !== undefined ? status : (ex.status ?? "active"),
-    colorTheme: colorTheme !== undefined ? colorTheme : (ex.colorTheme ?? "blue"),
-    autoCompoundAvailable: autoCompoundAvailable !== undefined ? autoCompoundAvailable : (ex.autoCompoundAvailable ?? true),
-    startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : (ex.startDate ?? null),
-    endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : (ex.endDate ?? null),
-    sortOrder: sortOrder !== undefined ? sortOrder : (ex.sortOrder ?? 0),
-    totalParticipantLimit: totalParticipantLimit !== undefined ? (totalParticipantLimit !== null ? parseInt(totalParticipantLimit, 10) : null) : (ex.totalParticipantLimit ?? null),
-    displayParticipantCount: displayParticipantCount !== undefined ? (displayParticipantCount !== null && displayParticipantCount !== "" ? parseInt(displayParticipantCount, 10) : null) : (ex.displayParticipantCount ?? null),
-  } as any).where(eq(investmentPlansTable.id, id)).returning();
-
-  res.json(serializeAdminPlan(updated));
 });
 
 router.delete("/admin/plans/:id", requireAdmin, async (req, res): Promise<void> => {

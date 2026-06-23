@@ -2432,6 +2432,39 @@ function SettingsTab({ settingsData, toast }: { settingsData: any; toast: any })
         </Button>
       </div>
 
+      {/* Withdrawal Security Settings */}
+      <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <Lock size={14} className="text-red-500" />
+          <p className="text-sm font-bold text-foreground">Withdrawal Security</p>
+        </div>
+        <p className="text-xs text-muted-foreground -mt-1">Control whether 2FA (Authenticator) is required when users make a withdrawal.</p>
+
+        <div>
+          <Label className="text-xs text-muted-foreground">2FA Mode for Withdrawals</Label>
+          <Select
+            value={form["withdrawal_2fa_mode"] ?? "optional"}
+            onValueChange={(v) => setForm((f) => ({ ...f, withdrawal_2fa_mode: v }))}
+          >
+            <SelectTrigger className="mt-1 h-9 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="optional">Optional — Password only required; 2FA verified if provided</SelectItem>
+              <SelectItem value="always">Always — Both withdrawal password AND 2FA code required</SelectItem>
+              <SelectItem value="disabled">Disabled — Password only; 2FA field hidden entirely</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            <strong>Optional</strong>: users can submit with just their withdrawal password. If they have 2FA enabled and enter a code, it is also verified. <strong>Always</strong>: users with 2FA enabled must provide both. <strong>Disabled</strong>: the 2FA field is hidden and never checked.
+          </p>
+        </div>
+
+        <Button className="w-full h-10 font-semibold" onClick={handleSave} disabled={saving}>
+          {saving ? "Saving…" : "Save Security Settings"}
+        </Button>
+      </div>
+
       {/* Activity Feed Settings */}
       <div className="bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
         <div className="flex items-center gap-2 mb-1">

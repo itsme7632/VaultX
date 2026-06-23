@@ -53,8 +53,10 @@ export default function WithdrawPage() {
 
   const savedAddresses: any[] = secStatus?.withdrawalAddresses ?? [];
   const allConfigured = secStatus?.allConfigured ?? false;
+  const twoFaMode: string = platformSettings?.withdrawal_2fa_mode ?? "optional";
+  const twoFaRequired = twoFaMode === "always" && secStatus?.twoFaEnabled;
+  const show2Fa = twoFaMode !== "disabled" && secStatus?.twoFaEnabled;
   const missingItems: string[] = [];
-  if (secStatus && !secStatus.twoFaEnabled) missingItems.push("Authenticator (2FA)");
   if (secStatus && !secStatus.hasWithdrawalPassword) missingItems.push("Withdrawal Password");
   if (secStatus && savedAddresses.length === 0) missingItems.push("Withdrawal Address");
 
@@ -121,7 +123,6 @@ export default function WithdrawPage() {
 
           <div className="bg-white border border-border rounded-2xl divide-y divide-border overflow-hidden shadow-sm">
             {[
-              { label: "Authenticator (2FA)", ok: secStatus.twoFaEnabled, href: "/setup-2fa" },
               { label: "Withdrawal Password", ok: secStatus.hasWithdrawalPassword, href: "/security" },
               { label: "Withdrawal Address", ok: savedAddresses.length > 0, href: "/security" },
             ].map(({ label, ok, href }) => (
@@ -359,20 +360,27 @@ export default function WithdrawPage() {
               />
             </div>
 
-            <div>
-              <Label className="text-sm font-semibold mb-2 block">Authenticator Code</Label>
-              <Input
-                value={twoFaCode}
-                onChange={e => setTwoFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                placeholder="000 000"
-                className="h-14 text-center text-2xl tracking-[0.4em] font-bold font-mono rounded-xl border-2 focus:border-primary"
-                maxLength={6}
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-              />
-              <p className="text-xs text-muted-foreground mt-1.5 px-1 text-center">6-digit code from your authenticator app</p>
-            </div>
+            {show2Fa && (
+              <div>
+                <Label className="text-sm font-semibold mb-2 block">
+                  Authenticator Code
+                  {!twoFaRequired && <span className="ml-1.5 text-xs font-normal text-muted-foreground">(optional)</span>}
+                </Label>
+                <Input
+                  value={twoFaCode}
+                  onChange={e => setTwoFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="000 000"
+                  className="h-14 text-center text-2xl tracking-[0.4em] font-bold font-mono rounded-xl border-2 focus:border-primary"
+                  maxLength={6}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                />
+                <p className="text-xs text-muted-foreground mt-1.5 px-1 text-center">
+                  {twoFaRequired ? "Required: 6-digit code from your authenticator app" : "Optional: add extra security with your 6-digit authenticator code"}
+                </p>
+              </div>
+            )}
 
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-1.5">
               <p className="text-xs font-bold text-foreground mb-2">Withdrawal Summary</p>
@@ -427,7 +435,7 @@ export default function WithdrawPage() {
               className="bg-red-500 hover:bg-red-600 font-bold rounded-2xl shadow-lg"
               style={{ height: 52 }}
               onClick={handleSubmit}
-              disabled={submitting || !wdPassword || twoFaCode.length !== 6}
+              disabled={submitting || !wdPassword || (twoFaRequired && twoFaCode.length !== 6)}
             >
               {submitting ? (
                 <span className="flex items-center gap-2">

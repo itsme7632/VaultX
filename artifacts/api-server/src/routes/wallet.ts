@@ -170,7 +170,6 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
     .where(eq(withdrawalAddressesTable.userId, req.session.userId!));
 
   const missing: string[] = [];
-  if (!user.twoFaEnabled) missing.push("Authenticator (2FA)");
   if (!user.withdrawalPasswordHash) missing.push("Withdrawal Password");
   if (savedAddresses.length === 0) missing.push("Withdrawal Address");
 
@@ -184,6 +183,8 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
+  const twoFaMode = await getSetting("withdrawal_2fa_mode", "optional");
+
   if (!withdrawalPassword) {
     res.status(400).json({ error: "Password required", message: "Withdrawal password is required" });
     return;
@@ -194,19 +195,32 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
     return;
   }
 
-  if (!twoFaCode) {
-    res.status(400).json({ error: "2FA required", message: "Authenticator code is required" });
-    return;
-  }
-  const codeValid = speakeasy.totp.verify({
-    secret: user.twoFaSecret!,
-    encoding: "base32",
-    token: String(twoFaCode),
-    window: 1,
-  });
-  if (!codeValid) {
-    res.status(400).json({ error: "Invalid 2FA code", message: "Authenticator code is incorrect or expired" });
-    return;
+  if (twoFaMode === "always" && user.twoFaEnabled) {
+    if (!twoFaCode) {
+      res.status(400).json({ error: "2FA required", message: "Authenticator code is required for this withdrawal" });
+      return;
+    }
+    const codeValid = speakeasy.totp.verify({
+      secret: user.twoFaSecret!,
+      encoding: "base32",
+      token: String(twoFaCode),
+      window: 1,
+    });
+    if (!codeValid) {
+      res.status(400).json({ error: "Invalid 2FA code", message: "Authenticator code is incorrect or expired" });
+      return;
+    }
+  } else if (twoFaMode !== "disabled" && user.twoFaEnabled && twoFaCode) {
+    const codeValid = speakeasy.totp.verify({
+      secret: user.twoFaSecret!,
+      encoding: "base32",
+      token: String(twoFaCode),
+      window: 1,
+    });
+    if (!codeValid) {
+      res.status(400).json({ error: "Invalid 2FA code", message: "Authenticator code is incorrect or expired" });
+      return;
+    }
   }
 
   const kycRequired = await getSetting("kyc_required_for_withdrawal", "false");

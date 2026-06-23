@@ -35,7 +35,7 @@ router.get("/security/status", requireAuth, async (req, res): Promise<void> => {
       maskedAddress: maskAddress(a.address),
       createdAt: a.createdAt,
     })),
-    allConfigured: user.twoFaEnabled && !!user.withdrawalPasswordHash && addresses.length > 0,
+    allConfigured: !!user.withdrawalPasswordHash && addresses.length > 0,
   });
 });
 
