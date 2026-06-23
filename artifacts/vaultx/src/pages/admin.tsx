@@ -76,6 +76,8 @@ export default function AdminPage() {
   const [resetPwModal, setResetPwModal] = useState<{ userId: number; username: string } | null>(null);
   const [resetNewPw, setResetNewPw] = useState("");
   const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", type: "announcement" as AdminBroadcastBodyType });
+  const [communityNotifyForm, setCommunityNotifyForm] = useState({ title: "📢 New Announcement", message: "" });
+  const [communityNotifsEnabled, setCommunityNotifsEnabled] = useState<boolean | null>(null);
   const [roiRunning, setRoiRunning] = useState(false);
   const [roiResult, setRoiResult] = useState<{ processed: number; matured: number; skipped: number } | null>(null);
   const [planSearch, setPlanSearch] = useState("");
@@ -104,7 +106,7 @@ export default function AdminPage() {
   const { data: networks } = useQuery({ queryKey: ["admin-networks"], queryFn: () => adminApi("/admin/deposit-networks"), staleTime: 30000 });
   const { data: newsData } = useQuery({ queryKey: ["admin-news"], queryFn: () => adminApi("/admin/news"), staleTime: 30000 });
   const { data: depData, isLoading: depLoading } = useQuery({ queryKey: ["admin-deposits", depFilter], queryFn: () => adminApi(`/admin/deposits?status=${depFilter}`), staleTime: 20000, enabled: tab === "deposits" });
-  const { data: settingsData, refetch: refetchSettings } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" || tab === "content" || tab === "plans" });
+  const { data: settingsData, refetch: refetchSettings } = useQuery({ queryKey: ["admin-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "settings" || tab === "content" || tab === "plans" || tab === "broadcast" });
   const { data: resetLogs } = useQuery({ queryKey: ["admin-reset-logs"], queryFn: () => adminApi("/admin/password-reset-logs"), staleTime: 30000, enabled: tab === "logs" });
   const { data: appSettings, refetch: refetchAppSettings } = useQuery({ queryKey: ["admin-app-settings"], queryFn: () => adminApi("/admin/app-settings"), staleTime: 30000, enabled: tab === "app-settings" });
   const { data: aboutData, refetch: refetchAbout } = useQuery({ queryKey: ["admin-about"], queryFn: () => adminApi("/admin/about"), staleTime: 30000, enabled: tab === "about" });
@@ -129,6 +131,10 @@ export default function AdminPage() {
   const rejectWd = useAdminRejectWithdrawal();
   const adjustBalance = useAdminAdjustBalance();
   const broadcast = useAdminBroadcastNotification();
+  const communityNotify = useMutation({
+    mutationFn: (data: { title: string; message: string }) =>
+      adminApi("/community/admin/notify", "POST", data),
+  });
 
   const approveDep = useMutation({
     mutationFn: (id: number) => adminApi(`/admin/deposits/${id}/approve`, "POST"),
@@ -150,6 +156,7 @@ export default function AdminPage() {
     try { setBadgeForm(JSON.parse(s.opportunity_badges ?? "{}")); } catch { setBadgeForm({}); }
     try { setCustomStatsForm(JSON.parse(s.opportunity_custom_stats ?? "{}")); } catch { setCustomStatsForm({}); }
     try { setMomentumOverrides(JSON.parse(s.momentum_overrides ?? "{}")); } catch { setMomentumOverrides({}); }
+    setCommunityNotifsEnabled(s.community_notifications_enabled !== "false");
   }, [settingsData]);
 
   const saveAnalyticsSettings = async () => {
@@ -1107,28 +1114,91 @@ export default function AdminPage() {
 
           {/* BROADCAST */}
           {tab === "broadcast" && (
-            <div className="bg-white border border-border rounded-2xl p-4 shadow-sm space-y-3">
-              <h3 className="font-semibold text-sm">Broadcast Notification</h3>
-              <div>
-                <Label className="text-xs">Type</Label>
-                <Select value={broadcastForm.type} onValueChange={(v) => setBroadcastForm(f => ({ ...f, type: v as AdminBroadcastBodyType }))}>
-                  <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {["announcement", "security", "earning", "transaction", "referral"].map((t) => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+            <div className="space-y-4">
+              {/* General Broadcast */}
+              <div className="bg-white dark:bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
+                <h3 className="font-semibold text-sm">Broadcast Notification</h3>
+                <div>
+                  <Label className="text-xs">Type</Label>
+                  <Select value={broadcastForm.type} onValueChange={(v) => setBroadcastForm(f => ({ ...f, type: v as AdminBroadcastBodyType }))}>
+                    <SelectTrigger className="mt-1 h-9 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["announcement", "security", "earning", "transaction", "referral"].map((t) => <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Title</Label>
+                  <Input value={broadcastForm.title} onChange={(e) => setBroadcastForm(f => ({ ...f, title: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="Notification title" />
+                </div>
+                <div>
+                  <Label className="text-xs">Message</Label>
+                  <Textarea value={broadcastForm.message} onChange={(e) => setBroadcastForm(f => ({ ...f, message: e.target.value }))} className="mt-1 text-sm min-h-[80px] resize-none" placeholder="Message content..." />
+                </div>
+                <Button className="w-full h-10 text-sm" onClick={() => broadcast.mutate({ data: broadcastForm }, { onSuccess: (r: any) => { toast({ title: "Broadcast sent!", description: `Sent to ${r.sentTo} users` }); setBroadcastForm({ title: "", message: "", type: "announcement" }); }, onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }) })} disabled={broadcast.isPending || !broadcastForm.title || !broadcastForm.message}>
+                  {broadcast.isPending ? "Sending..." : "Send to All Users"}
+                </Button>
               </div>
-              <div>
-                <Label className="text-xs">Title</Label>
-                <Input value={broadcastForm.title} onChange={(e) => setBroadcastForm(f => ({ ...f, title: e.target.value }))} className="mt-1 h-9 text-sm" placeholder="Notification title" />
+
+              {/* Community Announcement Notifications */}
+              <div className="bg-white dark:bg-card border border-border rounded-2xl p-4 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-sm">Community Announcement Notifications</h3>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Notify all members when an announcement is posted</p>
+                  </div>
+                  <Switch
+                    checked={communityNotifsEnabled ?? true}
+                    onCheckedChange={async (v) => {
+                      setCommunityNotifsEnabled(v);
+                      try {
+                        await adminApi("/admin/settings", "PUT", { community_notifications_enabled: v ? "true" : "false" });
+                        toast({ title: v ? "Notifications enabled" : "Notifications disabled" });
+                      } catch {
+                        setCommunityNotifsEnabled(!v);
+                        toast({ title: "Error", description: "Could not update setting", variant: "destructive" });
+                      }
+                    }}
+                  />
+                </div>
+                <div className="border-t border-border pt-3 space-y-3">
+                  <p className="text-[11px] text-muted-foreground">Send a standalone notification blast to all active users without posting a message to the channel.</p>
+                  <div>
+                    <Label className="text-xs">Title</Label>
+                    <Input
+                      value={communityNotifyForm.title}
+                      onChange={(e) => setCommunityNotifyForm(f => ({ ...f, title: e.target.value }))}
+                      className="mt-1 h-9 text-sm"
+                      placeholder="📢 New Announcement"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Message</Label>
+                    <Textarea
+                      value={communityNotifyForm.message}
+                      onChange={(e) => setCommunityNotifyForm(f => ({ ...f, message: e.target.value }))}
+                      className="mt-1 text-sm min-h-[70px] resize-none"
+                      placeholder="Message to send to all users..."
+                    />
+                  </div>
+                  <Button
+                    className="w-full h-10 text-sm"
+                    variant="outline"
+                    onClick={() =>
+                      communityNotify.mutate(communityNotifyForm, {
+                        onSuccess: (r: any) => {
+                          toast({ title: "Notification blast sent!", description: `Sent to ${r.sentTo} users` });
+                          setCommunityNotifyForm({ title: "📢 New Announcement", message: "" });
+                        },
+                        onError: (e: any) => toast({ title: "Error", description: e?.message ?? "Failed to send", variant: "destructive" }),
+                      })
+                    }
+                    disabled={communityNotify.isPending || !communityNotifyForm.message.trim()}
+                  >
+                    {communityNotify.isPending ? "Sending…" : "Send Notification Blast"}
+                  </Button>
+                </div>
               </div>
-              <div>
-                <Label className="text-xs">Message</Label>
-                <Textarea value={broadcastForm.message} onChange={(e) => setBroadcastForm(f => ({ ...f, message: e.target.value }))} className="mt-1 text-sm min-h-[80px] resize-none" placeholder="Message content..." />
-              </div>
-              <Button className="w-full h-10 text-sm" onClick={() => broadcast.mutate({ data: broadcastForm }, { onSuccess: (r: any) => { toast({ title: "Broadcast sent!", description: `Sent to ${r.sentTo} users` }); setBroadcastForm({ title: "", message: "", type: "announcement" }); }, onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }) })} disabled={broadcast.isPending || !broadcastForm.title || !broadcastForm.message}>
-                {broadcast.isPending ? "Sending..." : "Send to All Users"}
-              </Button>
             </div>
           )}
 

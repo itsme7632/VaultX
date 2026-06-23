@@ -749,6 +749,7 @@ async function ensureSalarySettings(db: ReturnType<typeof drizzle<typeof schema>
     { key: "salary_tier1_amount", value: "100" },
     { key: "salary_tier2_volume", value: "3500" },
     { key: "salary_tier2_amount", value: "300" },
+    { key: "community_notifications_enabled", value: "true" },
   ];
   for (const s of defaults) {
     await db.insert(platformSettingsTable).values(s).onConflictDoNothing();

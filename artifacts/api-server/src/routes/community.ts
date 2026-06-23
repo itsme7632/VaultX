@@ -16,9 +16,19 @@ import {
   userInvestmentsTable,
   referralSalaryTable,
   notificationsTable,
+  platformSettingsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { broadcastToChannel, getOnlineUserCount } from "../lib/community-ws";
+
+async function getSetting(key: string, fallback: string): Promise<string> {
+  const [row] = await db
+    .select({ value: platformSettingsTable.value })
+    .from(platformSettingsTable)
+    .where(eq(platformSettingsTable.key, key))
+    .limit(1);
+  return row?.value ?? fallback;
+}
 
 const router: IRouter = Router();
 
@@ -327,18 +337,24 @@ router.post("/community/channels/:id/messages", requireAuth, async (req: Request
   broadcastToChannel(channelId, { type: "message", data: shaped });
 
   if (channel.type === "announcement") {
-    const allUsers = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.isActive, true));
-    const notifs = allUsers.map((u: { id: number }) => ({
-      userId: u.id,
-      type: "community_announcement" as const,
-      title: "📢 New Announcement",
-      message: content.slice(0, 100) + (content.length > 100 ? "…" : ""),
-      isRead: false,
-      isBroadcast: false,
-    }));
-    if (notifs.length > 0) {
-      for (let i = 0; i < notifs.length; i += 100) {
-        await db.insert(notificationsTable).values(notifs.slice(i, i + 100)).onConflictDoNothing();
+    const notificationsEnabled = await getSetting("community_notifications_enabled", "true");
+    if (notificationsEnabled !== "false") {
+      const allUsers = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(and(eq(usersTable.isActive, true), eq(usersTable.isAdmin, false)));
+      const notifs = allUsers.map((u: { id: number }) => ({
+        userId: u.id,
+        type: "community_announcement" as const,
+        title: "📢 New Announcement",
+        message: filtered.slice(0, 120) + (filtered.length > 120 ? "…" : ""),
+        isRead: false,
+        isBroadcast: false,
+      }));
+      if (notifs.length > 0) {
+        for (let i = 0; i < notifs.length; i += 100) {
+          await db.insert(notificationsTable).values(notifs.slice(i, i + 100)).onConflictDoNothing();
+        }
       }
     }
   }
@@ -657,6 +673,43 @@ router.put("/community/admin/role", requireAuth, async (req: Request, res: Respo
   await db.insert(communityMembersTable).values({ userId, communityRole: role })
     .onConflictDoUpdate({ target: communityMembersTable.userId, set: { communityRole: role } });
   res.json({ success: true });
+});
+
+// ── POST /community/admin/notify (admin-only standalone blast) ────────────
+
+router.post("/community/admin/notify", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  if (!req.session.isAdmin) { res.status(403).json({ error: "Admin only" }); return; }
+
+  const { title = "📢 New Announcement", message = "" } = req.body;
+  if (!message.trim()) { res.status(400).json({ error: "Message is required" }); return; }
+
+  const notificationsEnabled = await getSetting("community_notifications_enabled", "true");
+  if (notificationsEnabled === "false") {
+    res.status(400).json({ error: "Community notifications are disabled" });
+    return;
+  }
+
+  const allUsers = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(and(eq(usersTable.isActive, true), eq(usersTable.isAdmin, false)));
+
+  const notifs = allUsers.map((u: { id: number }) => ({
+    userId: u.id,
+    type: "community_announcement" as const,
+    title,
+    message: message.slice(0, 200),
+    isRead: false,
+    isBroadcast: false,
+  }));
+
+  if (notifs.length > 0) {
+    for (let i = 0; i < notifs.length; i += 100) {
+      await db.insert(notificationsTable).values(notifs.slice(i, i + 100)).onConflictDoNothing();
+    }
+  }
+
+  res.json({ success: true, sentTo: notifs.length });
 });
 
 // ── GET /community/notifications ──────────────────────────────────────────

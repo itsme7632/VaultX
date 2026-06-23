@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const TYPE_ICON: Record<string, typeof Bell> = {
   announcement: Megaphone,
+  community_announcement: Megaphone,
   transaction: DollarSign,
   security: Shield,
   referral: Users,
@@ -22,6 +23,7 @@ const TYPE_ICON: Record<string, typeof Bell> = {
 
 const TYPE_COLOR: Record<string, string> = {
   announcement: "bg-primary/10 text-primary",
+  community_announcement: "bg-violet-500/10 text-violet-600",
   transaction: "bg-accent/10 text-accent",
   security: "bg-amber-500/10 text-amber-600",
   referral: "bg-purple-500/10 text-purple-500",
@@ -178,7 +180,10 @@ export default function NotificationsPage() {
                       >
                         <button
                           className="flex items-start gap-3 flex-1 text-left min-w-0"
-                          onClick={() => !n.isRead && handleMarkRead(n.id)}
+                          onClick={() => {
+                            if (!n.isRead) handleMarkRead(n.id);
+                            if (n.type === "community_announcement") setLocation("/community");
+                          }}
                         >
                           <div className={cn(
                             "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5",
