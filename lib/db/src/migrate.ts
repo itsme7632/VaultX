@@ -359,6 +359,94 @@ const COLUMN_MIGRATIONS_SQL = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_channels" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "name" text NOT NULL,
+    "type" text DEFAULT 'chat' NOT NULL,
+    "description" text DEFAULT '' NOT NULL,
+    "is_locked" boolean DEFAULT false NOT NULL,
+    "sort_order" integer DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_messages" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "channel_id" integer NOT NULL,
+    "user_id" integer NOT NULL,
+    "content" text DEFAULT '' NOT NULL,
+    "image_url" text,
+    "reply_to_id" integer,
+    "is_deleted" boolean DEFAULT false NOT NULL,
+    "deleted_by" integer,
+    "is_pinned" boolean DEFAULT false NOT NULL,
+    "is_system_message" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_reactions" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "message_id" integer NOT NULL,
+    "user_id" integer NOT NULL,
+    "emoji" text NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_reports" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "message_id" integer NOT NULL,
+    "reporter_id" integer NOT NULL,
+    "reason" text DEFAULT '' NOT NULL,
+    "status" text DEFAULT 'pending' NOT NULL,
+    "reviewed_by" integer,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_pinned_posts" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "channel_id" integer NOT NULL,
+    "message_id" integer NOT NULL,
+    "pinned_by" integer NOT NULL,
+    "pinned_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_bans" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "banned_by" integer NOT NULL,
+    "reason" text DEFAULT '' NOT NULL,
+    "is_active" boolean DEFAULT true NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_mutes" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "muted_by" integer NOT NULL,
+    "reason" text DEFAULT '' NOT NULL,
+    "expires_at" timestamp with time zone,
+    "is_active" boolean DEFAULT true NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_notifications" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL,
+    "type" text NOT NULL,
+    "message_id" integer,
+    "channel_id" integer,
+    "title" text NOT NULL,
+    "body" text DEFAULT '' NOT NULL,
+    "is_read" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "community_members" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL UNIQUE,
+    "community_role" text DEFAULT 'member' NOT NULL,
+    "joined_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
 ];
 
 const sslConfig =

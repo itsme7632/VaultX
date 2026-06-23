@@ -1,7 +1,9 @@
+import http from "http";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations, backfillTransactionIds } from "@workspace/db";
 import { runSeed } from "@workspace/db";
+import { setupCommunityWS } from "./lib/community-ws";
 
 const rawPort = process.env["PORT"];
 
@@ -30,7 +32,10 @@ async function main() {
   await backfillTransactionIds();
   logger.info("Transaction ID backfill complete ✓");
 
-  app.listen(port, (err?: Error) => {
+  const httpServer = http.createServer(app);
+  setupCommunityWS(httpServer);
+
+  httpServer.listen(port, (err?: Error) => {
     if (err) {
       logger.error({ err }, "Error listening on port");
       process.exit(1);
