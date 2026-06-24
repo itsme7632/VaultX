@@ -12,6 +12,7 @@ import {
   Send, Trash2, Pin, Flag, Reply, X, ChevronRight,
   Shield, AlertCircle, RefreshCw, CornerDownRight,
   Wifi, WifiOff, Ticket, Lock, HelpCircle, Users, MoreHorizontal,
+  ImageIcon, Download, ZoomIn, Loader2,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,9 +59,61 @@ async function apiDelete(path: string): Promise<any> {
   return res.json();
 }
 
+// Upload with progress via XHR
+function uploadImage(
+  file: File,
+  onProgress: (pct: number) => void,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append("image", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data.imageUrl as string);
+        } catch {
+          reject(new Error("Invalid server response"));
+        }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText);
+          reject(new Error(err.error ?? "Upload failed"));
+        } catch {
+          reject(new Error(`Upload failed (${xhr.status})`));
+        }
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network error during upload"));
+    xhr.open("POST", "/api/community/upload-image");
+    xhr.send(fd);
+  });
+}
+
 // ─── Constants & Helpers ──────────────────────────────────────────────────────
 
 const EMOJI_LIST = ["👍", "❤️", "🔥", "😂", "🎉", "👏", "💎", "🚀"];
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
+function validateImageFile(file: File): string | null {
+  if (!ALLOWED_TYPES.includes(file.type.toLowerCase())) {
+    return "Only JPG, PNG, and WebP images are supported.";
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return `Image is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 5 MB.`;
+  }
+  return null;
+}
 
 function formatTime(iso: string): string {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -88,6 +141,186 @@ function avatarColor(u: string): string {
   let h = 0;
   for (let i = 0; i < u.length; i++) h = u.charCodeAt(i) + ((h << 5) - h);
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+// ─── ImageLightbox ─────────────────────────────────────────────────────────
+
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [scale, setScale] = useState(1);
+  const [origin, setOrigin] = useState({ x: 50, y: 50 });
+  const lastPinchRef = useRef<number | null>(null);
+
+  // Block body scroll while lightbox is open
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length !== 2) return;
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (lastPinchRef.current === null) { lastPinchRef.current = dist; return; }
+    const delta = dist / lastPinchRef.current;
+    lastPinchRef.current = dist;
+    setScale(s => Math.max(1, Math.min(5, s * delta)));
+    // Origin = midpoint of two fingers relative to image
+    const rect = imgRef.current?.getBoundingClientRect();
+    if (rect) {
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      setOrigin({
+        x: ((mx - rect.left) / rect.width) * 100,
+        y: ((my - rect.top) / rect.height) * 100,
+      });
+    }
+  };
+
+  const handleTouchEnd = () => { lastPinchRef.current = null; };
+
+  const handleDownload = async () => {
+    try {
+      const res = await fetch(src, { credentials: "include" });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const ext = src.split(".").pop()?.split("?")[0] ?? "jpg";
+      a.download = `wexora-community-image.${ext}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {}
+  };
+
+  const handleDoubleClick = () => {
+    setScale(s => s > 1 ? 1 : 2.5);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] bg-black/95 flex flex-col"
+      onClick={() => { if (scale === 1) onClose(); }}
+    >
+      {/* Toolbar */}
+      <div
+        className="flex items-center justify-between px-4 py-3 shrink-0"
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white transition-colors"
+        >
+          <X size={18} />
+        </button>
+        <div className="flex items-center gap-2">
+          {scale > 1 && (
+            <button
+              onClick={() => setScale(1)}
+              className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs transition-colors"
+            >
+              Reset
+            </button>
+          )}
+          <button
+            onClick={handleDownload}
+            className="w-9 h-9 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/20 text-white transition-colors"
+            title="Download image"
+          >
+            <Download size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/* Image area */}
+      <div
+        className="flex-1 flex items-center justify-center overflow-hidden"
+        onClick={e => e.stopPropagation()}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onDoubleClick={handleDoubleClick}
+      >
+        <img
+          ref={imgRef}
+          src={src}
+          alt="Community image"
+          className="max-w-full max-h-full object-contain select-none transition-transform duration-150"
+          style={{
+            transform: `scale(${scale})`,
+            transformOrigin: `${origin.x}% ${origin.y}%`,
+            cursor: scale > 1 ? "move" : "zoom-in",
+          }}
+          draggable={false}
+        />
+      </div>
+
+      {/* Hint */}
+      {scale === 1 && (
+        <p className="text-center text-white/30 text-[11px] pb-4 shrink-0">
+          Double-tap or pinch to zoom · Tap outside to close
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── ImageBubble ──────────────────────────────────────────────────────────────
+
+function ImageBubble({
+  src, caption, isOwn = false,
+}: {
+  src: string; caption?: string; isOwn?: boolean;
+}) {
+  const [lightbox, setLightbox] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [errored, setErrored] = useState(false);
+
+  return (
+    <>
+      {lightbox && <ImageLightbox src={src} onClose={() => setLightbox(false)} />}
+
+      <div
+        className={cn(
+          "relative rounded-xl overflow-hidden cursor-pointer group max-w-[220px]",
+          isOwn ? "ml-auto" : ""
+        )}
+        onClick={() => !errored && setLightbox(true)}
+      >
+        {!loaded && !errored && (
+          <div className="w-[220px] h-[160px] flex items-center justify-center bg-muted rounded-xl">
+            <Loader2 size={20} className="animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {errored && (
+          <div className="w-[180px] h-[120px] flex flex-col items-center justify-center bg-muted rounded-xl gap-1.5">
+            <ImageIcon size={18} className="text-muted-foreground/40" />
+            <p className="text-[10px] text-muted-foreground">Image unavailable</p>
+          </div>
+        )}
+        <img
+          src={src}
+          alt={caption ?? "Image"}
+          className={cn(
+            "rounded-xl object-cover max-h-[320px] w-full transition-opacity",
+            loaded ? "opacity-100" : "opacity-0 absolute inset-0",
+            errored && "hidden"
+          )}
+          onLoad={() => setLoaded(true)}
+          onError={() => { setLoaded(true); setErrored(true); }}
+          draggable={false}
+        />
+        {/* Zoom overlay */}
+        {loaded && !errored && (
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 group-active:bg-black/30 transition-colors flex items-center justify-center">
+            <ZoomIn size={20} className="text-white opacity-0 group-hover:opacity-80 transition-opacity" />
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
 
 // ─── UserAvatar ───────────────────────────────────────────────────────────────
@@ -141,24 +374,19 @@ function MobileActionSheet({
   const canMod = isAdmin || msg.communityRole === "moderator";
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex flex-col justify-end"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-[60] flex flex-col justify-end" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50" />
       <div
         className="relative bg-card rounded-t-2xl shadow-2xl overflow-hidden max-h-[85dvh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        {/* Handle + preview */}
         <div className="px-4 pt-3 pb-2.5 border-b border-border bg-muted/40">
           <div className="w-10 h-1 bg-border rounded-full mx-auto mb-3" />
           <p className="text-[11px] text-muted-foreground truncate">
-            {msg.isDeleted ? "[Message removed]" : msg.content}
+            {msg.isDeleted ? "[Message removed]" : (msg.imageUrl && !msg.content ? "📷 Image" : msg.content)}
           </p>
         </div>
 
-        {/* Quick emoji reactions */}
         {!msg.isDeleted && (
           <div className="px-4 py-3 border-b border-border">
             <div className="flex gap-1 justify-around">
@@ -175,15 +403,13 @@ function MobileActionSheet({
           </div>
         )}
 
-        {/* Action buttons */}
         <div className="divide-y divide-border">
           {!msg.isDeleted && !isAnnouncement && (
             <button
               onClick={() => { onReply(msg); onClose(); }}
               className="flex items-center gap-3 w-full px-5 py-4 text-[15px] text-foreground hover:bg-muted active:bg-muted/70 transition-colors"
             >
-              <Reply size={19} className="text-muted-foreground shrink-0" />
-              Reply
+              <Reply size={19} className="text-muted-foreground shrink-0" /> Reply
             </button>
           )}
           {canMod && !msg.isDeleted && (
@@ -200,8 +426,7 @@ function MobileActionSheet({
               onClick={() => { onReport(msg.id); onClose(); }}
               className="flex items-center gap-3 w-full px-5 py-4 text-[15px] text-foreground hover:bg-muted active:bg-muted/70 transition-colors"
             >
-              <Flag size={19} className="text-muted-foreground shrink-0" />
-              Report
+              <Flag size={19} className="text-muted-foreground shrink-0" /> Report
             </button>
           )}
           {!msg.isDeleted && (isOwn || canMod) && (
@@ -209,22 +434,19 @@ function MobileActionSheet({
               onClick={() => { onDelete(msg.id); onClose(); }}
               className="flex items-center gap-3 w-full px-5 py-4 text-[15px] text-destructive hover:bg-destructive/10 active:bg-destructive/15 transition-colors"
             >
-              <Trash2 size={19} className="shrink-0" />
-              Delete
+              <Trash2 size={19} className="shrink-0" /> Delete
             </button>
           )}
         </div>
 
-        {/* Cancel */}
         <div className="px-4 py-3">
           <button
             onClick={onClose}
-            className="w-full py-3.5 rounded-xl bg-muted text-sm font-semibold text-foreground hover:bg-muted/80 active:bg-muted/60 transition-colors"
+            className="w-full py-3.5 rounded-xl bg-muted text-sm font-semibold text-foreground hover:bg-muted/80 transition-colors"
           >
             Cancel
           </button>
         </div>
-        {/* Safe area bottom spacer */}
         <div className="h-[env(safe-area-inset-bottom,0px)]" />
       </div>
     </div>
@@ -265,7 +487,6 @@ function AnnouncementCard({
     if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
   };
 
-  // Hard-deleted announcements are gone from DB; filter any legacy soft-deleted
   if (msg.isDeleted) return null;
 
   return (
@@ -290,7 +511,6 @@ function AnnouncementCard({
         onTouchMove={cancelLongPress}
         onTouchCancel={cancelLongPress}
       >
-        {/* Pinned banner */}
         {msg.isPinned && (
           <div className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-100/80 dark:bg-amber-900/30 border-b border-amber-200/60 dark:border-amber-700/30">
             <Pin size={10} className="text-amber-600 dark:text-amber-400" />
@@ -311,9 +531,18 @@ function AnnouncementCard({
                   {formatFullTime(msg.createdAt)}
                 </span>
               </div>
-              <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground">
-                {msg.content}
-              </p>
+
+              {/* Content + optional image */}
+              {msg.content && (
+                <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground mb-2">
+                  {msg.content}
+                </p>
+              )}
+              {msg.imageUrl && (
+                <div className="mt-1">
+                  <ImageBubble src={msg.imageUrl} caption={msg.content || undefined} />
+                </div>
+              )}
             </div>
 
             {/* Desktop admin menu */}
@@ -338,8 +567,7 @@ function AnnouncementCard({
                       onClick={() => { onDelete(msg.id); setShowMenu(false); }}
                       className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
                     >
-                      <Trash2 size={13} />
-                      Delete
+                      <Trash2 size={13} /> Delete
                     </button>
                   </div>
                 )}
@@ -367,7 +595,7 @@ function AnnouncementCard({
             </div>
           )}
 
-          {/* Emoji picker row */}
+          {/* Emoji quick-react row */}
           <div className="flex flex-wrap gap-0.5 mt-2 ml-14">
             {EMOJI_LIST.map(em => (
               <button
@@ -407,7 +635,6 @@ function ChatMessage({
   const canMod = isAdmin || msg.communityRole === "moderator";
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Group consecutive messages from same author within 5 min
   const isSameAuthor = !!(
     prevMsg &&
     prevMsg.userId === msg.userId &&
@@ -420,10 +647,7 @@ function ChatMessage({
   const cancelLongPress = () => {
     if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
   };
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setShowActionSheet(true);
-  };
+  const handleContextMenu = (e: React.MouseEvent) => { e.preventDefault(); setShowActionSheet(true); };
 
   return (
     <>
@@ -448,7 +672,6 @@ function ChatMessage({
         onTouchCancel={cancelLongPress}
         onContextMenu={handleContextMenu}
       >
-        {/* Pin label */}
         {msg.isPinned && !isSameAuthor && (
           <p className={cn(
             "text-[9px] text-amber-600 dark:text-amber-400 font-semibold mb-1 flex items-center gap-1",
@@ -459,7 +682,6 @@ function ChatMessage({
         )}
 
         <div className={cn("flex items-end gap-2", isOwn && "flex-row-reverse")}>
-          {/* Avatar — others only, first in group */}
           {!isOwn && (
             isSameAuthor
               ? <div className="w-7 shrink-0" />
@@ -467,7 +689,6 @@ function ChatMessage({
           )}
 
           <div className={cn("flex flex-col min-w-0 max-w-[78%]", isOwn && "items-end")}>
-            {/* Author header — others, first in group */}
             {!isOwn && !isSameAuthor && (
               <div className="flex items-center gap-1.5 mb-0.5 px-1 flex-wrap">
                 <span className="text-[12px] font-semibold text-foreground">@{msg.username}</span>
@@ -475,43 +696,68 @@ function ChatMessage({
               </div>
             )}
 
-            {/* Message bubble */}
-            <div className={cn(
-              "relative px-3 pt-2 pb-1.5 rounded-2xl text-[13px] leading-relaxed break-words whitespace-pre-wrap",
-              isOwn
-                ? "bg-primary text-primary-foreground rounded-br-[4px]"
-                : "bg-muted text-foreground rounded-bl-[4px]",
-              msg.isDeleted && "opacity-60 italic text-xs"
-            )}>
-              {/* Reply preview */}
-              {msg.replyTo && !msg.isDeleted && (
-                <div className={cn(
-                  "mb-2 px-2 py-1 rounded-lg border-l-2 text-[11px] leading-snug",
-                  isOwn
-                    ? "bg-white/20 border-white/60"
-                    : "bg-background/60 border-primary/50"
-                )}>
-                  <p className={cn("font-semibold truncate", isOwn ? "text-white/90" : "text-primary")}>
-                    @{msg.replyTo.username}
+            {/* Image-only or image + text: render image outside bubble */}
+            {msg.imageUrl && !msg.isDeleted ? (
+              <div className={cn("mb-1", isOwn && "items-end flex flex-col")}>
+                <ImageBubble src={msg.imageUrl} caption={msg.content || undefined} isOwn={isOwn} />
+                {/* Caption bubble if text present */}
+                {msg.content && (
+                  <div className={cn(
+                    "mt-1 px-3 pt-1.5 pb-1 rounded-2xl text-[13px] leading-relaxed break-words whitespace-pre-wrap max-w-full",
+                    isOwn
+                      ? "bg-primary text-primary-foreground rounded-br-[4px]"
+                      : "bg-muted text-foreground rounded-bl-[4px]"
+                  )}>
+                    <span>{msg.content}</span>
+                    <span className={cn(
+                      "inline-block float-right ml-2 mt-0.5 text-[9px] leading-none",
+                      isOwn ? "text-white/55" : "text-muted-foreground/60"
+                    )}>
+                      {formatTime(msg.createdAt)}
+                    </span>
+                    <div className="clear-both" />
+                  </div>
+                )}
+                {/* Timestamp when no caption */}
+                {!msg.content && (
+                  <p className={cn("text-[9px] mt-0.5 px-0.5", isOwn ? "text-muted-foreground/60 text-right" : "text-muted-foreground/60")}>
+                    {formatTime(msg.createdAt)}
                   </p>
-                  <p className={cn("truncate", isOwn ? "text-white/70" : "text-muted-foreground")}>
-                    {msg.replyTo.content}
-                  </p>
-                </div>
-              )}
-
-              {/* Content */}
-              <span>{msg.content}</span>
-
-              {/* Timestamp (floated right, inside bubble) */}
-              <span className={cn(
-                "inline-block float-right ml-2 mt-0.5 text-[9px] leading-none",
-                isOwn ? "text-white/55" : "text-muted-foreground/60"
+                )}
+              </div>
+            ) : (
+              /* Standard text bubble */
+              <div className={cn(
+                "relative px-3 pt-2 pb-1.5 rounded-2xl text-[13px] leading-relaxed break-words whitespace-pre-wrap",
+                isOwn
+                  ? "bg-primary text-primary-foreground rounded-br-[4px]"
+                  : "bg-muted text-foreground rounded-bl-[4px]",
+                msg.isDeleted && "opacity-60 italic text-xs"
               )}>
-                {formatTime(msg.createdAt)}
-              </span>
-              <div className="clear-both" />
-            </div>
+                {/* Reply preview */}
+                {msg.replyTo && !msg.isDeleted && (
+                  <div className={cn(
+                    "mb-2 px-2 py-1 rounded-lg border-l-2 text-[11px] leading-snug",
+                    isOwn ? "bg-white/20 border-white/60" : "bg-background/60 border-primary/50"
+                  )}>
+                    <p className={cn("font-semibold truncate", isOwn ? "text-white/90" : "text-primary")}>
+                      @{msg.replyTo.username}
+                    </p>
+                    <p className={cn("truncate", isOwn ? "text-white/70" : "text-muted-foreground")}>
+                      {msg.replyTo.content || "📷 Image"}
+                    </p>
+                  </div>
+                )}
+                <span>{msg.content}</span>
+                <span className={cn(
+                  "inline-block float-right ml-2 mt-0.5 text-[9px] leading-none",
+                  isOwn ? "text-white/55" : "text-muted-foreground/60"
+                )}>
+                  {formatTime(msg.createdAt)}
+                </span>
+                <div className="clear-both" />
+              </div>
+            )}
 
             {/* Reactions */}
             {msg.reactions.length > 0 && (
@@ -533,7 +779,7 @@ function ChatMessage({
               </div>
             )}
 
-            {/* Desktop: inline emoji picker */}
+            {/* Desktop inline emoji picker */}
             {showEmoji && !msg.isDeleted && (
               <div className={cn(
                 "mt-1 flex flex-wrap gap-0.5 p-2 bg-card border border-border rounded-xl shadow-lg z-40 relative",
@@ -558,47 +804,94 @@ function ChatMessage({
               "flex items-center gap-0.5 shrink-0 transition-opacity",
               showEmoji ? "opacity-100" : "opacity-0 group-hover:opacity-100"
             )}>
-              <button
-                onClick={() => setShowEmoji(v => !v)}
+              <button onClick={() => setShowEmoji(v => !v)}
                 className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors text-sm"
-                title="React"
-              >😊</button>
-              <button
-                onClick={() => onReply(msg)}
+                title="React">😊</button>
+              <button onClick={() => onReply(msg)}
                 className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-                title="Reply"
-              ><Reply size={12} /></button>
+                title="Reply"><Reply size={12} /></button>
               {!isOwn && (
-                <button
-                  onClick={() => onReport(msg.id)}
+                <button onClick={() => onReport(msg.id)}
                   className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-                  title="Report"
-                ><Flag size={11} /></button>
+                  title="Report"><Flag size={11} /></button>
               )}
               {(isOwn || canMod) && (
-                <button
-                  onClick={() => onDelete(msg.id)}
+                <button onClick={() => onDelete(msg.id)}
                   className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-950/30 transition-colors"
-                  title="Delete"
-                ><Trash2 size={11} /></button>
+                  title="Delete"><Trash2 size={11} /></button>
               )}
               {canMod && (
-                <button
-                  onClick={() => onPin(msg.id)}
+                <button onClick={() => onPin(msg.id)}
                   className={cn(
                     "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
-                    msg.isPinned
-                      ? "text-amber-500 bg-amber-50 dark:bg-amber-950/20"
-                      : "text-muted-foreground hover:bg-muted"
+                    msg.isPinned ? "text-amber-500 bg-amber-50 dark:bg-amber-950/20" : "text-muted-foreground hover:bg-muted"
                   )}
-                  title={msg.isPinned ? "Unpin" : "Pin"}
-                ><Pin size={11} /></button>
+                  title={msg.isPinned ? "Unpin" : "Pin"}><Pin size={11} /></button>
               )}
             </div>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+// ─── ImagePreviewBar ──────────────────────────────────────────────────────────
+
+function ImagePreviewBar({
+  file, progress, onRemove,
+}: {
+  file: File;
+  progress: number | null;
+  onRemove: () => void;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string>("");
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  return (
+    <div className="mb-2 flex items-center gap-2 bg-muted rounded-xl px-2 py-2">
+      <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-muted-foreground/10">
+        {previewUrl && (
+          <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" draggable={false} />
+        )}
+        {/* Upload progress overlay */}
+        {progress !== null && progress < 100 && (
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+            <span className="text-white text-[10px] font-bold">{progress}%</span>
+          </div>
+        )}
+        {progress === 100 && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <Loader2 size={14} className="text-white animate-spin" />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium truncate text-foreground">{file.name}</p>
+        <p className="text-[10px] text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</p>
+        {progress !== null && progress < 100 && (
+          <div className="mt-1 h-1 bg-muted-foreground/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-200"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
+      </div>
+      {progress === null && (
+        <button
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-foreground shrink-0 p-1"
+        >
+          <X size={14} />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -620,6 +913,11 @@ function ChatPane({
   const [replyTo, setReplyTo] = useState<MessageShape | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
+  // Image state
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempts = useRef(0);
@@ -696,13 +994,11 @@ function ChatPane({
 
         } else if (payload.type === "delete") {
           if (payload.hardDelete) {
-            // Hard delete: remove from list entirely (announcements)
             setMessages(prev => prev.filter(m => m.id !== payload.messageId));
           } else {
-            // Soft delete: show "[Message removed]" (chat/support)
             setMessages(prev => prev.map(m =>
               m.id === payload.messageId
-                ? { ...m, isDeleted: true, content: "[Message removed]" }
+                ? { ...m, isDeleted: true, content: "[Message removed]", imageUrl: null }
                 : m
             ));
           }
@@ -714,22 +1010,16 @@ function ChatPane({
             const idx = reactions.findIndex(r => r.emoji === payload.emoji);
             if (payload.added) {
               if (idx >= 0) {
-                reactions[idx] = {
-                  ...reactions[idx],
-                  count: reactions[idx].count + 1,
-                  userReacted: payload.userId === currentUserId ? true : reactions[idx].userReacted,
-                };
+                reactions[idx] = { ...reactions[idx], count: reactions[idx].count + 1,
+                  userReacted: payload.userId === currentUserId ? true : reactions[idx].userReacted };
               } else {
                 reactions.push({ emoji: payload.emoji, count: 1, userReacted: payload.userId === currentUserId });
               }
             } else if (idx >= 0) {
               const nc = reactions[idx].count - 1;
               if (nc <= 0) reactions.splice(idx, 1);
-              else reactions[idx] = {
-                ...reactions[idx],
-                count: nc,
-                userReacted: payload.userId === currentUserId ? false : reactions[idx].userReacted,
-              };
+              else reactions[idx] = { ...reactions[idx], count: nc,
+                userReacted: payload.userId === currentUserId ? false : reactions[idx].userReacted };
             }
             return { ...m, reactions };
           }));
@@ -761,22 +1051,50 @@ function ChatPane({
     };
   }, [channel.id, connectWS]);
 
+  // ── Image picker ───────────────────────────────────────────────────────────
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const err = validateImageFile(file);
+    if (err) {
+      toast({ title: "Invalid image", description: err, variant: "destructive" });
+      return;
+    }
+    setImageFile(file);
+  };
+
   // ── Actions ────────────────────────────────────────────────────────────────
 
   const sendMessage = async () => {
-    if (!input.trim() || sending) return;
+    if ((!input.trim() && !imageFile) || sending) return;
+    setSending(true);
     const text = input.trim();
     setInput("");
-    setSending(true);
+    let uploadedUrl: string | null = null;
+
     try {
+      // Upload image first if present
+      if (imageFile) {
+        setUploadProgress(0);
+        uploadedUrl = await uploadImage(imageFile, setUploadProgress);
+        setUploadProgress(100);
+        setImageFile(null);
+        setUploadProgress(null);
+      }
+
       await apiPost(`/api/community/channels/${channel.id}/messages`, {
         content: text,
+        imageUrl: uploadedUrl ?? undefined,
         replyToId: replyTo?.id ?? null,
       });
       setReplyTo(null);
     } catch (e: any) {
-      toast({ title: "Error", description: e?.message ?? "Failed to send", variant: "destructive" });
-      setInput(text);
+      const msg = e?.message ?? "Failed to send";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+      if (!uploadedUrl) setInput(text); // restore text only if upload failed
+      setUploadProgress(null);
     } finally {
       setSending(false);
     }
@@ -789,12 +1107,11 @@ function ChatPane({
   const handleDelete = async (msgId: number) => {
     try {
       await apiDelete(`/api/community/messages/${msgId}`);
-      // Optimistic update
       if (announcementMode) {
         setMessages(prev => prev.filter(m => m.id !== msgId));
       } else {
         setMessages(prev => prev.map(m =>
-          m.id === msgId ? { ...m, isDeleted: true, content: "[Message removed]" } : m
+          m.id === msgId ? { ...m, isDeleted: true, content: "[Message removed]", imageUrl: null } : m
         ));
       }
     } catch (e: any) {
@@ -842,7 +1159,6 @@ function ChatPane({
 
       {/* Scrollable messages area */}
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-        {/* Empty state */}
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-40 text-center px-4 pt-6">
             {announcementMode ? (
@@ -861,7 +1177,6 @@ function ChatPane({
           </div>
         )}
 
-        {/* Message list */}
         {announcementMode
           ? messages.map(msg => (
               <AnnouncementCard
@@ -884,13 +1199,24 @@ function ChatPane({
       {/* Input toolbar */}
       {canPost && !isLocked && (
         <div className="border-t border-border bg-background px-3 pt-2 pb-3 shrink-0">
+          {/* Image preview */}
+          {imageFile && (
+            <ImagePreviewBar
+              file={imageFile}
+              progress={uploadProgress}
+              onRemove={() => { setImageFile(null); setUploadProgress(null); }}
+            />
+          )}
+
           {/* Reply preview strip */}
           {replyTo && (
             <div className="mb-2 flex items-center gap-2 bg-muted rounded-xl px-3 py-1.5">
               <CornerDownRight size={11} className="text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] font-semibold text-primary">@{replyTo.username}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{replyTo.content}</p>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  {replyTo.imageUrl && !replyTo.content ? "📷 Image" : replyTo.content}
+                </p>
               </div>
               <button onClick={() => setReplyTo(null)} className="text-muted-foreground hover:text-foreground shrink-0">
                 <X size={13} />
@@ -899,24 +1225,51 @@ function ChatPane({
           )}
 
           <div className="flex items-center gap-2">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            {/* Image picker button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending || uploadProgress !== null}
+              className={cn(
+                "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors border",
+                imageFile
+                  ? "bg-primary/10 border-primary/40 text-primary"
+                  : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              title="Attach image"
+            >
+              <ImageIcon size={17} />
+            </button>
+
             <Input
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
               }}
-              placeholder={announcementMode ? "Post an announcement…" : "Message…"}
+              placeholder={imageFile ? "Add a caption…" : announcementMode ? "Post an announcement…" : "Message…"}
               className="flex-1 h-10 text-sm rounded-xl bg-muted border-0 focus-visible:ring-1 focus-visible:ring-primary/40"
               maxLength={2000}
               autoComplete="off"
+              disabled={sending && !imageFile}
             />
             <Button
               size="icon"
               className="h-10 w-10 rounded-xl shrink-0"
               onClick={sendMessage}
-              disabled={!input.trim() || sending}
+              disabled={(!input.trim() && !imageFile) || (sending && uploadProgress !== null)}
             >
-              <Send size={15} />
+              {sending && uploadProgress !== null
+                ? <Loader2 size={15} className="animate-spin" />
+                : <Send size={15} />
+              }
             </Button>
           </div>
 
@@ -944,7 +1297,7 @@ function ChatPane({
         </div>
       )}
 
-      {/* Locked channel notice */}
+      {/* Locked channel */}
       {isLocked && (
         <div className="border-t border-border px-4 py-3 text-center shrink-0">
           <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5">
@@ -975,7 +1328,6 @@ function SupportPane({ channel, currentUserId, isAdmin }: {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Scrollable upper section */}
       <div className="shrink-0 overflow-y-auto px-4 py-4 space-y-3" style={{ maxHeight: "52%" }}>
         <div className="grid grid-cols-2 gap-3">
           <button
@@ -1041,7 +1393,6 @@ function SupportPane({ channel, currentUserId, isAdmin }: {
         )}
       </div>
 
-      {/* Community chat area */}
       {channel && (
         <div className="flex-1 min-h-0 border-t border-border">
           <ChatPane channel={channel} currentUserId={currentUserId} isAdmin={isAdmin} />

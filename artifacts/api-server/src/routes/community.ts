@@ -1,5 +1,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, and, desc, sql, count, sum, lt, isNull, or, inArray } from "drizzle-orm";
+import multer from "multer";
+import { randomUUID } from "crypto";
+import path from "path";
 import {
   db,
   usersTable,
@@ -20,6 +23,12 @@ import {
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { broadcastToChannel, getOnlineUserCount } from "../lib/community-ws";
+import {
+  saveCommunityImage,
+  communityImageExists,
+  openCommunityImageStream,
+  deleteCommunityImage,
+} from "../lib/localFileStorage";
 
 async function getSetting(key: string, fallback: string): Promise<string> {
   const [row] = await db
@@ -513,13 +522,23 @@ router.delete("/community/messages/:id", requireAuth, async (req: Request, res: 
     await db
       .delete(communityMessagesTable)
       .where(eq(communityMessagesTable.id, messageId));
+    // Clean up image file from disk if present
+    if (msg.imageUrl) {
+      const imgMatch = (msg.imageUrl as string).match(/\/api\/community\/images\/([^/]+)$/);
+      if (imgMatch) { try { await deleteCommunityImage(imgMatch[1]); } catch {} }
+    }
     broadcastToChannel(msg.channelId, { type: "delete", messageId, hardDelete: true });
   } else {
     // Soft delete: mark as deleted, show "[Message removed]" in Chat/Support
     await db
       .update(communityMessagesTable)
-      .set({ isDeleted: true, deletedBy: userId })
+      .set({ isDeleted: true, deletedBy: userId, imageUrl: null })
       .where(eq(communityMessagesTable.id, messageId));
+    // Clean up image file from disk if present
+    if (msg.imageUrl) {
+      const imgMatch = (msg.imageUrl as string).match(/\/api\/community\/images\/([^/]+)$/);
+      if (imgMatch) { try { await deleteCommunityImage(imgMatch[1]); } catch {} }
+    }
     broadcastToChannel(msg.channelId, { type: "delete", messageId, hardDelete: false });
   }
 
@@ -817,5 +836,133 @@ router.get("/community/reports", requireAuth, async (req: Request, res: Response
   `);
   res.json(reports.rows);
 });
+
+// ── Image upload setup ─────────────────────────────────────────────────────
+
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB hard limit
+});
+
+// Allowed MIME types and their magic-byte signatures
+const ALLOWED_MIME: Record<string, string> = {
+  "image/jpeg": "jpeg",
+  "image/jpg":  "jpeg",
+  "image/png":  "png",
+  "image/webp": "webp",
+};
+
+function detectImageType(buf: Buffer): string | null {
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "image/jpeg";
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  // WebP: RIFF????WEBP
+  if (
+    buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+    buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
+  ) return "image/webp";
+  return null;
+}
+
+// ── POST /community/upload-image ───────────────────────────────────────────
+
+// Wrap multer so LIMIT_FILE_SIZE returns JSON 400 instead of an unhandled 500
+function uploadSingle(req: Request, res: Response, next: (err?: any) => void): void {
+  imageUpload.single("image")(req, res, (err: any) => {
+    if (err) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        res.status(400).json({ error: "Image exceeds 5 MB limit" });
+      } else {
+        res.status(400).json({ error: err.message ?? "Upload error" });
+      }
+      return;
+    }
+    next();
+  });
+}
+
+router.post(
+  "/community/upload-image",
+  requireAuth,
+  uploadSingle,
+  async (req: Request, res: Response): Promise<void> => {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: "No image file provided" });
+      return;
+    }
+
+    // Validate size (multer limit is 5MB, but enforce explicitly too)
+    if (file.size > 5 * 1024 * 1024) {
+      res.status(400).json({ error: "Image exceeds 5 MB limit" });
+      return;
+    }
+
+    // Server-side MIME validation via magic bytes (not trusting Content-Type)
+    const detected = detectImageType(file.buffer);
+    if (!detected || !ALLOWED_MIME[detected]) {
+      res.status(400).json({
+        error: "Unsupported format. Only JPG, PNG, and WebP images are allowed.",
+      });
+      return;
+    }
+
+    const ext = ALLOWED_MIME[detected]; // "jpeg" | "png" | "webp"
+    const filename = `${randomUUID()}.${ext}`;
+
+    try {
+      await saveCommunityImage(file.buffer, filename);
+      res.json({ imageUrl: `/api/community/images/${filename}` });
+    } catch (err: any) {
+      console.error("[Community] Image upload error:", err);
+      res.status(500).json({ error: "Failed to save image" });
+    }
+  }
+);
+
+// ── GET /community/images/:filename ───────────────────────────────────────
+// Public: any authenticated user can view community images
+
+router.get("/community/images/:filename", requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const filename = path.basename(req.params.filename); // prevent traversal
+
+  const exists = await communityImageExists(filename);
+  if (!exists) {
+    res.status(404).json({ error: "Image not found" });
+    return;
+  }
+
+  // Determine content type from extension
+  const ext = filename.split(".").pop()?.toLowerCase();
+  const contentTypeMap: Record<string, string> = {
+    jpeg: "image/jpeg",
+    png:  "image/png",
+    webp: "image/webp",
+  };
+  const contentType = ext ? (contentTypeMap[ext] ?? "application/octet-stream") : "application/octet-stream";
+
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+
+  const stream = openCommunityImageStream(filename);
+  stream.on("error", (err) => {
+    console.error("[Community] Image stream error:", err);
+    if (!res.headersSent) res.status(500).json({ error: "Failed to stream image" });
+    else res.destroy();
+  });
+  stream.pipe(res);
+});
+
+// ── DELETE /community/images/:filename (admin or owner via message delete) ─
+// Images are cleaned up when their parent message is deleted.
+// Exported for use by the message delete route.
+export async function cleanupMessageImage(imageUrl: string | null): Promise<void> {
+  if (!imageUrl) return;
+  const match = imageUrl.match(/\/api\/community\/images\/([^/]+)$/);
+  if (!match) return;
+  try { await deleteCommunityImage(match[1]); } catch {}
+}
 
 export default router;
