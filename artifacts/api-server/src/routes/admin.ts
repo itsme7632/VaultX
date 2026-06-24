@@ -15,6 +15,7 @@ import {
   adminActionLogsTable,
   withdrawalAddressesTable,
   referralSalaryTable,
+  popupAnnouncementsTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -1227,6 +1228,124 @@ router.put("/admin/settings", requireAdmin, async (req, res): Promise<void> => {
   }
 
   res.json({ success: true });
+});
+
+router.get("/admin/announcements", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const rows = await db
+      .select()
+      .from(popupAnnouncementsTable)
+      .orderBy(desc(popupAnnouncementsTable.createdAt));
+    res.json(rows);
+  } catch (err) {
+    console.error("[admin/announcements] GET error:", err);
+    res.status(500).json({ error: "Failed to fetch announcements" });
+  }
+});
+
+router.post("/admin/announcements", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const {
+      title,
+      message,
+      isActive,
+      isPinned,
+      showToNewUsers,
+      showToExistingUsers,
+      scheduledAt,
+      expiresAt,
+    } = req.body as Record<string, any>;
+
+    if (!title?.trim()) {
+      res.status(400).json({ error: "Title is required" });
+      return;
+    }
+    if (!message?.trim()) {
+      res.status(400).json({ error: "Message is required" });
+      return;
+    }
+
+    const [row] = await db
+      .insert(popupAnnouncementsTable)
+      .values({
+        title: String(title).trim(),
+        message: String(message).trim(),
+        isActive: isActive !== false,
+        isPinned: isPinned === true,
+        showToNewUsers: showToNewUsers !== false,
+        showToExistingUsers: showToExistingUsers !== false,
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        createdBy: (req.session as any).userId ?? null,
+      })
+      .returning();
+
+    res.status(201).json(row);
+  } catch (err) {
+    console.error("[admin/announcements] POST error:", err);
+    res.status(500).json({ error: "Failed to create announcement" });
+  }
+});
+
+router.put("/admin/announcements/:id", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid announcement id" });
+      return;
+    }
+
+    const {
+      title,
+      message,
+      isActive,
+      isPinned,
+      showToNewUsers,
+      showToExistingUsers,
+      scheduledAt,
+      expiresAt,
+    } = req.body as Record<string, any>;
+
+    const setValues: Record<string, any> = { updatedAt: new Date() };
+    if (title !== undefined) setValues.title = String(title).trim();
+    if (message !== undefined) setValues.message = String(message).trim();
+    if (isActive !== undefined) setValues.isActive = Boolean(isActive);
+    if (isPinned !== undefined) setValues.isPinned = Boolean(isPinned);
+    if (showToNewUsers !== undefined) setValues.showToNewUsers = Boolean(showToNewUsers);
+    if (showToExistingUsers !== undefined) setValues.showToExistingUsers = Boolean(showToExistingUsers);
+    if (scheduledAt !== undefined) setValues.scheduledAt = scheduledAt ? new Date(scheduledAt) : null;
+    if (expiresAt !== undefined) setValues.expiresAt = expiresAt ? new Date(expiresAt) : null;
+
+    const [row] = await db
+      .update(popupAnnouncementsTable)
+      .set(setValues)
+      .where(eq(popupAnnouncementsTable.id, id))
+      .returning();
+
+    if (!row) {
+      res.status(404).json({ error: "Announcement not found" });
+      return;
+    }
+    res.json(row);
+  } catch (err) {
+    console.error("[admin/announcements] PUT error:", err);
+    res.status(500).json({ error: "Failed to update announcement" });
+  }
+});
+
+router.delete("/admin/announcements/:id", requireAdmin, async (req, res): Promise<void> => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "Invalid announcement id" });
+      return;
+    }
+    await db.delete(popupAnnouncementsTable).where(eq(popupAnnouncementsTable.id, id));
+    res.json({ success: true });
+  } catch (err) {
+    console.error("[admin/announcements] DELETE error:", err);
+    res.status(500).json({ error: "Failed to delete announcement" });
+  }
 });
 
 export default router;

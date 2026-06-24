@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq" | "referral-salary";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq" | "referral-salary" | "announcements";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -114,6 +114,7 @@ export default function AdminPage() {
   const { data: ticketsData, refetch: refetchTickets } = useQuery({ queryKey: ["admin-tickets"], queryFn: () => adminApi("/support/tickets"), staleTime: 15000, enabled: tab === "tickets" });
   const { data: salaryData, refetch: refetchSalary } = useQuery({ queryKey: ["admin-salary"], queryFn: () => adminApi("/admin/referral-salary"), staleTime: 30000, enabled: tab === "referral-salary" });
   const { data: salarySettings, refetch: refetchSalarySettings } = useQuery({ queryKey: ["admin-salary-settings"], queryFn: () => adminApi("/admin/settings"), staleTime: 30000, enabled: tab === "referral-salary" });
+  const { data: announcementsData, refetch: refetchAnnouncements } = useQuery({ queryKey: ["admin-announcements"], queryFn: () => adminApi("/admin/announcements"), staleTime: 15000, enabled: tab === "announcements" });
 
   const approveKyc = useAdminApproveKyc();
   const rejectKyc = useAdminRejectKyc();
@@ -323,6 +324,7 @@ export default function AdminPage() {
     { id: "logs", label: "Logs", icon: FileText },
     { id: "faq" as Tab, label: "FAQ", icon: MessageSquare },
     { id: "referral-salary" as Tab, label: "Referral Salary", icon: DollarSign },
+    { id: "announcements" as Tab, label: "Popup Announcements", icon: Bell },
   ];
 
   const STAT_CARDS = analytics ? [
@@ -1275,6 +1277,10 @@ export default function AdminPage() {
               toast={toast}
               onRefresh={() => { refetchSalary(); refetchSalarySettings(); }}
             />
+          )}
+
+          {tab === "announcements" && (
+            <AnnouncementsTab data={announcementsData} onRefresh={refetchAnnouncements} toast={toast} />
           )}
 
           {tab === "performance" && (
@@ -3553,6 +3559,232 @@ function FaqTab({ toast }: { toast: any }) {
               variant="destructive"
               className="flex-1 h-9 text-sm"
               onClick={() => deleteId !== null && remove.mutate(deleteId)}
+              disabled={remove.isPending}
+            >
+              {remove.isPending ? "Deleting…" : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function AnnouncementsTab({ data, onRefresh, toast }: { data: any; onRefresh: () => void; toast: any }) {
+  const queryClient = useQueryClient();
+  const emptyForm = { title: "", message: "", isActive: true, isPinned: false, showToNewUsers: true, showToExistingUsers: true, scheduledAt: "", expiresAt: "" };
+  const [modal, setModal] = useState<any>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
+
+  const save = useMutation({
+    mutationFn: (body: any) =>
+      modal?.id
+        ? adminApi(`/admin/announcements/${modal.id}`, "PUT", body)
+        : adminApi("/admin/announcements", "POST", body),
+    onSuccess: () => {
+      toast({ title: modal?.id ? "Announcement updated" : "Announcement created" });
+      setModal(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-announcements"] });
+      onRefresh();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message ?? "Failed to save", variant: "destructive" }),
+  });
+
+  const toggle = useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      adminApi(`/admin/announcements/${id}`, "PUT", { isActive }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-announcements"] });
+      queryClient.invalidateQueries({ queryKey: ["announcements-active"] });
+      onRefresh();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: number) => adminApi(`/admin/announcements/${id}`, "DELETE"),
+    onSuccess: () => {
+      toast({ title: "Announcement deleted" });
+      setDeleting(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-announcements"] });
+      queryClient.invalidateQueries({ queryKey: ["announcements-active"] });
+      onRefresh();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e?.message, variant: "destructive" }),
+  });
+
+  const announcements: any[] = Array.isArray(data) ? data : [];
+
+  const handleSave = () => {
+    if (!modal) return;
+    save.mutate({
+      title: modal.title,
+      message: modal.message,
+      isActive: modal.isActive,
+      isPinned: modal.isPinned,
+      showToNewUsers: modal.showToNewUsers,
+      showToExistingUsers: modal.showToExistingUsers,
+      scheduledAt: modal.scheduledAt || null,
+      expiresAt: modal.expiresAt || null,
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-bold text-foreground">Popup Announcements</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Modal popups shown to users when they open the app</p>
+        </div>
+        <Button size="sm" className="h-9 text-xs gap-1.5" onClick={() => setModal({ ...emptyForm })}>
+          <Plus size={13} />New
+        </Button>
+      </div>
+
+      {announcements.length === 0 ? (
+        <div className="py-10 text-center bg-white border border-border rounded-2xl">
+          <Bell size={28} className="mx-auto text-muted-foreground/40 mb-2" />
+          <p className="text-sm font-medium text-muted-foreground">No popup announcements yet</p>
+          <p className="text-xs text-muted-foreground mt-1">Create one to show a modal to your users</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {announcements.map((a: any) => (
+            <div key={a.id} className="bg-white border border-border rounded-2xl p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                    <p className="text-sm font-semibold text-foreground truncate">{a.title}</p>
+                    {a.isPinned && (
+                      <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[9px] h-4 px-1.5">📌 Pinned</Badge>
+                    )}
+                    <Badge className={cn("text-[9px] h-4 px-1.5 border", a.isActive ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-muted text-muted-foreground border-border")}>
+                      {a.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{a.message}</p>
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="text-[10px] text-muted-foreground">New users: {a.showToNewUsers ? "✓" : "✗"}</span>
+                    <span className="text-[10px] text-muted-foreground">Existing: {a.showToExistingUsers ? "✓" : "✗"}</span>
+                    {a.scheduledAt && <span className="text-[10px] text-muted-foreground">From: {new Date(a.scheduledAt).toLocaleDateString()}</span>}
+                    {a.expiresAt && <span className="text-[10px] text-muted-foreground">Expires: {new Date(a.expiresAt).toLocaleDateString()}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Switch
+                    checked={!!a.isActive}
+                    onCheckedChange={(v) => toggle.mutate({ id: a.id, isActive: v })}
+                    className="scale-90"
+                  />
+                  <button
+                    onClick={() => setModal({
+                      ...a,
+                      scheduledAt: a.scheduledAt ? new Date(a.scheduledAt).toISOString().slice(0, 16) : "",
+                      expiresAt: a.expiresAt ? new Date(a.expiresAt).toISOString().slice(0, 16) : "",
+                    })}
+                    className="p-1.5 rounded-lg hover:bg-muted"
+                  >
+                    <Edit2 size={13} className="text-muted-foreground" />
+                  </button>
+                  <button onClick={() => setDeleting(a.id)} className="p-1.5 rounded-lg hover:bg-red-50">
+                    <Trash2 size={13} className="text-red-500" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
+      <Dialog open={!!modal} onOpenChange={(o) => !o && setModal(null)}>
+        <DialogContent className="max-w-sm mx-4">
+          <DialogHeader>
+            <DialogTitle>{modal?.id ? "Edit Announcement" : "New Popup Announcement"}</DialogTitle>
+          </DialogHeader>
+          {modal && (
+            <div className="space-y-3 pt-1">
+              <div>
+                <Label className="text-xs text-muted-foreground">Title *</Label>
+                <Input
+                  value={modal.title}
+                  onChange={(e) => setModal((m: any) => ({ ...m, title: e.target.value }))}
+                  placeholder="e.g. Important Update"
+                  className="mt-1 h-9 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Message *</Label>
+                <Textarea
+                  value={modal.message}
+                  onChange={(e) => setModal((m: any) => ({ ...m, message: e.target.value }))}
+                  placeholder="Full announcement message shown to users…"
+                  className="mt-1 text-sm min-h-[80px] resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: "isActive", label: "Active" },
+                  { key: "isPinned", label: "Pinned" },
+                  { key: "showToNewUsers", label: "New Users" },
+                  { key: "showToExistingUsers", label: "Existing Users" },
+                ].map(({ key, label }) => (
+                  <div key={key} className="flex items-center justify-between bg-muted/30 rounded-xl px-3 py-2">
+                    <span className="text-xs font-medium">{label}</span>
+                    <Switch
+                      checked={!!modal[key]}
+                      onCheckedChange={(v) => setModal((m: any) => ({ ...m, [key]: v }))}
+                      className="scale-90"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Schedule At (optional — leave blank to show immediately)</Label>
+                <Input
+                  type="datetime-local"
+                  value={modal.scheduledAt || ""}
+                  onChange={(e) => setModal((m: any) => ({ ...m, scheduledAt: e.target.value }))}
+                  className="mt-1 h-9 text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Expires At (optional — leave blank to never expire)</Label>
+                <Input
+                  type="datetime-local"
+                  value={modal.expiresAt || ""}
+                  onChange={(e) => setModal((m: any) => ({ ...m, expiresAt: e.target.value }))}
+                  className="mt-1 h-9 text-sm"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button variant="outline" className="flex-1 h-10 text-sm" onClick={() => setModal(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 h-10 text-sm"
+                  onClick={handleSave}
+                  disabled={save.isPending || !modal.title?.trim() || !modal.message?.trim()}
+                >
+                  {save.isPending ? "Saving…" : modal?.id ? "Save Changes" : "Create"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirm */}
+      <Dialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader><DialogTitle>Delete Announcement?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">This will permanently remove the popup announcement. This action cannot be undone.</p>
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1 h-9 text-sm" onClick={() => setDeleting(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              className="flex-1 h-9 text-sm"
+              onClick={() => deleting !== null && remove.mutate(deleting)}
               disabled={remove.isPending}
             >
               {remove.isPending ? "Deleting…" : "Delete"}

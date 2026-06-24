@@ -447,6 +447,21 @@ const COLUMN_MIGRATIONS_SQL = [
     "community_role" text DEFAULT 'member' NOT NULL,
     "joined_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
+
+  `CREATE TABLE IF NOT EXISTS "popup_announcements" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "title" text NOT NULL,
+    "message" text NOT NULL,
+    "is_active" boolean DEFAULT true NOT NULL,
+    "is_pinned" boolean DEFAULT false NOT NULL,
+    "show_to_new_users" boolean DEFAULT true NOT NULL,
+    "show_to_existing_users" boolean DEFAULT true NOT NULL,
+    "scheduled_at" timestamp with time zone,
+    "expires_at" timestamp with time zone,
+    "created_by" integer,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
 ];
 
 const sslConfig =

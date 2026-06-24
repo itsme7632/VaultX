@@ -22,6 +22,7 @@ import faqRouter from "./faq";
 import platformMetricsRouter from "./platform-metrics";
 import securityRouter from "./security";
 import communityRouter from "./community";
+import announcementsRouter from "./announcements";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(faqRouter);
 router.use(platformMetricsRouter);
 router.use(securityRouter);
 router.use(communityRouter);
+router.use(announcementsRouter);
 
 export default router;
