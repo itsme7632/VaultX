@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, inArray, count, sum, sql } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, count, sum, sql } from "drizzle-orm";
 import {
   db,
   investmentPlansTable,
@@ -123,7 +123,7 @@ router.get("/investments/plans", async (_req, res): Promise<void> => {
         inArray(investmentPlansTable.status as any, VISIBLE_STATUSES),
       ),
     )
-    .orderBy(investmentPlansTable.minAmount, investmentPlansTable.id);
+    .orderBy(asc(investmentPlansTable.minAmount), asc(investmentPlansTable.id));
 
   if (plans.length === 0) {
     res.json([]);

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, sum, count, and, or } from "drizzle-orm";
+import { eq, sum, count, and, or, asc } from "drizzle-orm";
 import {
   db,
   investmentPlansTable,
@@ -35,7 +35,7 @@ function autoParticipantsFromRaised(raised: number, planId: number): number {
 router.get("/platform-metrics", requireAuth, async (req, res): Promise<void> => {
   try {
     const [plans, planStats, activeInvRes, distributionsRes] = await Promise.all([
-      db.select().from(investmentPlansTable).where(eq(investmentPlansTable.isActive, true)),
+      db.select().from(investmentPlansTable).where(eq(investmentPlansTable.isActive, true)).orderBy(asc(investmentPlansTable.minAmount), asc(investmentPlansTable.id)),
 
       db.select({
         planId: userInvestmentsTable.planId,

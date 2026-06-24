@@ -392,20 +392,9 @@ export default function InvestmentsPage() {
               {plansLoading ? (
                 [1, 2, 3].map((i) => <Skeleton key={i} className="h-64 rounded-2xl" />)
               ) : [...(plans ?? [])].sort((a: any, b: any) => {
-                // 1. Featured plans first
-                const statusScore = (p: any) => {
-                  if (p.status === "featured" || p.isFeatured) return 4;
-                  if (p.status === "trending") return 3;
-                  if (p.status === "active" || p.status === "funding") return 2;
-                  return 0;
-                };
-                const scoreDiff = statusScore(b) - statusScore(a);
-                if (scoreDiff !== 0) return scoreDiff;
-                // 2. Min amount ascending (lowest entry barrier first)
                 const aMin = parseFloat(a.minAmount ?? a.min_amount ?? 0);
                 const bMin = parseFloat(b.minAmount ?? b.min_amount ?? 0);
                 if (aMin !== bMin) return aMin - bMin;
-                // 3. ID ascending as stable tiebreaker
                 return a.id - b.id;
               }).map((plan: any) => {
                 const minRoi = plan.minRoiRate ?? 0.013;

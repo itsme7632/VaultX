@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
-import { eq, ilike, desc, count, sum, or, and, gte, sql } from "drizzle-orm";
+import { eq, ilike, desc, asc, count, sum, or, and, gte, sql } from "drizzle-orm";
 import {
   db,
   usersTable,
@@ -789,7 +789,7 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
     db.select({ s: sum(userInvestmentsTable.amount) }).from(userInvestmentsTable).where(eq(userInvestmentsTable.status, "active")),
     db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "deposit"), eq(transactionsTable.status, "completed"), gte(transactionsTable.createdAt, todayStart))),
     db.select({ s: sum(transactionsTable.amount) }).from(transactionsTable).where(and(eq(transactionsTable.type, "withdrawal"), eq(transactionsTable.status, "completed"), gte(transactionsTable.createdAt, todayStart))),
-    db.select().from(investmentPlansTable).orderBy(investmentPlansTable.minAmount, investmentPlansTable.id),
+    db.select().from(investmentPlansTable).orderBy(asc(investmentPlansTable.minAmount), asc(investmentPlansTable.id)),
     db.select({
       planId: userInvestmentsTable.planId,
       activeCount: count(),
@@ -895,7 +895,7 @@ router.get("/admin/plans", requireAdmin, async (req, res): Promise<void> => {
   const plans = await db
     .select()
     .from(investmentPlansTable)
-    .orderBy(investmentPlansTable.minAmount, investmentPlansTable.id);
+    .orderBy(asc(investmentPlansTable.minAmount), asc(investmentPlansTable.id));
 
   if (plans.length === 0) {
     res.json([]);
