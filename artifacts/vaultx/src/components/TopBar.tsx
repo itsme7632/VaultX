@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { playNotificationSound } from "@/lib/notificationSound";
+import { NotificationPanel } from "@/components/NotificationPanel";
 import wxLogo from "/wx-logo.png";
 
 export function TopBar({ title }: { title?: string }) {
@@ -27,6 +28,9 @@ export function TopBar({ title }: { title?: string }) {
   const logout = useLogout();
   const prevUnreadRef = useRef<number | null>(null);
   const prevNotifIdsRef = useRef<Set<number>>(new Set());
+  const [panelOpen, setPanelOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const notifWrapRef = useRef<HTMLDivElement>(null);
 
   const { data: notifications } = useGetNotifications({
     query: {
@@ -37,7 +41,7 @@ export function TopBar({ title }: { title?: string }) {
   });
 
   const unreadCount = notifications?.unreadCount ?? 0;
-  const notifList: any[] = (notifications as any)?.notifications ?? [];
+  const notifList: any[] = notifications?.items ?? [];
 
   useEffect(() => {
     if (prevUnreadRef.current === null) {
@@ -47,12 +51,10 @@ export function TopBar({ title }: { title?: string }) {
     }
 
     if (unreadCount > (prevUnreadRef.current ?? 0)) {
-      // Find newly arrived notifications
       const currentIds = new Set(notifList.map((n: any) => n.id));
       const newNotifs = notifList.filter((n: any) => !prevNotifIdsRef.current.has(n.id));
       prevNotifIdsRef.current = currentIds;
 
-      // Determine sound type from the newest notification
       const newest = newNotifs[0];
       const type = newest?.type as string | undefined;
 
@@ -62,7 +64,7 @@ export function TopBar({ title }: { title?: string }) {
         playNotificationSound("withdrawal");
       } else if (type === "support_reply" || type === "support") {
         playNotificationSound("support");
-      } else if (type === "announcement") {
+      } else if (type === "announcement" || type === "community_announcement") {
         playNotificationSound("announcement");
       } else {
         playNotificationSound("notification");
@@ -121,16 +123,32 @@ export function TopBar({ title }: { title?: string }) {
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
-          <Link href="/notifications">
-            <button className="relative p-1.5 rounded-xl hover:bg-muted transition-colors">
-              <Bell size={20} className="text-foreground" />
+          {/* Bell + floating panel */}
+          <div ref={notifWrapRef} className="relative">
+            <button
+              ref={bellRef}
+              onClick={() => setPanelOpen((v) => !v)}
+              className="relative p-1.5 rounded-xl hover:bg-muted transition-colors"
+              aria-label="Notifications"
+              aria-expanded={panelOpen}
+            >
+              <Bell
+                size={20}
+                className={panelOpen ? "text-primary" : "text-foreground"}
+              />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive rounded-full flex items-center justify-center text-white text-[9px] font-bold">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-0.5 bg-destructive rounded-full flex items-center justify-center text-white text-[9px] font-bold">
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </span>
               )}
             </button>
-          </Link>
+
+            <NotificationPanel
+              open={panelOpen}
+              onClose={() => setPanelOpen(false)}
+              anchorRef={bellRef}
+            />
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

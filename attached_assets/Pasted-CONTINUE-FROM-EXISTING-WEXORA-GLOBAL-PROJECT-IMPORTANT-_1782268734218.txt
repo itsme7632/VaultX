@@ -1,0 +1,90 @@
+CONTINUE FROM EXISTING WEXORA GLOBAL PROJECT.
+
+IMPORTANT:
+Do NOT rebuild the announcement system.
+Do NOT redesign the admin panel.
+Do NOT create duplicate routes.
+Do NOT repeat previous investigation.
+
+PROJECT STATUS (ALREADY VERIFIED):
+
+✅ Announcement database schema exists.
+✅ Announcement routes exist.
+✅ Announcement tables were added.
+✅ API error handling was improved.
+✅ Vite proxy issue was fixed.
+✅ Changes have already been committed to GitHub.
+✅ Current branch is synced.
+
+ANNOUNCEMENT FEATURE ONLY
+
+Current objective:
+
+Perform a final end-to-end verification of the existing announcement system.
+
+Verify:
+
+1. Admin Announcement Creation
+   - Create announcement
+   - Save announcement
+   - Verify record stored in database
+
+2. Admin Announcement Editing
+   - Edit title
+   - Edit content
+   - Save changes
+   - Verify update persists
+
+3. Admin Announcement Delete
+   - Delete announcement
+   - Verify removal from database
+
+4. Admin Announcement Pinning
+   - Pin announcement
+   - Verify pinned announcements appear first
+
+5. Scheduled Announcements
+   - Create future scheduled announcement
+   - Verify visibility logic
+
+6. Popup Announcement System
+   - Display popup after login
+   - Display for new users
+   - Display for existing users
+   - Verify targeting logic
+
+7. Acknowledgement Timer
+   - User clicks "I Understand"
+   - Popup hidden for 24 hours
+   - Verify persistence after page refresh
+   - Verify persistence after logout/login
+
+8. Server Restart Test
+   - Restart application
+   - Verify announcements remain functional
+   - Verify popup state still works
+
+9. Error Handling
+   - All announcement endpoints must return JSON
+   - Never return HTML pages
+   - Never return <!DOCTYPE responses
+
+Verify these routes:
+
+GET    /api/admin/announcements
+POST   /api/admin/announcements
+PUT    /api/admin/announcements/:id
+DELETE /api/admin/announcements/:id
+POST   /api/admin/announcements/:id/pin
+
+FINAL OUTPUT REQUIRED:
+
+Provide a concise report:
+
+- Routes tested
+- Bugs found
+- Files changed
+- Fixes applied
+- Final status
+
+Do not stop until announcement creation works completely from Admin Panel to User Popup.
