@@ -26,6 +26,11 @@ if (!basePath) {
   );
 }
 
+// API server always runs on port 8080 (localPort in artifact config).
+// The proxy forwards /api/* requests from the Vite dev server to the Express
+// server, preventing Vite from returning index.html for API calls.
+const API_PORT = process.env.API_PORT ?? "8080";
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -65,6 +70,13 @@ export default defineConfig({
     allowedHosts: true,
     fs: {
       strict: true,
+    },
+    proxy: {
+      "/api": {
+        target: `http://localhost:${API_PORT}`,
+        changeOrigin: true,
+        // Do NOT rewrite — Express is mounted at /api so the full path must be preserved
+      },
     },
   },
   preview: {

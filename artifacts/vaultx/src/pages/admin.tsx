@@ -51,7 +51,15 @@ async function adminApi(path: string, method = "GET", body?: any) {
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (!res.ok) throw new Error((await res.json()).message ?? "Request failed");
+  if (!res.ok) {
+    // Guard against HTML error pages (e.g. from Vite fallback or Express)
+    const ct = res.headers.get("content-type") ?? "";
+    if (ct.includes("application/json")) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.message ?? `Request failed (${res.status})`);
+    }
+    throw new Error(`Request failed (${res.status})`);
+  }
   return res.json();
 }
 
