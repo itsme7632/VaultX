@@ -4,9 +4,12 @@ import {
   db,
   investmentPlansTable,
   userInvestmentsTable,
+  usersTable,
+  referralsTable,
   walletsTable,
   transactionsTable,
   notificationsTable,
+  platformSettingsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
@@ -292,6 +295,81 @@ router.post("/investments", requireAuth, async (req, res): Promise<void> => {
     title: "Investment Started",
     message: `Your ${amount} USDT investment in ${plan.name} is now active. Daily ROI: ${(midRoi * 100).toFixed(2)}% — distributions will be ready in 24 hours.`,
   });
+
+  // ── Investment referral commission ──────────────────────────────────────────
+  // Credit L1/L2/L3 referrers when the investor places an investment.
+  try {
+    const [investor] = await db
+      .select({ referredBy: usersTable.referredBy, username: usersTable.username })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.session.userId!))
+      .limit(1);
+
+    if (investor?.referredBy) {
+      const getRate = async (key: string, fallback: string): Promise<number> => {
+        const [s] = await db.select().from(platformSettingsTable).where(eq(platformSettingsTable.key, key)).limit(1);
+        return parseFloat(s?.value ?? fallback);
+      };
+
+      const l1Rate = await getRate("referral_l1_roi_rate", "5");
+      const l2Rate = await getRate("referral_l2_roi_rate", "3");
+      const l3Rate = await getRate("referral_l3_roi_rate", "1");
+      const investorUsername = investor.username ?? "user";
+
+      const applyInvestmentCommission = async (referrerId: number, level: number, rateRaw: number) => {
+        const commission = (amount * rateRaw) / 100;
+        if (commission < 0.0001) return;
+
+        await db.update(walletsTable).set({
+          referralPendingEarnings: sql`referral_pending_earnings + ${commission.toFixed(8)}`,
+        }).where(eq(walletsTable.userId, referrerId));
+
+        await db.insert(transactionsTable).values({
+          userId: referrerId,
+          type: "referral",
+          amount: commission.toFixed(8),
+          status: "completed",
+          txId: `REF-INV-${investment.id}-L${level}`,
+          note: `L${level} referral commission (${rateRaw.toFixed(1)}%) from @${investorUsername} investment`,
+        });
+
+        await db.insert(notificationsTable).values({
+          userId: referrerId,
+          type: "transaction",
+          title: "Referral Commission Earned",
+          message: `You earned ${commission.toFixed(2)} USDT L${level} commission from @${investorUsername}'s ${amount} USDT investment.`,
+        });
+      };
+
+      const l1Id = investor.referredBy;
+      await applyInvestmentCommission(l1Id, 1, l1Rate);
+
+      // Update the referrals table commission total
+      await db.update(referralsTable).set({
+        commissionAmount: sql`commission_amount + ${((amount * l1Rate) / 100).toFixed(8)}`,
+        status: "active",
+      }).where(and(eq(referralsTable.referrerId, l1Id), eq(referralsTable.referredId, req.session.userId!)));
+
+      // L2
+      if (l2Rate > 0) {
+        const [l1User] = await db.select({ referredBy: usersTable.referredBy }).from(usersTable).where(eq(usersTable.id, l1Id)).limit(1);
+        if (l1User?.referredBy) {
+          await applyInvestmentCommission(l1User.referredBy, 2, l2Rate);
+          // L3
+          if (l3Rate > 0) {
+            const [l2User] = await db.select({ referredBy: usersTable.referredBy }).from(usersTable).where(eq(usersTable.id, l1User.referredBy)).limit(1);
+            if (l2User?.referredBy) {
+              await applyInvestmentCommission(l2User.referredBy, 3, l3Rate);
+            }
+          }
+        }
+      }
+    }
+  } catch (refErr) {
+    // Non-fatal: referral commission failure must never block investment confirmation
+    console.error("Investment referral commission error (non-fatal):", refErr);
+  }
+  // ───────────────────────────────────────────────────────────────────────────
 
   res.status(201).json(
     computeInvestmentView(investment, plan.name, plan.minRoiRate ?? undefined, plan.maxRoiRate ?? undefined),
