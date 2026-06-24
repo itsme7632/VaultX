@@ -463,6 +463,28 @@ const COLUMN_MIGRATIONS_SQL = [
     "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT "referral_salary_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "users"("id")
   )`,
+
+  `CREATE TABLE IF NOT EXISTS "announcements" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "title" text NOT NULL,
+    "content" text NOT NULL,
+    "is_active" boolean NOT NULL DEFAULT false,
+    "priority" integer NOT NULL DEFAULT 0,
+    "show_to_new_users" boolean NOT NULL DEFAULT true,
+    "show_to_existing_users" boolean NOT NULL DEFAULT true,
+    "is_pinned" boolean NOT NULL DEFAULT false,
+    "scheduled_at" timestamp with time zone,
+    "created_by" integer REFERENCES "users"("id"),
+    "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+    "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS "announcement_views" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "user_id" integer NOT NULL REFERENCES "users"("id"),
+    "announcement_id" integer NOT NULL REFERENCES "announcements"("id"),
+    "viewed_at" timestamp with time zone NOT NULL DEFAULT now()
+  )`,
 ];
 
 const sslConfig =
