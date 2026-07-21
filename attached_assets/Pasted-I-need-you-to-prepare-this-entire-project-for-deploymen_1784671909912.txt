@@ -1,0 +1,67 @@
+I need you to prepare this entire project for deployment on a standard Ubuntu 24.04 DigitalOcean VPS. The application currently deploys successfully through Replit Publish/Deployments, but it fails when built manually on a VPS.
+
+Environment:
+- Ubuntu 24.04
+- Node.js 22
+- pnpm 11
+- PM2
+- Nginx
+- PostgreSQL (Neon)
+
+Current issue:
+
+Running:
+
+pnpm install
+
+completes successfully.
+
+But running:
+
+pnpm build
+
+fails because the root workspace executes strict TypeScript typechecking before building.
+
+Errors include:
+- Property 'signed_url' does not exist on type 'unknown'
+- Multiple errors:
+  Argument of type 'string | string[]' is not assignable to parameter of type 'string'
+  (req.params.id, req.params.userId, req.params.channelId, etc.)
+
+I do NOT want workarounds.
+
+I want the repository itself fixed so it builds cleanly outside Replit.
+
+Please do the following:
+
+1. Fix every TypeScript error in the project.
+2. Ensure the project builds successfully with:
+   pnpm install
+   pnpm build
+3. Ensure the backend starts successfully with:
+   pnpm --filter @workspace/api-server start
+4. Preserve all existing features and business logic.
+5. Do NOT change the database schema.
+6. Do NOT remove or disable type checking.
+7. Do NOT skip build validation.
+8. Remove or replace any Replit-only deployment assumptions so the application is fully self-hostable.
+9. Keep compatibility with:
+   - Express 5
+   - Vite
+   - Drizzle ORM
+   - Neon PostgreSQL
+10. Verify that the generated build artifacts work on a clean Ubuntu server.
+
+After completing the work:
+
+- Commit every required code change to the repository.
+- Provide a summary of every file modified and why.
+- Confirm that a fresh clone of the repository can successfully run:
+
+pnpm install
+pnpm build
+pnpm --filter @workspace/api-server start
+
+without requiring Replit Deployments.
+
+Do not stop after fixing the first error. Continue until the entire project builds successfully on a standard Linux VPS.
