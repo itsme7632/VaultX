@@ -1209,7 +1209,7 @@ router.put("/admin/referral-salary/settings", requireAdmin, async (req, res): Pr
 });
 
 router.put("/admin/referral-salary/:userId/override", requireAdmin, async (req, res): Promise<void> => {
-  const userId = parseInt(req.params.userId, 10);
+  const userId = parseInt(String(req.params.userId), 10);
   const { tier, salary, notes } = req.body;
 
   const existing = await db.select().from(referralSalaryTable).where(eq(referralSalaryTable.userId, userId)).limit(1);

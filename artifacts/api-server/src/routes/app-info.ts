@@ -72,7 +72,7 @@ router.get("/app-info", async (_req, res): Promise<void> => {
 
 // ─── Track download click (public) ────────────────────────────────────────
 router.post("/app-info/download/:server", async (req, res): Promise<void> => {
-  const { server } = req.params;
+  const server = String(req.params['server']);
   if (!MIRROR_KEYS.includes(server)) {
     res.status(400).json({ error: "Invalid server name" });
     return;
@@ -126,7 +126,7 @@ router.put("/admin/app-settings", requireAdmin, async (req, res): Promise<void> 
 
 // ─── Admin: reset download counter ────────────────────────────────────────
 router.post("/admin/app-settings/reset-counter/:server", requireAdmin, async (req, res): Promise<void> => {
-  const { server } = req.params;
+  const server = String(req.params['server']);
   if (!MIRROR_KEYS.includes(server)) {
     res.status(400).json({ error: "Invalid server name" });
     return;

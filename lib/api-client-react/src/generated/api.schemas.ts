@@ -27,6 +27,7 @@ export interface SignupBody {
   password: string;
   confirmPassword: string;
   referralCode?: string;
+  referralSource?: string;
 }
 
 export interface LoginBody {
@@ -69,6 +70,7 @@ export interface UserProfile {
   isAdmin: boolean;
   isVerified: boolean;
   createdAt: string;
+  displayId?: string;
 }
 
 export interface AuthResponse {
@@ -246,6 +248,7 @@ export interface ReferralStats {
   totalEarned: number;
   pendingEarnings: number;
   commissionRate: number;
+  nextTierAt?: number;
 }
 
 export interface ReferralEntry {

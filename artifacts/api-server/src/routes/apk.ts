@@ -119,7 +119,7 @@ router.get("/admin/apk/diagnostic", requireAdmin, async (_req, res): Promise<voi
 
 // ─── Admin: activate a release ─────────────────────────────────────────────
 router.post("/admin/apk/:id/activate", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   await db.update(appReleasesTable).set({ isActive: false });
   const [updated] = await db
     .update(appReleasesTable)
@@ -135,7 +135,7 @@ router.post("/admin/apk/:id/activate", requireAdmin, async (req, res): Promise<v
 
 // ─── Admin: deactivate a release ───────────────────────────────────────────
 router.post("/admin/apk/:id/deactivate", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const [updated] = await db
     .update(appReleasesTable)
     .set({ isActive: false })
@@ -150,7 +150,7 @@ router.post("/admin/apk/:id/deactivate", requireAdmin, async (req, res): Promise
 
 // ─── Admin: delete a release ───────────────────────────────────────────────
 router.delete("/admin/apk/:id", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   const [deleted] = await db
     .delete(appReleasesTable)
     .where(eq(appReleasesTable.id, id))

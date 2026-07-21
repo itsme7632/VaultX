@@ -114,7 +114,7 @@ router.post("/admin/announcements", requireAdmin, async (req, res): Promise<void
 
 // ── Admin: Update announcement ─────────────────────────────────────────────────
 router.put("/admin/announcements/:id", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   logger.info({ id, body: req.body }, "announcement update: incoming payload");
 
   try {
@@ -168,7 +168,7 @@ router.put("/admin/announcements/:id", requireAdmin, async (req, res): Promise<v
 
 // ── Admin: Delete announcement ─────────────────────────────────────────────────
 router.delete("/admin/announcements/:id", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
 
   try {
     if (isNaN(id)) {
@@ -207,7 +207,7 @@ router.delete("/admin/announcements/:id", requireAdmin, async (req, res): Promis
 
 // ── Admin: Toggle active ───────────────────────────────────────────────────────
 router.patch("/admin/announcements/:id/toggle", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
 
   try {
     if (isNaN(id)) {
@@ -237,7 +237,7 @@ router.patch("/admin/announcements/:id/toggle", requireAdmin, async (req, res): 
 
 // ── Admin: Pin / Unpin announcement ───────────────────────────────────────────
 router.patch("/admin/announcements/:id/pin", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
 
   try {
     if (isNaN(id)) {
@@ -267,7 +267,7 @@ router.patch("/admin/announcements/:id/pin", requireAdmin, async (req, res): Pro
 
 // ── Admin: Force-show to all users (clear views) ───────────────────────────────
 router.post("/admin/announcements/:id/force-show", requireAdmin, async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
 
   try {
     if (isNaN(id)) {
@@ -368,7 +368,7 @@ router.get("/announcements/active", requireAuth, async (req, res): Promise<void>
 // ── User: Mark announcement as viewed ─────────────────────────────────────────
 router.post("/announcements/:id/view", requireAuth, async (req, res): Promise<void> => {
   try {
-    const announcementId = parseInt(req.params.id, 10);
+    const announcementId = parseInt(String(req.params.id), 10);
     if (isNaN(announcementId)) {
       res.status(400).json({ success: false, message: "Invalid ID" });
       return;

@@ -175,7 +175,7 @@ router.get("/community/channels", requireAuth, async (req: Request, res: Respons
 // ── GET /community/channels/:id/messages ───────────────────────────────────
 
 router.get("/community/channels/:id/messages", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const channelId = parseInt(req.params.id, 10);
+  const channelId = parseInt(String(req.params.id), 10);
   const userId = req.session.userId!;
   const before = req.query.before ? parseInt(req.query.before as string, 10) : undefined;
   const limit = Math.min(parseInt((req.query.limit as string) ?? "50", 10), 100);
@@ -259,7 +259,7 @@ router.get("/community/channels/:id/messages", requireAuth, async (req: Request,
 // ── POST /community/channels/:id/messages ──────────────────────────────────
 
 router.post("/community/channels/:id/messages", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const channelId = parseInt(req.params.id, 10);
+  const channelId = parseInt(String(req.params.id), 10);
   const userId = req.session.userId!;
 
   // Always check DB for isAdmin so newly-promoted admins work without re-login
@@ -400,7 +400,7 @@ router.post("/community/channels/:id/messages", requireAuth, async (req: Request
 // ── POST /community/messages/:id/react ─────────────────────────────────────
 
 router.post("/community/messages/:id/react", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const messageId = parseInt(req.params.id, 10);
+  const messageId = parseInt(String(req.params.id), 10);
   const userId = req.session.userId!;
   const { emoji } = req.body;
 
@@ -445,7 +445,7 @@ router.post("/community/messages/:id/react", requireAuth, async (req: Request, r
 // ── POST /community/messages/:id/report ────────────────────────────────────
 
 router.post("/community/messages/:id/report", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const messageId = parseInt(req.params.id, 10);
+  const messageId = parseInt(String(req.params.id), 10);
   const reporterId = req.session.userId!;
   const { reason = "Inappropriate content" } = req.body;
 
@@ -468,7 +468,7 @@ router.post("/community/messages/:id/report", requireAuth, async (req: Request, 
 // ── DELETE /community/messages/:id ─────────────────────────────────────────
 
 router.delete("/community/messages/:id", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const messageId = parseInt(req.params.id, 10);
+  const messageId = parseInt(String(req.params.id), 10);
   const userId = req.session.userId!;
 
   // Always check isAdmin from DB — session can be stale after promotion
@@ -529,7 +529,7 @@ router.delete("/community/messages/:id", requireAuth, async (req: Request, res: 
 // ── POST /community/messages/:id/pin ───────────────────────────────────────
 
 router.post("/community/messages/:id/pin", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const messageId = parseInt(req.params.id, 10);
+  const messageId = parseInt(String(req.params.id), 10);
   const userId = req.session.userId!;
   const isAdmin = req.session.isAdmin ?? false;
   const role = await getUserRole(userId, isAdmin);
@@ -668,7 +668,7 @@ router.post("/community/admin/ban/:userId", requireAuth, async (req: Request, re
   const role = await getUserRole(adminId, isAdmin);
   if (!canModerate(role)) { res.status(403).json({ error: "Not allowed" }); return; }
 
-  const targetUserId = parseInt(req.params.userId, 10);
+  const targetUserId = parseInt(String(req.params.userId), 10);
   const { reason = "" } = req.body;
 
   await db.update(communityBansTable)
@@ -684,7 +684,7 @@ router.post("/community/admin/ban/:userId", requireAuth, async (req: Request, re
 
 router.delete("/community/admin/ban/:userId", requireAuth, async (req: Request, res: Response): Promise<void> => {
   if (!req.session.isAdmin) { res.status(403).json({ error: "Admin only" }); return; }
-  const targetUserId = parseInt(req.params.userId, 10);
+  const targetUserId = parseInt(String(req.params.userId), 10);
   await db.update(communityBansTable).set({ isActive: false }).where(eq(communityBansTable.userId, targetUserId));
   res.json({ success: true });
 });
@@ -697,7 +697,7 @@ router.post("/community/admin/mute/:userId", requireAuth, async (req: Request, r
   const role = await getUserRole(adminId, isAdmin);
   if (!canModerate(role)) { res.status(403).json({ error: "Not allowed" }); return; }
 
-  const targetUserId = parseInt(req.params.userId, 10);
+  const targetUserId = parseInt(String(req.params.userId), 10);
   const { reason = "", durationMinutes = 60 } = req.body;
   const expiresAt = new Date(Date.now() + durationMinutes * 60_000);
 
@@ -711,7 +711,7 @@ router.post("/community/admin/mute/:userId", requireAuth, async (req: Request, r
 
 router.delete("/community/admin/mute/:userId", requireAuth, async (req: Request, res: Response): Promise<void> => {
   if (!req.session.isAdmin) { res.status(403).json({ error: "Admin only" }); return; }
-  await db.update(communityMutesTable).set({ isActive: false }).where(eq(communityMutesTable.userId, parseInt(req.params.userId, 10)));
+  await db.update(communityMutesTable).set({ isActive: false }).where(eq(communityMutesTable.userId, parseInt(String(req.params.userId), 10)));
   res.json({ success: true });
 });
 
@@ -719,7 +719,7 @@ router.delete("/community/admin/mute/:userId", requireAuth, async (req: Request,
 
 router.put("/community/admin/lock/:channelId", requireAuth, async (req: Request, res: Response): Promise<void> => {
   if (!req.session.isAdmin) { res.status(403).json({ error: "Admin only" }); return; }
-  const channelId = parseInt(req.params.channelId, 10);
+  const channelId = parseInt(String(req.params.channelId), 10);
   const [ch] = await db.select().from(communityChannelsTable).where(eq(communityChannelsTable.id, channelId)).limit(1);
   if (!ch) { res.status(404).json({ error: "Channel not found" }); return; }
   const newLocked = !ch.isLocked;

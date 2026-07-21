@@ -45,7 +45,7 @@ router.post("/support/upload-image", requireAuth, async (req, res): Promise<void
 
 // ─── Serve attachment ──────────────────────────────────────────────────────
 router.get("/support/images/:filename", requireAuth, async (req, res): Promise<void> => {
-  const { filename } = req.params;
+  const filename = String(req.params['filename']);
   if (!/^[a-f0-9]+\.(jpg|png|webp)$/i.test(filename)) {
     res.status(400).json({ error: "Invalid filename" }); return;
   }

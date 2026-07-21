@@ -351,7 +351,7 @@ export default function DownloadAppPage() {
                   year: "numeric", month: "long", day: "numeric",
                 })],
                 installedVersion && ["Installed Version", `v${installedVersion}`],
-              ].filter(Boolean).map(([label, value]) => (
+              ].filter((x): x is [string, string] => Boolean(x)).map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between px-4 py-3 border-b border-border last:border-0 gap-3">
                   <span className="text-sm text-muted-foreground">{label}</span>
                   <span className="text-sm font-semibold text-foreground">{value}</span>
