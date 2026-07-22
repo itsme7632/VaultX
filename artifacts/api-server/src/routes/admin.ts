@@ -446,6 +446,11 @@ router.post("/admin/kyc/:id/approve", requireAdmin, async (req, res): Promise<vo
     message: "Your identity verification has been approved. Your account is now fully verified.",
   });
 
+  const [kycUser] = await db.select({ email: usersTable.email, fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, sub.userId)).limit(1);
+  if (kycUser?.email) {
+    EmailService.sendKycApproved(kycUser.email, kycUser.fullName).catch(() => {});
+  }
+
   res.json({ success: true });
 });
 
@@ -468,6 +473,11 @@ router.post("/admin/kyc/:id/reject", requireAdmin, async (req, res): Promise<voi
     title: "KYC Rejected",
     message: `Your identity verification was rejected. Reason: ${reason || "Please resubmit with clearer images."}`,
   });
+
+  const [kycRejUser] = await db.select({ email: usersTable.email, fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, sub.userId)).limit(1);
+  if (kycRejUser?.email) {
+    EmailService.sendKycRejected(kycRejUser.email, kycRejUser.fullName, reason).catch(() => {});
+  }
 
   res.json({ success: true });
 });
@@ -535,6 +545,11 @@ router.post("/admin/withdrawals/:id/approve", requireAdmin, async (req, res): Pr
     message: `Your withdrawal of ${parseFloat(tx.amount).toFixed(2)} USDT has been processed.${txHash ? ` TX: ${txHash}` : ""}`,
   });
 
+  const [wdApprUser] = await db.select({ email: usersTable.email, fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, tx.userId)).limit(1);
+  if (wdApprUser?.email) {
+    EmailService.sendWithdrawalApproved(wdApprUser.email, wdApprUser.fullName, parseFloat(tx.amount), tx.address ?? "", txHash ?? undefined).catch(() => {});
+  }
+
   res.json({ success: true });
 });
 
@@ -570,6 +585,11 @@ router.post("/admin/withdrawals/:id/reject", requireAdmin, async (req, res): Pro
     title: "Withdrawal Rejected",
     message: `Your withdrawal of ${grossAmount.toFixed(2)} USDT was rejected. ${reason ? `Reason: ${reason}` : "Please contact support."} The full amount has been refunded to your wallet.`,
   });
+
+  const [wdRejUser] = await db.select({ email: usersTable.email, fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, tx.userId)).limit(1);
+  if (wdRejUser?.email) {
+    EmailService.sendWithdrawalRejected(wdRejUser.email, wdRejUser.fullName, grossAmount, reason).catch(() => {});
+  }
 
   res.json({ success: true });
 });
@@ -646,6 +666,19 @@ router.post("/admin/deposits/:id/approve", requireAdmin, async (req, res): Promi
   });
 
   const [depositor] = await db.select().from(usersTable).where(eq(usersTable.id, tx.userId)).limit(1);
+
+  // Send deposit approved email
+  if (depositor?.email) {
+    EmailService.sendDepositApproved(
+      depositor.email,
+      depositor.fullName,
+      parseFloat(tx.amount),
+      tx.network ?? "Crypto",
+      undefined,
+      new Date().toUTCString(),
+    ).catch(() => {});
+  }
+
   if (depositor?.referredBy) {
     const depositAmount = parseFloat(tx.amount);
     const depositorUsername = depositor.username ?? "user";

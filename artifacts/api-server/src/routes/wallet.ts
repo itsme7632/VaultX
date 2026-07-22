@@ -14,6 +14,7 @@ import {
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
+import { EmailService } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -137,6 +138,12 @@ router.post("/wallet/deposit", requireAuth, async (req, res): Promise<void> => {
     title: "Deposit Submitted",
     message: `Your deposit of ${amount} USDT via ${network} has been submitted and is pending review.`,
   });
+
+  // Fire-and-forget email
+  const [depUser] = await db.select({ email: usersTable.email, fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, req.session.userId!)).limit(1);
+  if (depUser?.email) {
+    EmailService.sendDepositSubmitted(depUser.email, depUser.fullName, parseFloat(amount), "USDT", network, tx.txId ?? "").catch(() => {});
+  }
 
   res.status(201).json({
     id: tx.id,
@@ -267,6 +274,11 @@ router.post("/wallet/withdraw", requireAuth, async (req, res): Promise<void> => 
     title: "Withdrawal Submitted",
     message: `Your withdrawal of ${netAmount.toFixed(2)} USDT via ${network} has been submitted and is pending review.`,
   });
+
+  // Fire-and-forget email (user record already fetched above)
+  if (user?.email) {
+    EmailService.sendWithdrawalRequested(user.email, user.fullName, netAmount, address, network).catch(() => {});
+  }
 
   res.status(201).json({
     id: tx.id,

@@ -398,6 +398,14 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   req.session.userId = user.id;
   req.session.isAdmin = user.isAdmin;
 
+  // Fire-and-forget: security alert for new login
+  const ua = req.headers["user-agent"] ?? "";
+  EmailService.sendNewLogin(user.email, user.fullName, {
+    ip: req.ip ?? undefined,
+    browser: ua ? ua.slice(0, 120) : undefined,
+    time: new Date().toUTCString(),
+  }).catch(() => {});
+
   res.json({ user: serializeUser(user) });
 });
 
@@ -523,6 +531,12 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
     .update(passwordResetTokensTable)
     .set({ usedAt: new Date() })
     .where(eq(passwordResetTokensTable.id, resetToken.id));
+
+  // Fire-and-forget: notify user their password was changed
+  const [changedUser] = await db.select({ email: usersTable.email, fullName: usersTable.fullName }).from(usersTable).where(eq(usersTable.id, resetToken.userId)).limit(1);
+  if (changedUser?.email) {
+    EmailService.sendPasswordChanged(changedUser.email, changedUser.fullName, new Date().toUTCString()).catch(() => {});
+  }
 
   res.json({ success: true, message: "Password reset successfully" });
 });
