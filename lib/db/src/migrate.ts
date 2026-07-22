@@ -485,6 +485,12 @@ const COLUMN_MIGRATIONS_SQL = [
     "announcement_id" integer NOT NULL REFERENCES "announcements"("id"),
     "viewed_at" timestamp with time zone NOT NULL DEFAULT now()
   )`,
+
+  // Email verification fields — DEFAULT true so ALL EXISTING users are pre-verified;
+  // new registrations insert emailVerified=false explicitly.
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified" boolean DEFAULT true NOT NULL`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_code" text`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_expires" timestamp with time zone`,
 ];
 
 const sslConfig =

@@ -1,10 +1,41 @@
+import { useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, MessageCircle, Phone, HeadphonesIcon } from "lucide-react";
+import { ArrowLeft, Mail, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+async function postJson(url: string, body: object) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw { status: res.status, ...data };
+  return data;
+}
 
 export default function ForgotPasswordPage() {
-  const telegram = "https://t.me/WexoraGlobal";
-  const whatsapp = "https://wa.me/WexoraGlobal";
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) { setError("Email is required"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      await postJson("/api/auth/forgot-password", { email: email.trim() });
+      setSent(true);
+    } catch (err: any) {
+      setError(err?.message ?? "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-5">
@@ -12,36 +43,66 @@ export default function ForgotPasswordPage() {
         <div className="text-center mb-8">
           <img src="/wx-logo.png" alt="Wexora" className="w-14 h-14 rounded-2xl mx-auto mb-4 shadow-lg object-cover" />
           <h1 className="text-2xl font-bold text-foreground">Forgot password?</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Contact our support team to reset your password</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {sent ? "Check your inbox" : "Enter your email and we'll send a reset link"}
+          </p>
         </div>
 
-        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 space-y-4">
-          <div className="flex items-start gap-3 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
-            <HeadphonesIcon className="w-5 h-5 text-primary mt-0.5 shrink-0" />
-            <p className="text-sm text-foreground leading-relaxed">
-              For security reasons, password resets are handled by our support team. Please reach out via the channels below and we'll help you regain access to your account.
-            </p>
-          </div>
+        <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+          {sent ? (
+            <div className="text-center space-y-4">
+              <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-7 h-7 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground mb-1">Reset link sent</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  If an account exists for <span className="font-medium text-foreground">{email}</span>,
+                  you'll receive a password reset link shortly. The link expires in 30 minutes.
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Didn't get it? Check your spam folder or{" "}
+                <button
+                  onClick={() => setSent(false)}
+                  className="text-primary hover:underline font-medium"
+                >
+                  try again
+                </button>
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Email address</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); if (error) setError(""); }}
+                    placeholder="you@example.com"
+                    className="pl-9 h-11 bg-muted/40 border-border"
+                    autoFocus
+                    required
+                  />
+                </div>
+                {error && <p className="text-xs text-destructive mt-1.5">{error}</p>}
+              </div>
 
-          <div className="space-y-3 pt-1">
-            <a href={telegram.startsWith("http") ? telegram : `https://t.me/${telegram.replace("@", "")}`} target="_blank" rel="noopener noreferrer" className="block">
-              <Button variant="outline" className="w-full h-12 gap-3 border-[1.5px] hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
-                <MessageCircle size={18} className="text-sky-500 shrink-0" />
-                <span className="font-semibold">Message us on Telegram</span>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full h-11 bg-primary hover:bg-primary/90 font-semibold text-sm"
+              >
+                {loading ? "Sending…" : (
+                  <span className="flex items-center gap-2">
+                    Send reset link <ArrowRight size={16} />
+                  </span>
+                )}
               </Button>
-            </a>
-
-            <a href={whatsapp.startsWith("http") ? whatsapp : `https://wa.me/${whatsapp.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer" className="block">
-              <Button variant="outline" className="w-full h-12 gap-3 border-[1.5px] hover:border-primary hover:text-primary hover:bg-primary/5 transition-colors">
-                <Phone size={18} className="text-emerald-500 shrink-0" />
-                <span className="font-semibold">Contact us on WhatsApp</span>
-              </Button>
-            </a>
-          </div>
-
-          <p className="text-[11px] text-muted-foreground text-center pt-1">
-            Please have your registered email address ready when contacting support.
-          </p>
+            </form>
+          )}
         </div>
 
         <Link href="/login" className="flex items-center justify-center gap-1 text-sm text-muted-foreground mt-5 hover:text-foreground">

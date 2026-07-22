@@ -57,6 +57,7 @@ export const UserProfileKycStatus = {
 } as const;
 
 export interface UserProfile {
+  emailVerified?: boolean;
   id: number;
   fullName: string;
   username: string;
@@ -76,6 +77,20 @@ export interface UserProfile {
 export interface AuthResponse {
   user: UserProfile;
   token?: string;
+}
+
+export interface SignupVerifyResponse {
+  requiresVerification: boolean;
+  email: string;
+}
+
+export interface VerifyEmailBody {
+  email: string;
+  code: string;
+}
+
+export interface ResendVerificationBody {
+  email: string;
 }
 
 export interface UpdateProfileBody {

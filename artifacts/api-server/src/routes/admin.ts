@@ -19,6 +19,8 @@ import {
 import { requireAdmin } from "../middlewares/auth";
 import { generateTxId } from "../lib/generate-tx-id";
 import { processAllInvestments } from "../lib/roi-engine";
+import { EmailService } from "../lib/email";
+import crypto from "crypto";
 
 const router: IRouter = Router();
 
@@ -43,6 +45,7 @@ function serializeUser(
     isAdmin: user.isAdmin,
     isActive: user.isActive,
     twoFaEnabled: user.twoFaEnabled,
+    emailVerified: user.emailVerified,
     hasWithdrawalPassword: !!user.withdrawalPasswordHash,
     withdrawalAddressCount: withdrawalAddressCount ?? 0,
     withdrawalLocked: user.withdrawalLocked,
@@ -240,6 +243,63 @@ router.post("/admin/users/:id/adjust-balance", requireAdmin, async (req, res): P
   });
 
   res.json({ success: true, newBalance, message: "Balance adjusted" });
+});
+
+// ── Admin: manually verify a user's email ────────────────────────────────────
+router.post("/admin/users/:id/verify-email", requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  await db.update(usersTable).set({
+    emailVerified: true,
+    emailVerificationCode: null,
+    emailVerificationExpires: null,
+  }).where(eq(usersTable.id, id));
+
+  await db.insert(adminActionLogsTable).values({
+    adminId: req.session.userId!,
+    targetUserId: id,
+    action: "email_verified",
+    details: `Email manually verified for @${user.username} (${user.email})`,
+  });
+
+  res.json({ success: true });
+});
+
+// ── Admin: resend verification email to a user ────────────────────────────────
+router.post("/admin/users/:id/resend-verification", requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
+  if (user.emailVerified) {
+    res.status(400).json({ error: "Already verified", message: "This user's email is already verified" });
+    return;
+  }
+
+  const code = String(crypto.randomInt(100000, 999999));
+  const codeHash = await bcrypt.hash(code, 10);
+  const codeExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+  await db.update(usersTable).set({
+    emailVerificationCode: codeHash,
+    emailVerificationExpires: codeExpires,
+  }).where(eq(usersTable.id, id));
+
+  await EmailService.sendVerificationEmail(user.email, user.fullName, code);
+
+  res.json({ success: true });
 });
 
 router.post("/admin/users/:id/reset-2fa", requireAdmin, async (req, res): Promise<void> => {

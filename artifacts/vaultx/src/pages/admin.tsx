@@ -1439,6 +1439,7 @@ export default function AdminPage() {
                     <Badge variant="outline" className={cn("text-[9px] capitalize", userModal.kycStatus === "approved" ? "bg-emerald-50 text-emerald-600" : userModal.kycStatus === "rejected" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600")}>{userModal.kycStatus}</Badge>
                   </div>
                 )}
+                <div className="flex justify-between items-center"><span className="text-muted-foreground">Email Verified</span><Badge variant="outline" className={cn("text-[9px]", userModal.emailVerified ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-500 border-red-200")}>{userModal.emailVerified ? "Verified" : "Unverified"}</Badge></div>
                 <div className="flex justify-between items-center"><span className="text-muted-foreground">2FA</span><Badge variant="outline" className={cn("text-[9px]", userModal.twoFaEnabled ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-500 border-red-200")}>{userModal.twoFaEnabled ? "Enabled" : "Disabled"}</Badge></div>
                 <div className="flex justify-between items-center"><span className="text-muted-foreground">Withdrawal Password</span><Badge variant="outline" className={cn("text-[9px]", userModal.hasWithdrawalPassword ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-500 border-red-200")}>{userModal.hasWithdrawalPassword ? "Set" : "Not Set"}</Badge></div>
                 <div className="flex justify-between items-center"><span className="text-muted-foreground">Withdrawal Addresses</span><Badge variant="outline" className={cn("text-[9px]", userModal.withdrawalAddressCount > 0 ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-500 border-red-200")}>{userModal.withdrawalAddressCount > 0 ? `${userModal.withdrawalAddressCount} saved` : "None"}</Badge></div>
@@ -1469,6 +1470,21 @@ export default function AdminPage() {
                         Remove Verification
                       </Button>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Email verification controls */}
+              {!userModal.emailVerified && (
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">Email Verification</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => adminApi(`/admin/users/${userModal.id}/verify-email`, "POST").then(() => { toast({ title: "Email verified" }); queryClient.invalidateQueries({ queryKey: ["admin-users"] }); setUserModal(null); }).catch(() => toast({ title: "Error", variant: "destructive" }))}>
+                      Manually Verify
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 text-xs border-blue-300 text-blue-600" onClick={() => adminApi(`/admin/users/${userModal.id}/resend-verification`, "POST").then(() => { toast({ title: "Verification email sent" }); }).catch(() => toast({ title: "Error", variant: "destructive" }))}>
+                      Resend Email
+                    </Button>
                   </div>
                 </div>
               )}

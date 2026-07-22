@@ -1,0 +1,307 @@
+Implement a complete production-grade email verification and transactional email system for Wexora Global using Resend.
+
+Requirements:
+
+## 1. Use Resend
+- Integrate the official Resend SDK.
+- Use an environment variable:
+  RESEND_API_KEY=
+- All emails must be sent from:
+  Wexora Global <noreply@mail.wexoraglobal.com>
+
+Future addresses:
+support@mail.wexoraglobal.com
+security@mail.wexoraglobal.com
+billing@mail.wexoraglobal.com
+
+## 2. Registration Flow
+
+Current registration must change to:
+
+User enters:
+- Name
+- Email
+- Password
+
+↓
+
+Create a 6-digit verification code.
+
+↓
+
+Store:
+- verification code
+- expiration time (10 minutes)
+- email verified = false
+
+↓
+
+Send beautiful verification email using Resend.
+
+↓
+
+Redirect user to Verify Email page.
+
+↓
+
+User enters code.
+
+↓
+
+If correct:
+- mark email_verified=true
+- delete verification code
+- allow login
+
+If incorrect:
+- show error.
+
+If expired:
+- show expired message.
+
+## 3. Resend Verification Code
+
+Add:
+- Resend Code button
+- 60 second cooldown
+- Generate a new code.
+- Invalidate previous code.
+
+## 4. Login Protection
+
+Prevent login if:
+
+email_verified=false
+
+Return:
+
+"Please verify your email before signing in."
+
+Include:
+Resend Verification Email button.
+
+## 5. Forgot Password
+
+Replace current flow.
+
+User enters email.
+
+↓
+
+Generate secure reset token.
+
+↓
+
+Expiry 30 minutes.
+
+↓
+
+Email reset link.
+
+↓
+
+Allow password change.
+
+↓
+
+Invalidate token after use.
+
+## 6. Email Templates
+
+Create premium responsive HTML templates.
+
+Template 1
+Email Verification
+
+Subject:
+Verify your Wexora Global account
+
+Include:
+- Wexora logo
+- Greeting
+- Verification code
+- Large verification code box
+- 10 minute expiry
+- Security note
+- Footer
+
+Template 2
+Password Reset
+
+Subject:
+Reset your password
+
+Include:
+- Reset button
+- Reset URL
+- Expiry
+- Security notice
+
+Template 3
+Welcome Email
+
+Subject:
+Welcome to Wexora Global
+
+Include:
+- Welcome message
+- Dashboard button
+- Referral information
+- Support links
+
+Template 4
+Investment Created
+
+Notify investment creation.
+
+Template 5
+Investment Matured
+
+Notify maturity.
+
+Template 6
+Deposit Approved
+
+Template 7
+Withdrawal Approved
+
+Template 8
+Withdrawal Rejected
+
+Template 9
+KYC Approved
+
+Template 10
+KYC Rejected
+
+Template 11
+Security Alert
+
+For:
+- password changed
+- login from new device
+- email changed
+
+Template 12
+Referral Commission
+
+Notify referral earnings.
+
+## 7. Email Design
+
+Modern dark Wexora theme.
+
+Use:
+- Wexora colors
+- responsive
+- mobile friendly
+- rounded cards
+- gradients
+- professional typography
+
+Every email should include:
+
+Logo
+
+Company name
+
+Support email
+
+Current year
+
+Copyright
+
+Do not reply notice
+
+## 8. Email Service Layer
+
+Create reusable EmailService.
+
+Methods:
+
+sendVerificationEmail()
+
+sendPasswordReset()
+
+sendWelcome()
+
+sendInvestmentCreated()
+
+sendInvestmentMatured()
+
+sendDepositApproved()
+
+sendWithdrawalApproved()
+
+sendWithdrawalRejected()
+
+sendSecurityAlert()
+
+sendReferralCommission()
+
+Easy to extend later.
+
+## 9. Database
+
+Create fields for:
+
+emailVerified
+
+verificationCode
+
+verificationExpires
+
+passwordResetToken
+
+passwordResetExpires
+
+Use secure hashing where appropriate.
+
+## 10. Security
+
+Verification codes:
+- 6 digits
+- cryptographically secure
+- expire after 10 minutes
+
+Reset tokens:
+- cryptographically secure
+- expire after 30 minutes
+- single-use
+
+Rate limit:
+- resend email
+- forgot password
+
+## 11. Admin
+
+Admin can:
+
+- see verification status
+- manually verify email
+- resend verification email
+- disable email verification (future setting)
+
+## 12. Environment Variables
+
+Use:
+
+RESEND_API_KEY
+
+EMAIL_FROM=noreply@mail.wexoraglobal.com
+
+Never hardcode secrets.
+
+## 13. Deployment
+
+Everything must work in production on our DigitalOcean server.
+
+No mock implementations.
+
+No placeholders.
+
+Use production-ready code.
+
+Use TypeScript best practices.
+
+Keep the implementation modular and clean.

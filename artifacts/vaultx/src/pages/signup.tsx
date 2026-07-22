@@ -339,9 +339,13 @@ export default function SignupPage() {
     signup.mutate(
       { data: { ...data, whatsapp: whatsappFull, referralSource: sourceFromUrl } },
       {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
-          setLocation("/");
+        onSuccess: (data: any) => {
+          if (data?.requiresVerification && data?.email) {
+            setLocation(`/verify-email?email=${encodeURIComponent(data.email)}`);
+          } else {
+            queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+            setLocation("/");
+          }
         },
         onError: (err: any) => {
           toast({ title: "Signup failed", description: err?.message || "Something went wrong", variant: "destructive" });
