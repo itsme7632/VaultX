@@ -1,0 +1,322 @@
+The Resend integration is now working correctly. Build a premium production email system for Wexora Global.
+
+IMPORTANT:
+- Do NOT break the existing verification flow.
+- Do NOT change database logic.
+- Do NOT modify authentication unless required for email sending.
+- Keep the existing OTP verification working.
+
+=========================
+BRANDING
+=========================
+
+Replace the placeholder "W" icon in ALL email templates.
+
+Use the official Wexora Global logo everywhere.
+
+Requirements:
+- Use the official WX logo from the project assets.
+- Display it centered at the top of every email.
+- Never use the purple W placeholder again.
+- Add proper spacing around the logo.
+- Dark premium theme matching the website.
+
+Brand colors:
+- Dark background
+- Blue gradients
+- White headings
+- Professional modern cards
+- Mobile responsive
+- Gmail compatible
+- Apple Mail compatible
+- Outlook compatible
+
+=========================
+FROM ADDRESS
+=========================
+
+Sender Name:
+Wexora Global
+
+Sender Email:
+noreply@mail.wexoraglobal.com
+
+The email should appear to users as:
+
+Wexora Global <noreply@mail.wexoraglobal.com>
+
+Fix the Resend implementation correctly so this display name works instead of falling back to only the email address.
+
+=========================
+EMAIL FOOTER
+=========================
+
+Every email must include:
+
+━━━━━━━━━━━━━━━━━━━━
+
+Wexora Global
+
+Global Opportunities.
+Smarter Growth.
+
+https://wexoraglobal.com
+
+Support:
+support@wexoraglobal.com
+
+This is an automated email.
+Please do not reply.
+
+If you did not perform this action,
+you may safely ignore this email.
+
+© Wexora Global
+All rights reserved.
+
+━━━━━━━━━━━━━━━━━━━━
+
+=========================
+EMAILS TO BUILD
+=========================
+
+Create premium HTML templates for:
+
+1. Email Verification (OTP)
+
+- Existing flow
+- Better design
+- Large verification code
+- Countdown
+- Security note
+
+2. Welcome Email
+
+Sent immediately after successful verification.
+
+Include:
+
+Welcome to Wexora Global
+
+Explain features:
+
+• Secure investing
+• Dashboard
+• Deposits
+• Withdrawals
+• Referral program
+• Community
+• Opportunities
+
+Button:
+
+Go to Dashboard
+
+=========================
+
+3. Forgot Password
+
+Professional reset email.
+
+Large button:
+
+Reset Password
+
+State:
+
+Valid for 30 minutes.
+
+=========================
+
+4. Password Changed
+
+Notify immediately after password change.
+
+Include:
+
+Time
+Browser
+IP (if available)
+
+If this wasn't you,
+contact support immediately.
+
+=========================
+
+5. Deposit Submitted
+
+Sent after user creates a deposit.
+
+Include:
+
+Amount
+Currency
+Network
+Transaction ID
+
+Status:
+Pending Review
+
+=========================
+
+6. Deposit Approved
+
+Inform user that deposit was approved.
+
+Show:
+
+Amount
+Plan
+Date
+
+Button:
+
+View Dashboard
+
+=========================
+
+7. Withdrawal Requested
+
+Sent after withdrawal request.
+
+Show:
+
+Amount
+Wallet
+Network
+
+Status:
+Pending Review
+
+=========================
+
+8. Withdrawal Approved
+
+Notify user payment was sent.
+
+Include:
+
+Amount
+Wallet
+Transaction ID
+
+=========================
+
+9. Withdrawal Rejected
+
+Explain rejection professionally.
+
+Include admin reason.
+
+=========================
+
+10. ROI Credited
+
+Notify whenever ROI is credited.
+
+Show:
+
+Investment
+Today's ROI
+Current Balance
+
+=========================
+
+11. Investment Completed
+
+Notify when investment matures.
+
+Show:
+
+Principal
+Total ROI
+Total Returned
+
+=========================
+
+12. Referral Reward
+
+Notify whenever referral commission is earned.
+
+Show:
+
+Referral Name
+Amount
+Level
+
+=========================
+
+13. Admin Announcement
+
+System-wide email template.
+
+Beautiful announcement card.
+
+=========================
+
+14. Security Alert
+
+New login detected.
+
+Include:
+
+Device
+Browser
+Country
+IP
+Time
+
+=========================
+EMAIL SERVICE
+=========================
+
+Create one centralized email service.
+
+Avoid duplicated HTML.
+
+Shared layout:
+
+logo
+header
+content
+button
+footer
+
+Each email should only define its own content.
+
+=========================
+QUALITY
+=========================
+
+Every email must:
+
+✓ Responsive
+✓ Gmail compatible
+✓ Outlook compatible
+✓ Apple Mail compatible
+✓ Dark mode friendly
+✓ Inline CSS
+✓ Accessible
+✓ Professional typography
+
+=========================
+TESTING
+=========================
+
+Verify every email sends correctly through Resend.
+
+Do not leave placeholder text.
+
+Do not use fake branding.
+
+Use real Wexora branding throughout.
+
+After implementation:
+
+1. Build the project.
+2. Fix any TypeScript errors.
+3. Restart locally.
+4. Commit everything.
+5. Push to GitHub.
+
+Finally provide a summary listing every new email template and where each one is triggered.
