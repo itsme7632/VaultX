@@ -1,19 +1,14 @@
 import { defineConfig } from "drizzle-kit";
-import { fileURLToPath } from "url";
-import path from "path";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
-}
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// DATABASE_URL is required for push/migrate but not for generate.
+// drizzle-kit generate compares schema files to the snapshot only.
+const dbUrl = process.env.DATABASE_URL ?? "postgresql://localhost/placeholder";
 
 export default defineConfig({
-  schema: path.join(__dirname, "./src/schema/index.ts"),
-  out: path.join(__dirname, "./drizzle"),
+  schema: "./src/schema/index.ts",
+  out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: dbUrl,
   },
 });

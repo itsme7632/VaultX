@@ -12,7 +12,7 @@ export const communityChannelsTable = pgTable("community_channels", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").notNull().default("chat"),
-  description: text("description").default(""),
+  description: text("description").notNull().default(""),
   isLocked: boolean("is_locked").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
