@@ -946,7 +946,10 @@ router.get("/admin/analytics", requireAdmin, async (req, res): Promise<void> => 
 
 function serializeAdminPlan(p: typeof investmentPlansTable.$inferSelect, stats?: { totalParticipants: number; capitalRaised: number; averageAllocation: number }) {
   const fundingGoal = (p as any).fundingGoal ? parseFloat((p as any).fundingGoal) : null;
-  const capitalRaised = stats?.capitalRaised ?? parseFloat((p as any).currentFunding ?? "0");
+  // currentFunding is always the raw DB column value (what the admin manually set).
+  // capitalRaised is the real aggregated investment total from active user investments.
+  const currentFunding = parseFloat((p as any).currentFunding ?? "0");
+  const capitalRaised = stats?.capitalRaised ?? currentFunding;
   const remainingCapacity = fundingGoal !== null ? Math.max(0, fundingGoal - capitalRaised) : null;
   const fundingPercent = fundingGoal && fundingGoal > 0 ? Math.min(100, Math.round((capitalRaised / fundingGoal) * 100)) : null;
   return {
@@ -967,7 +970,8 @@ function serializeAdminPlan(p: typeof investmentPlansTable.$inferSelect, stats?:
     category: (p as any).category ?? "General",
     bannerImageUrl: (p as any).bannerImageUrl ?? null,
     fundingGoal,
-    currentFunding: capitalRaised,
+    currentFunding,
+    capitalRaised,
     remainingCapacity,
     fundingPercent,
     totalParticipants: stats?.totalParticipants ?? 0,

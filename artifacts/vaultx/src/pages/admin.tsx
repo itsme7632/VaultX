@@ -189,7 +189,17 @@ export default function AdminPage() {
 
   const savePlan = useMutation({
     mutationFn: (data: any) => planModal?.id ? adminApi(`/admin/plans/${planModal.id}`, "PUT", data) : adminApi("/admin/plans", "POST", data),
-    onSuccess: () => { toast({ title: "Plan saved" }); setPlanModal(null); queryClient.invalidateQueries({ queryKey: ["admin-plans"] }); },
+    onSuccess: (updatedPlan: any) => {
+      toast({ title: "Plan saved" });
+      setPlanModal(null);
+      // Immediately patch the cache with the fresh plan so the editor shows the
+      // saved values if the admin reopens before the background refetch finishes.
+      queryClient.setQueryData(["admin-plans"], (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((p: any) => p.id === updatedPlan?.id ? updatedPlan : p);
+      });
+      queryClient.invalidateQueries({ queryKey: ["admin-plans"] });
+    },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
@@ -1001,7 +1011,7 @@ export default function AdminPage() {
                     switch (planSortBy) {
                       case "minAmount": return parseFloat(a.minAmount ?? 0) - parseFloat(b.minAmount ?? 0);
                       case "name": return (a.name ?? "").localeCompare(b.name ?? "");
-                      case "capitalRaised": return (b.currentFunding ?? 0) - (a.currentFunding ?? 0);
+                      case "capitalRaised": return (b.capitalRaised ?? 0) - (a.capitalRaised ?? 0);
                       case "participants": return (b.totalParticipants ?? 0) - (a.totalParticipants ?? 0);
                       case "endDate": return (a.endDate ? new Date(a.endDate).getTime() : Infinity) - (b.endDate ? new Date(b.endDate).getTime() : Infinity);
                       case "createdAt": return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime();
@@ -1033,7 +1043,7 @@ export default function AdminPage() {
                           <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
                             {(plan.totalParticipants ?? 0) > 0 && <span>👥 {Number(plan.totalParticipants).toLocaleString()} participants</span>}
                             {plan.totalParticipantLimit && <span>/ {Number(plan.totalParticipantLimit).toLocaleString()} max</span>}
-                            {(plan.currentFunding ?? 0) > 0 && <span>💰 {plan.currentFunding >= 1000 ? `$${(plan.currentFunding/1000).toFixed(0)}K` : `$${Number(plan.currentFunding).toFixed(0)}`} raised</span>}
+                            {(plan.capitalRaised ?? 0) > 0 && <span>💰 {plan.capitalRaised >= 1000 ? `$${(plan.capitalRaised/1000).toFixed(0)}K` : `$${Number(plan.capitalRaised).toFixed(0)}`} raised</span>}
                             {plan.fundingPercent !== null && plan.fundingPercent !== undefined && <span>📊 {plan.fundingPercent}% funded</span>}
                             {plan.remainingCapacity !== null && plan.remainingCapacity !== undefined && <span>🎯 {plan.remainingCapacity >= 1000 ? `$${(plan.remainingCapacity/1000).toFixed(0)}K` : `$${Number(plan.remainingCapacity).toFixed(0)}`} remaining</span>}
                             {plan.endDate && <span>⏰ Ends {new Date(plan.endDate).toLocaleDateString()}</span>}

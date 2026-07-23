@@ -211,8 +211,8 @@ function AnimatedBar({ pct, gradient, className }: { pct: number; gradient: stri
   return (
     <div className={cn("rounded-full overflow-hidden bg-muted", className ?? "h-2.5")}>
       <div
-        className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-1000 ease-out", gradient)}
-        style={{ width: `${width}%`, willChange: "width" }}
+        className={cn("h-full rounded-full bg-gradient-to-r", gradient)}
+        style={{ width: `${width}%`, transition: "width 1s ease-out" }}
       />
     </div>
   );
@@ -256,7 +256,7 @@ function OpportunityInsightsSummary() {
         </span>
       </div>
       <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-blue-400 to-emerald-400 rounded-full transition-all duration-1000" style={{ width: `${overallPct}%` }} />
+        <div className="h-full bg-gradient-to-r from-blue-400 to-emerald-400 rounded-full" style={{ width: `${overallPct}%`, transition: "width 1s ease-out" }} />
       </div>
     </div>
   );
