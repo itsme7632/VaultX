@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag, Lock, Copy, AlertTriangle, Megaphone, Eye, EyeOff, Pin, Calendar, ToggleLeft, ToggleRight, Users2 } from "lucide-react";
+import { Users, DollarSign, FileCheck, ArrowUpRight, ArrowDownLeft, Bell, Search, Check, X, ChevronRight, TrendingUp, Newspaper, Plus, Edit2, Network, Trash2, Settings, FileText, KeyRound, Zap, RefreshCcw, CheckCircle2, AlertCircle, Smartphone, Download, Info, Link2, ExternalLink, Server, RotateCcw, BarChart3, MessageSquare, Send, Activity, RefreshCw, Tag, Lock, Copy, AlertTriangle, Megaphone, Eye, EyeOff, Pin, Calendar, ToggleLeft, ToggleRight, Users2, Database } from "lucide-react";
+import DatabaseBackupTab from "@/components/DatabaseBackupTab";
 
 function opportunityStatusBadge(status: string) {
   switch (status) {
@@ -43,7 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatUSDT, formatUSDTCompact, formatDate, formatDateTime } from "@/lib/format";
 
-type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq" | "referral-salary" | "announcements";
+type Tab = "analytics" | "users" | "kyc" | "withdrawals" | "deposits" | "plans" | "networks" | "news" | "broadcast" | "settings" | "logs" | "app-settings" | "about" | "statistics" | "tickets" | "content" | "allocation" | "performance" | "faq" | "referral-salary" | "announcements" | "backup";
 
 async function adminApi(path: string, method = "GET", body?: any) {
   const res = await fetch(`/api${path}`, {
@@ -342,6 +343,7 @@ export default function AdminPage() {
     { id: "faq" as Tab, label: "FAQ", icon: MessageSquare },
     { id: "referral-salary" as Tab, label: "Referral Salary", icon: DollarSign },
     { id: "announcements" as Tab, label: "Announcements", icon: Megaphone },
+    { id: "backup" as Tab, label: "Database Backup", icon: Database },
   ];
 
   const STAT_CARDS = analytics ? [
@@ -1308,6 +1310,11 @@ export default function AdminPage() {
           )}
 
           {/* PERFORMANCE ADMIN */}
+          {/* DATABASE BACKUP */}
+          {tab === "backup" && (
+            <DatabaseBackupTab toast={toast} />
+          )}
+
           {/* REFERRAL SALARY */}
           {tab === "referral-salary" && (
             <ReferralSalaryTab

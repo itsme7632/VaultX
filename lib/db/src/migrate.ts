@@ -491,6 +491,29 @@ const COLUMN_MIGRATIONS_SQL = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified" boolean DEFAULT true NOT NULL`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_code" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verification_expires" timestamp with time zone`,
+
+  // Backup/restore logs
+  `CREATE TABLE IF NOT EXISTS "backup_logs" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "admin_id" integer NOT NULL,
+    "type" text NOT NULL,
+    "status" text DEFAULT 'pending' NOT NULL,
+    "backup_version" text,
+    "schema_version" text,
+    "table_count" integer,
+    "record_count" integer,
+    "file_size_bytes" bigint,
+    "checksum" text,
+    "file_name" text,
+    "error_message" text,
+    "restore_mode" text,
+    "pre_restore_backup_id" integer,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `DO $$ BEGIN
+    ALTER TABLE "backup_logs" ADD CONSTRAINT "backup_logs_admin_id_users_id_fk"
+      FOREIGN KEY ("admin_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
 ];
 
 const sslConfig =

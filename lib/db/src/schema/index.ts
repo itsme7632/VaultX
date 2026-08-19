@@ -19,3 +19,4 @@ export * from "./withdrawal_addresses";
 export * from "./referral_salary";
 export * from "./community";
 export * from "./announcements";
+export * from "./backup-logs";

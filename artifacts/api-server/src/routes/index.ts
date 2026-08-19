@@ -23,6 +23,7 @@ import platformMetricsRouter from "./platform-metrics";
 import securityRouter from "./security";
 import communityRouter from "./community";
 import announcementsRouter from "./announcements";
+import backupRouter from "./backup";
 
 const router: IRouter = Router();
 
@@ -50,5 +51,6 @@ router.use(platformMetricsRouter);
 router.use(securityRouter);
 router.use(communityRouter);
 router.use(announcementsRouter);
+router.use(backupRouter);
 
 export default router;
