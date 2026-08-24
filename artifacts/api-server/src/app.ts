@@ -82,6 +82,24 @@ const MAINTENANCE_EXEMPT = new Set([
   "/api/auth/reset-password",
 ]);
 
+// ── Format ISO timestamp for human-readable display ─────────────────────────
+function formatMaintenanceEta(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso; // fallback to raw string
+    const month = d.toLocaleString("en-US", { month: "long" });
+    const day = d.getDate();
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = d.getMinutes().toString().padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12; // convert 0→12
+    return `${month} ${day}, ${year} at ${hours}:${minutes} ${ampm}`;
+  } catch {
+    return iso;
+  }
+}
+
 // ── Maintenance HTML page (served for browser requests) ──────────────────────
 const MAINTENANCE_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -205,7 +223,7 @@ async function maintenanceMiddleware(req: Request, res: Response, next: NextFunc
       } catch { /* ignore — use defaults */ }
 
       const etaHtml = maintenanceEta
-        ? `<div class="eta">Estimated return: ${maintenanceEta}</div>`
+        ? `<div class="eta">Estimated return: ${formatMaintenanceEta(maintenanceEta)}</div>`
         : "";
       const html = MAINTENANCE_HTML.replace("{{ETA}}", etaHtml)
         .replace(/{{MESSAGE}}/g, maintenanceMsg || "");
