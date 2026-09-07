@@ -4,17 +4,20 @@ import { useGetMe, getGetMeQueryKey, type UserProfile } from "@workspace/api-cli
 interface AuthContextType {
   user: UserProfile | null;
   isLoading: boolean;
+  /** True while the session is being fetched or re-fetched (status not yet known). */
+  isFetching: boolean;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
+  isFetching: true,
   isAuthenticated: false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { data: user, isLoading } = useGetMe({
+  const { data: user, isLoading, isFetching } = useGetMe({
     query: { queryKey: getGetMeQueryKey(), retry: false, staleTime: 30000 },
   });
 
@@ -23,6 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user: user ?? null,
         isLoading,
+        isFetching,
         isAuthenticated: !!user,
       }}
     >

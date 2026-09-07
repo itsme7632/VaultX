@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Link } from "wouter";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -262,6 +262,26 @@ function useCountdown(isoEta: string) {
   return { remaining, expired };
 }
 
+// ─── Neutral loading screen ─────────────────────────────────────────────────
+// Shown while auth status is unknown (initial load or post-login refetch) so
+// neither the maintenance page nor app content flashes prematurely.
+function MaintenanceLoading() {
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center"
+      style={{ background: "#060d1a" }}
+    >
+      <img
+        src="/wx-icon.png"
+        alt="Wexora Global"
+        className="w-14 h-14 rounded-2xl mb-6 shadow-lg animate-pulse"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+      <div className="w-8 h-8 rounded-full border-2 border-white/15 border-t-blue-400 animate-spin" />
+    </div>
+  );
+}
+
 // ─── Maintenance page ─────────────────────────────────────────────────────────
 function MaintenancePage({ settings }: { settings: Record<string, string> | undefined }) {
   const platformName    = settings?.platform_name       ?? "Wexora Global";
@@ -412,6 +432,14 @@ function MaintenancePage({ settings }: { settings: Record<string, string> | unde
       <p className="mt-8 text-xs text-slate-600">
         © {new Date().getFullYear()} {platformName}. All rights reserved.
       </p>
+      {/* Discreet staff entry point — lets an admin reach the login form while
+          the rest of the platform is locked behind maintenance. */}
+      <Link
+        href="/login"
+        className="mt-2 text-[11px] text-slate-700 hover:text-slate-500 underline underline-offset-2 transition-colors"
+      >
+        Staff sign-in
+      </Link>
     </div>
   );
 }
@@ -429,7 +457,7 @@ const MAINTENANCE_GATE_AUTH_PATHS = new Set([
 ]);
 
 function MaintenanceGate({ children }: { children: React.ReactNode }) {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading, isFetching: authFetching } = useAuth();
   const [location] = useLocation();
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
@@ -452,10 +480,15 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
   // Auth pages stay reachable so an admin can sign in during maintenance
   if (MAINTENANCE_GATE_AUTH_PATHS.has(location)) return <>{children}</>;
 
-  // In maintenance:
-  // – While auth is still loading, show maintenance page (safe conservative default)
-  // – Once auth resolves, admins bypass, everyone else sees maintenance
-  if (authLoading || !isAdmin) {
+  // In maintenance, auth status unknown (initial load, or the post-login
+  // /auth/me refetch still in flight) → show a neutral loading screen instead
+  // of the maintenance page so a freshly signed-in admin is never blocked.
+  if (authLoading || (authFetching && !user)) {
+    return <MaintenanceLoading />;
+  }
+
+  // Auth resolved and the user is not an admin → maintenance page
+  if (!isAdmin) {
     return <MaintenancePage settings={settings} />;
   }
 

@@ -155,7 +155,9 @@ const MAINTENANCE_HTML = `<!DOCTYPE html>
       <strong>Your account, investments, and balances remain safe.</strong><br/>
       No action is required on your part. We expect to be back online shortly.
     </div>
-    <div class="footer">&copy; ${new Date().getFullYear()} Wexora Global. All rights reserved.</div>
+    <div class="footer">&copy; ${new Date().getFullYear()} Wexora Global. All rights reserved.<br/>
+      <a href="/login" style="color:#475569;font-size:0.7rem;text-decoration:underline;text-underline-offset:2px">Staff sign-in</a>
+    </div>
   </div>
 </body>
 </html>`;
