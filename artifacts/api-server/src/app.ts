@@ -160,6 +160,18 @@ const MAINTENANCE_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
+// Auth pages that must stay reachable during maintenance so an admin can sign
+// in. The frontend MaintenanceGate still shows non-admins the maintenance UI
+// inside the app, and all protected APIs keep returning 503 JSON — this only
+// unlocks the login/signup/password-reset screens.
+const MAINTENANCE_AUTH_PAGES = new Set([
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+]);
+
 // ── Maintenance middleware ─────────────────────────────────────────────────────
 // - Exempt paths, admin routes, and session-verified admins always pass through.
 // - Browser requests get an HTML maintenance page.
@@ -167,9 +179,10 @@ const MAINTENANCE_HTML = `<!DOCTYPE html>
 async function maintenanceMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
   const isAdminRoute = req.path.startsWith("/api/admin");
   const isExempt    = MAINTENANCE_EXEMPT.has(req.path);
+  const isAuthPage  = MAINTENANCE_AUTH_PAGES.has(req.path);
 
-  // Admin routes and always-exempt paths bypass maintenance entirely
-  if (isAdminRoute || isExempt) {
+  // Admin routes, always-exempt paths, and auth pages bypass maintenance entirely
+  if (isAdminRoute || isExempt || isAuthPage) {
     next();
     return;
   }

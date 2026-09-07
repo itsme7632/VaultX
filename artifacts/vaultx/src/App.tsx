@@ -419,8 +419,18 @@ function MaintenancePage({ settings }: { settings: Record<string, string> | unde
 // ─── Maintenance gate — wraps the entire router ────────────────────────────────
 // Renders MaintenancePage INSTEAD of the router for non-admin users when
 // maintenance mode is enabled. Routes never mount, so no page can be accessed.
+// Auth pages stay reachable so an admin can sign in during maintenance.
+const MAINTENANCE_GATE_AUTH_PATHS = new Set([
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+]);
+
 function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
+  const [location] = useLocation();
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["public-settings"],
@@ -438,6 +448,9 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
 
   // Not in maintenance → always render normally
   if (!inMaintenance) return <>{children}</>;
+
+  // Auth pages stay reachable so an admin can sign in during maintenance
+  if (MAINTENANCE_GATE_AUTH_PATHS.has(location)) return <>{children}</>;
 
   // In maintenance:
   // – While auth is still loading, show maintenance page (safe conservative default)
